@@ -1,0 +1,44 @@
+import type { Metadata } from "next";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import "./globals.css";
+import { LayoutWithSidebar } from "@/components/LayoutWithSidebar";
+import { AIAssistant } from "@/components/AIAssistant";
+
+const dmSans = DM_Sans({
+  variable: "--font-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const faviconSvg = "data:image/svg+xml," + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%231C1917" rx="4"/></svg>'
+);
+
+export const metadata: Metadata = {
+  title: "Ops Hub",
+  description: "Ops Hub - 运营工作台",
+  icons: { icon: { url: faviconSvg, type: "image/svg+xml" } },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="zh">
+      <body
+        className={`${dmSans.variable} ${jetbrainsMono.variable} min-h-screen font-sans antialiased`}
+      >
+        <LayoutWithSidebar>{children}</LayoutWithSidebar>
+        <AIAssistant />
+      </body>
+    </html>
+  );
+}

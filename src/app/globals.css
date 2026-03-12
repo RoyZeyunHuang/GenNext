@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 主背景白、次级背景 */
+    --background: 0 0% 100%;
+    --background-secondary: 60 9% 96%;
+    --foreground: 24 10% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 24 10% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 10% 11%;
+    /* 高亮/选中：深色 #1C1917 */
+    --primary: 24 10% 11%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 60 5% 96%;
+    --secondary-foreground: 24 10% 11%;
+    --muted: 60 5% 96%;
+    --muted-foreground: 25 8% 46%;
+    --accent: 60 9% 96%;
+    --accent-foreground: 24 10% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 6% 91%;
+    --input: 30 6% 91%;
+    --ring: 24 10% 11%;
+    /* 左侧导航背景 */
+    --sidebar: 40 13% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply antialiased;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
