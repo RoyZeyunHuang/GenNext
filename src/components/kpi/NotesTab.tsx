@@ -297,9 +297,10 @@ export function NotesTab({
                         backgroundColor: "#FAFAF9",
                         border: "1px solid #E7E5E4",
                       }}
-                      formatter={(value: number, name: string) => {
-                        if (name === "平均互动率") return [(value * 100).toFixed(2) + "%", name];
-                        return [value.toLocaleString(), name];
+                      formatter={(value, name) => {
+                        const v = Number(value ?? 0);
+                        if (String(name) === "平均互动率") return [(v * 100).toFixed(2) + "%", String(name)];
+                        return [v.toLocaleString(), String(name)];
                       }}
                       labelFormatter={(label) => `日期: ${label}`}
                     />

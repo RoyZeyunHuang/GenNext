@@ -153,10 +153,12 @@ export function PaidTab({ filters }: { filters: KpiFilters }) {
                     backgroundColor: "#FAFAF9",
                     border: "1px solid #E7E5E4",
                   }}
-                  formatter={(value: number, name: string) => {
+                  formatter={(value, name) => {
+                    const v = Number(value ?? 0);
+                    const n = String(name);
                     const labels: Record<string, string> = { spend: "消费", play_5s: "5s播放量" };
-                    const display = name === "spend" ? `¥${value}` : value.toLocaleString();
-                    return [display, labels[name] ?? name];
+                    const display = n === "spend" ? `¥${v}` : v.toLocaleString();
+                    return [display, labels[n] ?? n];
                   }}
                 />
                 <Legend />

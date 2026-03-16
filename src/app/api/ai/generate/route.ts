@@ -87,8 +87,8 @@ export async function POST(req: NextRequest) {
             ...(enableWebSearch
               ? {
                   tools: [
-                    { type: "web_search_20250305" as const, name: "web_search" },
-                  ],
+                    { type: "web_search_20250305", name: "web_search" },
+                  ] as unknown as Anthropic.Tool[],
                 }
               : {}),
           });

@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
       const { data: autoDocs } = await supabase.from("docs").select("id").in("category_id", autoCatIds);
       autoDocIds = (autoDocs ?? []).map((d) => d.id);
     }
-    const uniqueBrandIds = [...new Set([...(brand_doc_ids ?? []), ...autoDocIds])];
+    const uniqueBrandIds = Array.from(new Set([...(brand_doc_ids ?? []), ...autoDocIds]));
 
     let brandContent = "";
     if (uniqueBrandIds.length > 0) {
@@ -116,7 +116,7 @@ ${personaContent}
 - 语气像小红书博主发帖，不像写文章或报告
 - 整体节奏：短句为主，偶尔长句，读起来像在刷手机不是在看文档
 - 每隔2-3段自然加1个 emoji，不要堆砌
-- 不要有任何看起来像 Word 文档或公众号文章的排版痕迹`;*** End Patch ***!
+- 不要有任何看起来像 Word 文档或公众号文章的排版痕迹`;
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -126,8 +126,8 @@ ${personaContent}
       ...(enableWebSearch
         ? {
             tools: [
-              { type: "web_search_20250305" as const, name: "web_search" },
-            ],
+              { type: "web_search_20250305", name: "web_search" },
+            ] as unknown as Anthropic.Tool[],
           }
         : {}),
     });
