@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, Plus } from "lucide-react";
+import { CheckSquare, Plus, X } from "lucide-react";
 import type { Todo as TodoType } from "@/types/dashboard";
 import { addTodo, toggleTodo } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,14 @@ export function TodosCard({ todos: initialTodos }: { todos: TodoType[] }) {
       prev.map((t) => (t.id === id ? { ...t, done: !current } : t))
     );
     await toggleTodo(id, !current);
+  }
+
+  async function handleDelete(id: string) {
+    const res = await fetch(`/api/todos/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setTodos((prev) => prev.filter((t) => t.id !== id));
+      router.refresh();
+    }
   }
 
   return (
@@ -46,7 +54,10 @@ export function TodosCard({ todos: initialTodos }: { todos: TodoType[] }) {
       ) : (
         <ul className="space-y-1">
           {todos.map((t) => (
-            <li key={t.id} className="flex items-center gap-2">
+            <li
+              key={t.id}
+              className="group flex items-center gap-2 rounded-md py-0.5 pr-0"
+            >
               <button
                 type="button"
                 onClick={() => handleToggle(t.id, t.done)}
@@ -58,12 +69,20 @@ export function TodosCard({ todos: initialTodos }: { todos: TodoType[] }) {
               </button>
               <span
                 className={cn(
-                  "text-sm text-[#1C1917]",
+                  "min-w-0 flex-1 text-sm text-[#1C1917]",
                   t.done && "text-[#78716C] line-through"
                 )}
               >
                 {t.content}
               </span>
+              <button
+                type="button"
+                onClick={() => handleDelete(t.id)}
+                className="shrink-0 rounded p-1 text-[#A8A29E] opacity-0 transition-opacity hover:bg-[#F5F5F4] hover:text-red-600 group-hover:opacity-100"
+                aria-label="删除"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </li>
           ))}
         </ul>

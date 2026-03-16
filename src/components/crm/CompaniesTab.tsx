@@ -77,6 +77,29 @@ export function CompaniesTab() {
     fetchDetail(companyId);
   };
 
+  const handleDeleteCompany = async (id: string) => {
+    if (!window.confirm("确定要删除该公司吗？其联系人与楼盘关联将一并删除，且不可恢复。")) return;
+    const res = await fetch(`/api/crm/companies/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setSelected(null);
+      setDetail(null);
+      fetchList();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "删除失败");
+    }
+  };
+
+  const handleDeleteContact = async (companyId: string, contactId: string) => {
+    if (!window.confirm("确定要删除该联系人吗？此操作不可恢复。")) return;
+    const res = await fetch(`/api/crm/contacts/${contactId}`, { method: "DELETE" });
+    if (res.ok) fetchDetail(companyId);
+    else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "删除失败");
+    }
+  };
+
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
       <div>
@@ -154,6 +177,8 @@ export function CompaniesTab() {
             company={detail}
             onUpdate={(form) => handleUpdate(detail.id, form)}
             onAddContact={(c) => handleAddContact(detail.id, c)}
+            onDeleteCompany={() => handleDeleteCompany(detail.id)}
+            onDeleteContact={(contactId) => handleDeleteContact(detail.id, contactId)}
           />
         ) : (
           <p className="py-20 text-center text-sm text-[#78716C]">选择左侧公司查看详情，或点击「新增公司」</p>
@@ -167,10 +192,14 @@ function CompanyDetail({
   company,
   onUpdate,
   onAddContact,
+  onDeleteCompany,
+  onDeleteContact,
 }: {
   company: Company;
   onUpdate: (form: Record<string, string | null>) => void;
   onAddContact: (c: Record<string, string | boolean>) => void;
+  onDeleteCompany: () => void;
+  onDeleteContact: (contactId: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: company.name, type: company.type ?? "", phone: company.phone ?? "", email: company.email ?? "", website: company.website ?? "" });
@@ -186,13 +215,23 @@ function CompanyDetail({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <h3 className="text-lg font-semibold text-[#1C1917]">{company.name}</h3>
-        {!editing && (
-          <button type="button" onClick={() => setEditing(true)} className="rounded-lg border border-[#E7E5E4] px-3 py-1 text-xs text-[#78716C] hover:bg-[#F5F5F4]">
-            编辑
+        <div className="flex items-center gap-2">
+          {!editing && (
+            <button type="button" onClick={() => setEditing(true)} className="rounded-lg border border-[#E7E5E4] px-3 py-1 text-xs text-[#78716C] hover:bg-[#F5F5F4]">
+              编辑
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onDeleteCompany}
+            className="rounded-lg border border-[#FEE2E2] px-3 py-1 text-xs text-[#DC2626] hover:bg-[#FEF2F2]"
+            title="删除公司"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
-        )}
+        </div>
       </div>
       {editing ? (
         <div className="mb-4 grid gap-2">
@@ -251,6 +290,14 @@ function CompanyDetail({
                 </div>
                 <div className="text-xs text-[#78716C]">{[c.title, c.phone, c.email].filter(Boolean).join(" · ")}</div>
               </div>
+              <button
+                type="button"
+                onClick={() => onDeleteContact(c.id)}
+                className="shrink-0 rounded p-1 text-[#78716C] hover:bg-[#FEE2E2] hover:text-[#DC2626]"
+                title="删除联系人"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
           ))
         )}

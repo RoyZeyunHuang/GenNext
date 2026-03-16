@@ -3,7 +3,7 @@ import { DateGreeting } from "@/components/dashboard/DateGreeting";
 import { CalendarCard } from "@/components/dashboard/CalendarCard";
 import { NewsCard } from "@/components/dashboard/NewsCard";
 import { TodosCard } from "@/components/dashboard/TodosCard";
-import { KpiCard } from "@/components/dashboard/KpiCard";
+import { MonthlyOverviewCard } from "@/components/dashboard/MonthlyOverviewCard";
 
 function getThisWeekRange(): { start: string; end: string } {
   const d = new Date();
@@ -49,7 +49,7 @@ export default async function DashboardPage() {
         <CalendarCard />
         <NewsCard />
         <TodosCard todos={todos ?? []} />
-        <KpiCard entries={kpiEntries ?? []} />
+        <MonthlyOverviewCard />
       </div>
     </div>
   );
