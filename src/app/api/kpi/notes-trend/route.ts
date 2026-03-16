@@ -20,7 +20,7 @@ export async function GET() {
     return NextResponse.json({ error: dateError.message }, { status: 500 });
   }
 
-  const dates = [...new Set((dateRows ?? []).map((r) => String(r.snapshot_date).slice(0, 10)))];
+  const dates = Array.from(new Set((dateRows ?? []).map((r) => String(r.snapshot_date).slice(0, 10))));
   const result: { snapshot_date: string; total_exposure: number; total_interactions: number; avg_interaction_rate: number }[] = [];
 
   for (const d of dates) {

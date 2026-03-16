@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       .not("theme", "is", null)
       .order("updated_at", { ascending: false })
       .limit(20);
-    const usedThemes = [...new Set((recentPlans ?? []).map((p) => (p.theme ?? "").trim()).filter(Boolean))];
+    const usedThemes = Array.from(new Set((recentPlans ?? []).map((p) => (p.theme ?? "").trim()).filter(Boolean)));
 
     const systemPrompt = `你是纽约租房内容策略师。根据品牌资料和近期已用主题，推荐 3 个新的排期主题（避免与近期重复）。
 

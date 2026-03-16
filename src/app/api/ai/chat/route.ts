@@ -158,7 +158,7 @@ async function executeTool(name: string, input: ToolInput): Promise<unknown> {
         .select("id, title, content, category_id, tags, metadata")
         .or(`title.ilike.%${q}%,content.ilike.%${q}%`)
         .limit(10);
-      const categoryIds = [...new Set((docs ?? []).map((d) => d.category_id))];
+      const categoryIds = Array.from(new Set((docs ?? []).map((d) => d.category_id)));
       const { data: categories } = await supabase
         .from("doc_categories")
         .select("id, name")
@@ -240,7 +240,7 @@ async function executeTool(name: string, input: ToolInput): Promise<unknown> {
         .from("docs")
         .select("id, title, content, category_id")
         .in("id", docIds);
-      const categoryIds = [...new Set((docs ?? []).map((d) => d.category_id))];
+      const categoryIds = Array.from(new Set((docs ?? []).map((d) => d.category_id)));
       const { data: categories } = await supabase
         .from("doc_categories")
         .select("id, name, is_auto_include")

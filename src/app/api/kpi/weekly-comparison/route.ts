@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: dateError.message }, { status: 500 });
   }
 
-  const uniqueDates = [...new Set((dateRows ?? []).map((r) => String(r.snapshot_date).slice(0, 10)))];
+  const uniqueDates = Array.from(new Set((dateRows ?? []).map((r) => String(r.snapshot_date).slice(0, 10))));
   const this_week_date = uniqueDates[0] ?? null;
   const last_week_date = uniqueDates[1] ?? null;
 

@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
   }
 
   const rows = (data ?? []) as NoteRow[];
-  const dates = [...new Set(rows.map((r) => String(r.snapshot_date).slice(0, 10)))];
+  const dates = Array.from(new Set(rows.map((r) => String(r.snapshot_date).slice(0, 10))));
   if (dates.length === 0) {
     return NextResponse.json({
       start_date: null,

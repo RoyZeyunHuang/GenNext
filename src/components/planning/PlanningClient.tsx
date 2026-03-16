@@ -290,8 +290,6 @@ function NewPlanModal({
   setQuickRange,
   onClose,
   onSubmit,
-  onStrategy,
-  onSchedule,
 }: {
   title: string;
   setTitle: (s: string) => void;

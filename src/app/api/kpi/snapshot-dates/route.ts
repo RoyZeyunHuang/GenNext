@@ -24,7 +24,7 @@ export async function GET() {
     console.log("[snapshot-dates] 查询错误:", error.message, "code:", error.code);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const dates = [...new Set((data ?? []).map((r) => toDateString(r.snapshot_date)).filter(Boolean))] as string[];
+  const dates = Array.from(new Set((data ?? []).map((r) => toDateString(r.snapshot_date)).filter(Boolean))) as string[];
   console.log("[snapshot-dates] 查询结果条数:", data?.length ?? 0, "去重后日期数:", dates.length);
   if ((data?.length ?? 0) === 0) {
     console.warn("[snapshot-dates] 当前连接返回 0 条，请确认 .env.local 的 NEXT_PUBLIC_SUPABASE_URL 与 Supabase 控制台「项目 URL」一致，且表 xhs_notes 存在并允许 anon 读取（RLS 策略）");
