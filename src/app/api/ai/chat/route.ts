@@ -86,22 +86,15 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: "generate_copy",
-    description: "根据档案库和模板生成文案内容",
+    description: "根据档案库文档生成文案内容。先通过 search_knowledge 和 get_templates 获取文档 id，再传入 doc_ids",
     input_schema: {
       type: "object" as const,
       properties: {
-        brand_doc_ids: {
+        doc_ids: {
           type: "array",
           items: { type: "string" },
-          description: "品牌档案ID列表",
+          description: "文档ID列表（来自 search_knowledge 或 get_templates）",
         },
-        knowledge_doc_ids: {
-          type: "array",
-          items: { type: "string" },
-          description: "知识库文档ID列表",
-        },
-        task_template_id: { type: "string", description: "任务模板ID" },
-        persona_template_id: { type: "string", description: "人格模板ID" },
         user_request: { type: "string", description: "用户的具体需求描述" },
       },
       required: ["user_request"],
@@ -158,37 +151,51 @@ async function executeTool(name: string, input: ToolInput): Promise<unknown> {
     }
 
     case "search_knowledge": {
-      const [brand, knowledge] = await Promise.all([
-        supabase
-          .from("brand_docs")
-          .select("id, title, content, property_name, tags")
-          .or(
-            `title.ilike.%${input.query}%,content.ilike.%${input.query}%,property_name.ilike.%${input.query}%`
-          )
-          .limit(5),
-        supabase
-          .from("knowledge_docs")
-          .select("id, title, content, type, tags")
-          .or(`title.ilike.%${input.query}%,content.ilike.%${input.query}%`)
-          .limit(5),
-      ]);
-      return {
-        brand_docs: brand.data || [],
-        knowledge_docs: knowledge.data || [],
-      };
+      const q = String((input.query as string) || "").trim();
+      if (!q) return { docs: [] };
+      const { data: docs } = await supabase
+        .from("docs")
+        .select("id, title, content, category_id, tags, metadata")
+        .or(`title.ilike.%${q}%,content.ilike.%${q}%`)
+        .limit(10);
+      const categoryIds = [...new Set((docs ?? []).map((d) => d.category_id))];
+      const { data: categories } = await supabase
+        .from("doc_categories")
+        .select("id, name")
+        .in("id", categoryIds);
+      const catMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
+      const docsWithCategory = (docs ?? []).map((d) => ({
+        id: d.id,
+        title: d.title,
+        content: d.content,
+        category_name: catMap.get(d.category_id) ?? "",
+        tags: d.tags,
+      }));
+      return { docs: docsWithCategory };
     }
 
     case "get_templates": {
+      const { data: categories } = await supabase
+        .from("doc_categories")
+        .select("id, name")
+        .in("name", ["任务模板", "人格模板"]);
+      const categoryIds = (categories ?? []).map((c) => c.id);
+      if (categoryIds.length === 0) return { task_docs: [], persona_docs: [] };
+      const { data: docs } = await supabase
+        .from("docs")
+        .select("id, title, content, category_id, metadata")
+        .in("category_id", categoryIds);
+      const catMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
+      const taskDocs = (docs ?? []).filter((d) => catMap.get(d.category_id) === "任务模板");
+      const personaDocs = (docs ?? []).filter((d) => catMap.get(d.category_id) === "人格模板");
       const platform = input.platform || "all";
-      let taskQuery = supabase.from("task_templates").select("*");
-      if (platform !== "all") taskQuery = taskQuery.eq("platform", platform);
-      const [tasks, personas] = await Promise.all([
-        taskQuery,
-        supabase.from("persona_templates").select("*"),
-      ]);
+      const filteredTask =
+        platform === "all"
+          ? taskDocs
+          : taskDocs.filter((d) => (d.metadata as { platform?: string })?.platform === platform);
       return {
-        task_templates: tasks.data || [],
-        persona_templates: personas.data || [],
+        task_templates: filteredTask,
+        persona_templates: personaDocs,
       };
     }
 
@@ -214,86 +221,62 @@ async function executeTool(name: string, input: ToolInput): Promise<unknown> {
     }
 
     case "generate_copy": {
-      const brandIds = Array.isArray(input.brand_doc_ids) ? input.brand_doc_ids : [];
-      const knowledgeIds = Array.isArray(input.knowledge_doc_ids) ? input.knowledge_doc_ids : [];
-      const taskId = typeof input.task_template_id === "string" ? input.task_template_id : null;
-      const personaId = typeof input.persona_template_id === "string" ? input.persona_template_id : null;
+      const docIds = Array.isArray(input.doc_ids) ? input.doc_ids : [];
       const userRequest = String(input.user_request ?? "");
-
-      const [brandDocs, knowledgeDocs, taskTemplate, personaTemplate] =
-        await Promise.all([
-          brandIds.length
-            ? supabase
-                .from("brand_docs")
-                .select("title, content")
-                .in("id", brandIds)
-            : supabase
-                .from("brand_docs")
-                .select("title, content")
-                .eq("is_global", true),
-          knowledgeIds.length
-            ? supabase
-                .from("knowledge_docs")
-                .select("title, content")
-                .in("id", knowledgeIds)
-            : Promise.resolve({ data: [] as { title: string; content: string }[] }),
-          taskId
-            ? supabase
-                .from("task_templates")
-                .select("title, content")
-                .eq("id", taskId)
-                .single()
-            : supabase
-                .from("task_templates")
-                .select("title, content")
-                .eq("is_default", true)
-                .limit(1)
-                .single(),
-          personaId
-            ? supabase
-                .from("persona_templates")
-                .select("title, content")
-                .eq("id", personaId)
-                .single()
-            : supabase
-                .from("persona_templates")
-                .select("title, content")
-                .eq("is_default", true)
-                .limit(1)
-                .single(),
-        ]);
-
+      if (docIds.length === 0) {
+        const parts: string[] = ["用户需求："];
+        parts.push(userRequest || "无");
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          messages: [{ role: "user", content: parts.join("\n") }],
+        });
+        const textBlock = response.content.find(
+          (b): b is Anthropic.TextBlock => b.type === "text"
+        );
+        return textBlock?.text ?? "";
+      }
+      const { data: docs } = await supabase
+        .from("docs")
+        .select("id, title, content, category_id")
+        .in("id", docIds);
+      const categoryIds = [...new Set((docs ?? []).map((d) => d.category_id))];
+      const { data: categories } = await supabase
+        .from("doc_categories")
+        .select("id, name, is_auto_include")
+        .in("id", categoryIds);
+      const catMap = new Map((categories ?? []).map((c) => [c.id, { name: c.name, is_auto_include: c.is_auto_include }]));
+      const autoInclude = (categories ?? []).filter((c) => c.is_auto_include).map((c) => c.id);
       const parts: string[] = [];
-      if (brandDocs.data?.length) {
+      const autoDocs = (docs ?? []).filter((d) => autoInclude.includes(d.category_id));
+      const otherDocs = (docs ?? []).filter((d) => !autoInclude.includes(d.category_id));
+      if (autoDocs.length) {
         parts.push(
-          brandDocs.data
-            .map(
-              (d: { title: string; content: string | null }) =>
-                `【品牌档案：${d.title}】\n${d.content ?? ""}`
-            )
-            .join("\n\n")
+          "品牌规范与必读：\n" +
+            autoDocs
+              .map(
+                (d) =>
+                  `【${(catMap.get(d.category_id) as { name: string })?.name ?? ""} · ${d.title}】\n${d.content ?? ""}`
+              )
+              .join("\n\n")
         );
       }
-      if (knowledgeDocs.data?.length) {
+      if (otherDocs.length) {
         parts.push(
-          `参考资料：\n${(knowledgeDocs.data as { title: string; content: string | null }[])
-            .map((d) => `【${d.title}】\n${d.content ?? ""}`)
-            .join("\n\n")}`
+          "参考资料：\n" +
+            otherDocs
+              .map(
+                (d) =>
+                  `【${(catMap.get(d.category_id) as { name: string })?.name ?? ""} · ${d.title}】\n${d.content ?? ""}`
+              )
+              .join("\n\n")
         );
       }
-      if (taskTemplate.data) {
-        parts.push(`任务要求：\n${(taskTemplate.data as { content: string | null }).content ?? ""}`);
-      }
-      if (personaTemplate.data) {
-        parts.push(`人格设定：\n${(personaTemplate.data as { content: string | null }).content ?? ""}`);
-      }
-      parts.push(`用户需求：${userRequest}`);
-
-      const prompt = parts.join("\n\n");
+      parts.push(`用户需求：${userRequest || "无"}`);
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1000,
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content: parts.join("\n\n") }],
       });
       const textBlock = response.content.find(
         (b): b is Anthropic.TextBlock => b.type === "text"

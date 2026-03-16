@@ -16,20 +16,24 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { user_input, brand_doc_ids, knowledge_doc_ids, task_template_id, persona_template_id, detected_intent, output, platform, starred } = body;
+  const { user_input, doc_ids, brand_doc_ids, knowledge_doc_ids, task_template_id, persona_template_id, detected_intent, output, platform, starred } = body;
+  const insertPayload: Record<string, unknown> = {
+    user_input: user_input ?? null,
+    brand_doc_ids: brand_doc_ids || [],
+    knowledge_doc_ids: knowledge_doc_ids || [],
+    task_template_id: task_template_id || null,
+    persona_template_id: persona_template_id || null,
+    detected_intent: detected_intent ?? null,
+    output: output ?? null,
+    platform: platform ?? null,
+    starred: starred ?? false,
+  };
+  if (Array.isArray(doc_ids) && doc_ids.length > 0) {
+    insertPayload.doc_ids = doc_ids;
+  }
   const { data, error } = await supabase
     .from("generated_copies_v2")
-    .insert({
-      user_input,
-      brand_doc_ids: brand_doc_ids || [],
-      knowledge_doc_ids: knowledge_doc_ids || [],
-      task_template_id: task_template_id || null,
-      persona_template_id: persona_template_id || null,
-      detected_intent: detected_intent || null,
-      output,
-      platform: platform || null,
-      starred: starred ?? false,
-    })
+    .insert(insertPayload)
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

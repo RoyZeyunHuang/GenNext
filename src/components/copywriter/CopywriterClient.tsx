@@ -2,43 +2,18 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
-import {
-  Copy,
-  Star,
-  Loader2,
-  Sparkles,
-  RefreshCw,
-  FileText,
-  BookOpen,
-  ClipboardList,
-  Drama,
-  ChevronDown,
-  X,
-  Clock,
-} from "lucide-react";
+import { Copy, Star, Loader2, Sparkles, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/* ─── Types ─── */
-interface BrandDoc { id: string; title: string; property_name?: string | null }
-interface KnowledgeDoc { id: string; title: string; type?: string | null }
-interface TaskTemplate { id: string; title: string; platform?: string | null }
-interface PersonaTemplate { id: string; title: string; description?: string | null }
-interface DetectedIntent {
-  detected_property: string;
-  detected_platform: string;
-  suggested_brand_docs: string[];
-  suggested_knowledge: string[];
-  suggested_task_template: string | null;
-  suggested_persona: string | null;
-}
-interface HistoryItem {
-  id: string;
-  user_input: string | null;
-  platform: string | null;
-  output: string | null;
-  starred: boolean;
-  created_at: string;
-}
+const SINGLE_SELECT_CATEGORIES = ["人格模板", "任务模板"];
+const MULTI_SELECT_CATEGORIES = ["品牌档案", "知识库"];
+
+type Category = { id: string; name: string; icon: string; is_auto_include?: boolean };
+type Doc = { id: string; title: string; category_id: string; tags?: string[] };
+type SelectedItem = { doc_id: string; doc_title: string; category_name: string; reason?: string };
+type Intent = { suggested_docs: SelectedItem[] };
+type HistoryItem = { id: string; user_input: string | null; platform: string | null; output: string | null; starred: boolean; created_at: string };
+type OpenPicker = { categoryName: string; replaceIndex?: number } | null;
 
 const PLATFORM_ICONS: Record<string, string> = {
   xiaohongshu: "📕",
@@ -49,58 +24,95 @@ const PLATFORM_ICONS: Record<string, string> = {
   other: "📝",
 };
 
+function DocPickerDropdown({
+  categoryName,
+  docs,
+  currentId,
+  searchPlaceholder,
+  onSelect,
+  onClose,
+}: {
+  categoryName: string;
+  docs: Doc[];
+  currentId: string | undefined;
+  searchPlaceholder: string;
+  onSelect: (doc: Doc) => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const filtered = docs.filter(
+    (d) => !search.trim() || d.title.toLowerCase().includes(search.trim().toLowerCase())
+  );
+  return (
+    <div className="absolute left-0 right-0 top-full z-[60] mt-1 max-h-56 overflow-hidden rounded-lg border border-[#E7E5E4] bg-white shadow-lg">
+      <div className="border-b border-[#E7E5E4] p-2">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={searchPlaceholder}
+          className="w-full rounded border border-[#E7E5E4] px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+        />
+      </div>
+      <div className="max-h-44 overflow-y-auto p-1">
+        {filtered.length === 0 ? (
+          <p className="py-2 text-center text-xs text-[#A8A29E]">无匹配文档</p>
+        ) : (
+          filtered.map((doc) => (
+            <button
+              key={doc.id}
+              type="button"
+              onClick={() => onSelect(doc)}
+              className={cn(
+                "w-full rounded px-2.5 py-2 text-left text-sm transition-colors",
+                doc.id === currentId
+                  ? "bg-[#1C1917]/10 font-medium text-[#1C1917]"
+                  : "text-[#1C1917] hover:bg-[#FAFAF9]"
+              )}
+            >
+              {doc.title}
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CopywriterClient() {
-  /* ─── All available options ─── */
-  const [allBrandDocs, setAllBrandDocs] = useState<BrandDoc[]>([]);
-  const [allKnowledgeDocs, setAllKnowledgeDocs] = useState<KnowledgeDoc[]>([]);
-  const [allTaskTemplates, setAllTaskTemplates] = useState<TaskTemplate[]>([]);
-  const [allPersonas, setAllPersonas] = useState<PersonaTemplate[]>([]);
-
-  /* ─── User input ─── */
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [allDocs, setAllDocs] = useState<Doc[]>([]);
   const [userInput, setUserInput] = useState("");
-
-  /* ─── Intent detection ─── */
   const [detecting, setDetecting] = useState(false);
-  const [intent, setIntent] = useState<DetectedIntent | null>(null);
-
-  /* ─── Selected context ─── */
-  const [selectedBrandDocIds, setSelectedBrandDocIds] = useState<string[]>([]);
-  const [selectedKnowledgeDocIds, setSelectedKnowledgeDocIds] = useState<string[]>([]);
-  const [selectedTaskTemplateId, setSelectedTaskTemplateId] = useState<string | null>(null);
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
-
-  /* ─── Generation ─── */
+  const [intent, setIntent] = useState<Intent | null>(null);
+  const [selectedDocs, setSelectedDocs] = useState<SelectedItem[]>([]);
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [output, setOutput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [starred, setStarred] = useState(false);
-  const outputRef = useRef<HTMLDivElement>(null);
-
-  /* ─── Picker modals ─── */
-  const [pickerType, setPickerType] = useState<"brand" | "knowledge" | "task" | "persona" | null>(null);
-
-  /* ─── History ─── */
+  const [showManualPicker, setShowManualPicker] = useState(false);
+  const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const outputRef = useRef<HTMLDivElement>(null);
+  const pickerAnchorRef = useRef<HTMLDivElement>(null);
 
-  /* ─── Load catalogs ─── */
   useEffect(() => {
     Promise.all([
-      fetch("/api/brand-docs").then((r) => r.json()),
-      fetch("/api/knowledge-docs").then((r) => r.json()),
-      fetch("/api/task-templates").then((r) => r.json()),
-      fetch("/api/persona-templates").then((r) => r.json()),
+      fetch("/api/docs/categories").then((r) => r.json()),
+      fetch("/api/docs").then((r) => r.json()),
       fetch("/api/generated-copies").then((r) => r.json()),
-    ]).then(([bd, kd, tt, pt, hist]) => {
-      setAllBrandDocs(Array.isArray(bd) ? bd : []);
-      setAllKnowledgeDocs(Array.isArray(kd) ? kd : []);
-      setAllTaskTemplates(Array.isArray(tt) ? tt : []);
-      setAllPersonas(Array.isArray(pt) ? pt : []);
+    ]).then(([cats, docs, hist]) => {
+      setCategories(Array.isArray(cats) ? cats : []);
+      setAllDocs(Array.isArray(docs) ? docs : []);
       setHistory(Array.isArray(hist) ? hist.slice(0, 10) : []);
     });
   }, []);
 
-  /* ─── Detect intent ─── */
+  const categoryNameById = useCallback((id: string) => categories.find((c) => c.id === id)?.name ?? "", [categories]);
+  const categoryIconById = useCallback((id: string) => categories.find((c) => c.id === id)?.icon ?? "📁", [categories]);
+
   const detectIntent = useCallback(async () => {
     if (!userInput.trim()) return;
     setDetecting(true);
@@ -114,11 +126,10 @@ export function CopywriterClient() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "意图分析失败");
-      setIntent(data);
-      setSelectedBrandDocIds(data.suggested_brand_docs || []);
-      setSelectedKnowledgeDocIds(data.suggested_knowledge || []);
-      setSelectedTaskTemplateId(data.suggested_task_template || null);
-      setSelectedPersonaId(data.suggested_persona || null);
+      const suggested = data.suggested_docs ?? [];
+      setIntent({ suggested_docs: suggested });
+      setSelectedDocs(suggested);
+      setSelectedDocIds(new Set(suggested.map((d: SelectedItem) => d.doc_id)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "意图分析失败");
     } finally {
@@ -126,35 +137,108 @@ export function CopywriterClient() {
     }
   }, [userInput]);
 
-  /* ─── Generate ─── */
+  const toggleSelectedDoc = (docId: string) => {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) next.delete(docId);
+      else next.add(docId);
+      return next;
+    });
+  };
+
+  const addManualDoc = (doc: Doc) => {
+    const catName = categoryNameById(doc.category_id);
+    if (selectedDocIds.has(doc.id)) return;
+    setSelectedDocIds((prev) => new Set(prev).add(doc.id));
+    setSelectedDocs((prev) => {
+      if (prev.some((d) => d.doc_id === doc.id)) return prev;
+      return [...prev, { doc_id: doc.id, doc_title: doc.title, category_name: catName, reason: "手动添加" }];
+    });
+    if (!intent) setIntent({ suggested_docs: [] });
+  };
+
+  const getSelectedByCategory = useCallback(
+    (categoryName: string) => selectedDocs.filter((d) => d.category_name === categoryName),
+    [selectedDocs]
+  );
+
+  const replaceSingleInCategory = (categoryName: string, newDoc: Doc) => {
+    const catName = categoryNameById(newDoc.category_id);
+    setSelectedDocs((prev) => {
+      const rest = prev.filter((d) => d.category_name !== categoryName);
+      return [...rest, { doc_id: newDoc.id, doc_title: newDoc.title, category_name: catName, reason: "手动选择" }];
+    });
+    setSelectedDocIds((prev) => {
+      const old = selectedDocs.find((d) => d.category_name === categoryName)?.doc_id;
+      const next = new Set(prev);
+      if (old) next.delete(old);
+      next.add(newDoc.id);
+      return next;
+    });
+    setOpenPicker(null);
+  };
+
+  const replaceMultiAt = (categoryName: string, index: number, newDoc: Doc) => {
+    const catName = categoryNameById(newDoc.category_id);
+    const inCat = getSelectedByCategory(categoryName);
+    const oldId = inCat[index]?.doc_id;
+    setSelectedDocs((prev) => {
+      const rest = prev.filter((d) => d.category_name !== categoryName);
+      const newInCat = [...inCat];
+      newInCat[index] = { doc_id: newDoc.id, doc_title: newDoc.title, category_name: catName, reason: "手动选择" };
+      return [...rest, ...newInCat];
+    });
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (oldId) next.delete(oldId);
+      next.add(newDoc.id);
+      return next;
+    });
+    setOpenPicker(null);
+  };
+
+  const addMultiInCategory = (categoryName: string, newDoc: Doc) => {
+    if (selectedDocIds.has(newDoc.id)) {
+      setOpenPicker(null);
+      return;
+    }
+    const catName = categoryNameById(newDoc.category_id);
+    setSelectedDocs((prev) => [...prev, { doc_id: newDoc.id, doc_title: newDoc.title, category_name: catName, reason: "手动添加" }]);
+    setSelectedDocIds((prev) => new Set(prev).add(newDoc.id));
+    setOpenPicker(null);
+  };
+
+  const removeDoc = (docId: string) => {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      next.delete(docId);
+      return next;
+    });
+    setSelectedDocs((prev) => prev.filter((d) => d.doc_id !== docId));
+  };
+
   const generate = useCallback(async () => {
     setGenerating(true);
     setOutput("");
     setError(null);
     setStarred(false);
     setCopied(false);
-
+    const docIds = Array.from(selectedDocIds);
     try {
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          brand_doc_ids: selectedBrandDocIds,
-          knowledge_doc_ids: selectedKnowledgeDocIds,
-          task_template_id: selectedTaskTemplateId,
-          persona_template_id: selectedPersonaId,
+          selected_doc_ids: docIds,
           user_input: userInput,
         }),
       });
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-
       const reader = res.body?.getReader();
       if (!reader) throw new Error("无响应流");
-
       const decoder = new TextDecoder();
       let result = "";
       while (true) {
@@ -175,9 +259,8 @@ export function CopywriterClient() {
     } finally {
       setGenerating(false);
     }
-  }, [selectedBrandDocIds, selectedKnowledgeDocIds, selectedTaskTemplateId, selectedPersonaId, userInput]);
+  }, [selectedDocIds, userInput]);
 
-  /* ─── Actions ─── */
   const copyToClipboard = async () => {
     if (!output) return;
     await navigator.clipboard.writeText(output);
@@ -187,19 +270,16 @@ export function CopywriterClient() {
 
   const handleStar = async () => {
     if (!output || starred) return;
-    const task = allTaskTemplates.find((t) => t.id === selectedTaskTemplateId);
+    const docIds = Array.from(selectedDocIds);
     await fetch("/api/generated-copies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         user_input: userInput,
-        brand_doc_ids: selectedBrandDocIds,
-        knowledge_doc_ids: selectedKnowledgeDocIds,
-        task_template_id: selectedTaskTemplateId,
-        persona_template_id: selectedPersonaId,
+        doc_ids: docIds,
         detected_intent: intent,
         output,
-        platform: task?.platform || intent?.detected_platform || null,
+        platform: null,
         starred: true,
       }),
     });
@@ -209,25 +289,12 @@ export function CopywriterClient() {
     setHistory(Array.isArray(histData) ? histData.slice(0, 10) : []);
   };
 
-  const regenerateWithNewPersona = () => {
-    setPickerType("persona");
-  };
-
-  const regenerateWithNewTask = () => {
-    setPickerType("task");
-  };
-
-  /* ─── Helpers ─── */
-  const brandDocNames = (ids: string[]) => ids.map((id) => allBrandDocs.find((d) => d.id === id)?.title ?? "未知").join(", ");
-  const knowledgeDocNames = (ids: string[]) => ids.map((id) => allKnowledgeDocs.find((d) => d.id === id)?.title ?? "未知").join(", ");
-  const taskName = (id: string | null) => (id ? allTaskTemplates.find((t) => t.id === id)?.title : null) ?? "无";
-  const personaName = (id: string | null) => (id ? allPersonas.find((p) => p.id === id)?.title : null) ?? "无";
+  const hasIntent = intent !== null && (selectedDocs.length > 0 || selectedDocIds.size > 0);
+  const canShowBlock = intent !== null || selectedDocIds.size > 0 || selectedDocs.length > 0;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-      {/* ═══ Left: Input + Context ═══ */}
       <div className="space-y-4">
-        {/* Main input */}
         <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
           <textarea
             value={userInput}
@@ -256,40 +323,125 @@ export function CopywriterClient() {
           </button>
         </div>
 
-        {/* Intent confirmation area */}
-        {intent && (
-          <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
-            <h3 className="mb-3 text-sm font-medium text-[#1C1917]">AI 将使用：</h3>
-            <div className="space-y-2.5">
-              {/* Brand docs */}
-              <ContextRow
-                icon={<FileText className="h-4 w-4 text-blue-500" />}
-                label="品牌档案"
-                value={selectedBrandDocIds.length > 0 ? brandDocNames(selectedBrandDocIds) : "无"}
-                onPick={() => setPickerType("brand")}
-              />
-              {/* Knowledge */}
-              <ContextRow
-                icon={<BookOpen className="h-4 w-4 text-purple-500" />}
-                label="知识库"
-                value={selectedKnowledgeDocIds.length > 0 ? knowledgeDocNames(selectedKnowledgeDocIds) : "无"}
-                onPick={() => setPickerType("knowledge")}
-              />
-              {/* Task template */}
-              <ContextRow
-                icon={<ClipboardList className="h-4 w-4 text-green-500" />}
-                label="任务模板"
-                value={taskName(selectedTaskTemplateId)}
-                onPick={() => setPickerType("task")}
-              />
-              {/* Persona */}
-              <ContextRow
-                icon={<Drama className="h-4 w-4 text-orange-500" />}
-                label="人格模板"
-                value={personaName(selectedPersonaId)}
-                onPick={() => setPickerType("persona")}
-              />
+        <div className="mb-2">
+          <button
+            type="button"
+            onClick={() => setShowManualPicker(true)}
+            className="text-xs text-[#78716C] hover:text-[#1C1917]"
+          >
+            或 手动选择文档
+          </button>
+        </div>
+
+        {canShowBlock && (
+          <div className={cn("rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm", openPicker && "relative z-[50]")}>
+            {openPicker && (
+              <div className="fixed inset-0 z-[40]" onClick={() => setOpenPicker(null)} aria-hidden />
+            )}
+            <h3 className="mb-3 text-sm font-medium text-[#1C1917]">AI 将使用</h3>
+
+            <div className="space-y-3">
+              {[...SINGLE_SELECT_CATEGORIES, ...MULTI_SELECT_CATEGORIES].map((catName) => {
+                const cat = categories.find((c) => c.name === catName);
+                if (!cat) return null;
+                const docsInCat = allDocs.filter((d) => d.category_id === cat.id);
+                if (docsInCat.length === 0) return null;
+                const isSingle = SINGLE_SELECT_CATEGORIES.includes(catName);
+                const selectedInCat = getSelectedByCategory(catName);
+
+                const boxLabel = (() => {
+                  if (isSingle) return selectedInCat[0]?.doc_title ?? null;
+                  if (selectedInCat.length === 0) return null;
+                  if (selectedInCat.length === 1) return selectedInCat[0].doc_title;
+                  return `${selectedInCat[0].doc_title} 等${selectedInCat.length}个`;
+                })();
+                const showAdd = !isSingle;
+                const openForReplace =
+                  openPicker?.categoryName === catName &&
+                  (isSingle ? openPicker?.replaceIndex === undefined : openPicker?.replaceIndex === 0 || (openPicker?.replaceIndex === undefined && selectedInCat.length === 0));
+                const openForAdd = openPicker?.categoryName === catName && openPicker?.replaceIndex === undefined && !isSingle && selectedInCat.length > 0;
+
+                return (
+                  <div key={cat.id}>
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 text-base">{cat.icon}</span>
+                      <span className="w-20 shrink-0 text-sm text-[#78716C]">{cat.name}：</span>
+                      <div className="relative min-w-0 flex-1" ref={openForReplace ? pickerAnchorRef : null}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSingle) {
+                              setOpenPicker(openPicker?.categoryName === catName ? null : { categoryName: catName });
+                            } else {
+                              if (selectedInCat.length > 0) setOpenPicker(openPicker?.categoryName === catName && openPicker?.replaceIndex === 0 ? null : { categoryName: catName, replaceIndex: 0 });
+                              else setOpenPicker(openPicker?.categoryName === catName && openPicker?.replaceIndex === undefined ? null : { categoryName: catName });
+                            }
+                          }}
+                          className={cn(
+                            "flex h-9 w-full items-center justify-between rounded-lg border border-[#E7E5E4] px-3 text-left text-sm hover:bg-[#FAFAF9]",
+                            boxLabel ? "text-[#1C1917]" : "text-[#A8A29E]"
+                          )}
+                        >
+                          <span className="truncate">{boxLabel ?? "点击选择"}</span>
+                          <span className="shrink-0 text-[#A8A29E]">▾</span>
+                        </button>
+                        {openForReplace && (
+                          <DocPickerDropdown
+                            categoryName={catName}
+                            docs={docsInCat}
+                            currentId={isSingle ? selectedInCat[0]?.doc_id : selectedInCat[0]?.doc_id}
+                            searchPlaceholder="搜索文档…"
+                            onSelect={(doc) => {
+                              if (isSingle) replaceSingleInCategory(catName, doc);
+                              else if (selectedInCat.length === 0) addMultiInCategory(catName, doc);
+                              else replaceMultiAt(catName, 0, doc);
+                            }}
+                            onClose={() => setOpenPicker(null)}
+                          />
+                        )}
+                      </div>
+                      {showAdd && (
+                        <div className="relative shrink-0" ref={openForAdd ? pickerAnchorRef : null}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenPicker(openPicker?.categoryName === catName && openPicker?.replaceIndex === undefined ? null : { categoryName: catName })}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            + 添加
+                          </button>
+                          {openForAdd && (
+                            <DocPickerDropdown
+                              categoryName={catName}
+                              docs={docsInCat}
+                              currentId={undefined}
+                              searchPlaceholder="搜索文档…"
+                              onSelect={(doc) => addMultiInCategory(catName, doc)}
+                              onClose={() => setOpenPicker(null)}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {!isSingle && selectedInCat.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1 pl-7">
+                        {selectedInCat.map((item, idx) => (
+                          <span key={item.doc_id} className="inline-flex items-center gap-0.5 rounded-md bg-[#F5F5F4] px-2 py-0.5 text-xs text-[#1C1917]">
+                            {item.doc_title}
+                            <button type="button" onClick={() => removeDoc(item.doc_id)} className="rounded p-0.5 hover:bg-[#E7E5E4] hover:text-red-600" aria-label="移除">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+
+            {selectedDocs.length === 0 && selectedDocIds.size === 0 && (
+              <p className="mt-2 text-xs text-[#A8A29E]">点击上方类别中的文档名可切换；多选类别可「添加」或点 × 移除</p>
+            )}
 
             <button
               type="button"
@@ -310,27 +462,21 @@ export function CopywriterClient() {
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            {error}
-          </div>
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
         )}
       </div>
 
-      {/* ═══ Right: Output + History ═══ */}
       <div className="space-y-4">
-        {/* Output */}
         <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-medium text-[#1C1917]">生成结果</h3>
             {output && (
               <div className="flex gap-1">
                 <button type="button" onClick={copyToClipboard} className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]">
-                  <Copy className="h-3.5 w-3.5" />
-                  {copied ? "已复制" : "复制"}
+                  <Copy className="h-3.5 w-3.5" /> {copied ? "已复制" : "复制"}
                 </button>
                 <button type="button" onClick={handleStar} className={cn("flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-[#F5F5F4]", starred ? "text-amber-600" : "text-[#78716C] hover:text-[#1C1917]")}>
-                  <Star className={cn("h-3.5 w-3.5", starred && "fill-current")} />
-                  {starred ? "已收藏" : "收藏"}
+                  <Star className={cn("h-3.5 w-3.5", starred && "fill-current")} /> {starred ? "已收藏" : "收藏"}
                 </button>
               </div>
             )}
@@ -339,28 +485,10 @@ export function CopywriterClient() {
             ref={outputRef}
             className="min-h-[200px] max-h-[400px] overflow-y-auto rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-4 text-sm text-[#1C1917] whitespace-pre-wrap"
           >
-            {output
-              ? output
-              : generating
-                ? "..."
-                : "生成结果将显示在此处"}
+            {output ? output : generating ? "..." : "生成结果将显示在此处"}
           </div>
-
-          {output && !generating && (
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={regenerateWithNewPersona} className="flex items-center gap-1.5 rounded-lg border border-[#E7E5E4] px-3 py-1.5 text-xs text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]">
-                <RefreshCw className="h-3.5 w-3.5" />
-                换个风格
-              </button>
-              <button type="button" onClick={regenerateWithNewTask} className="flex items-center gap-1.5 rounded-lg border border-[#E7E5E4] px-3 py-1.5 text-xs text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]">
-                <RefreshCw className="h-3.5 w-3.5" />
-                换个格式
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* History */}
         <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
           <h3 className="mb-3 text-sm font-medium text-[#1C1917]">最近生成</h3>
           {history.length === 0 ? (
@@ -382,139 +510,50 @@ export function CopywriterClient() {
         </div>
       </div>
 
-      {/* ═══ Picker modal ═══ */}
-      {pickerType && (
-        <PickerModal
-          type={pickerType}
-          brandDocs={allBrandDocs}
-          knowledgeDocs={allKnowledgeDocs}
-          taskTemplates={allTaskTemplates}
-          personas={allPersonas}
-          selectedBrandDocIds={selectedBrandDocIds}
-          selectedKnowledgeDocIds={selectedKnowledgeDocIds}
-          selectedTaskTemplateId={selectedTaskTemplateId}
-          selectedPersonaId={selectedPersonaId}
-          onSelectBrandDocs={setSelectedBrandDocIds}
-          onSelectKnowledgeDocs={setSelectedKnowledgeDocIds}
-          onSelectTask={(id) => { setSelectedTaskTemplateId(id); if (output) generate(); }}
-          onSelectPersona={(id) => { setSelectedPersonaId(id); if (output) generate(); }}
-          onClose={() => setPickerType(null)}
-        />
+      {showManualPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowManualPicker(false)}>
+          <div className="max-h-[80vh] w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#E7E5E4] p-4">
+              <h3 className="text-sm font-medium text-[#1C1917]">从任意类别选择文档</h3>
+              <button type="button" onClick={() => setShowManualPicker(false)} className="rounded p-1 text-[#78716C] hover:bg-[#F5F5F4]">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+              {categories.map((cat) => {
+                const docsInCat = allDocs.filter((d) => d.category_id === cat.id);
+                if (docsInCat.length === 0) return null;
+                return (
+                  <div key={cat.id} className="mb-4">
+                    <p className="mb-2 text-xs font-medium text-[#78716C]">{cat.icon} {cat.name}</p>
+                    <div className="space-y-1">
+                      {docsInCat.map((doc) => (
+                        <button
+                          key={doc.id}
+                          type="button"
+                          onClick={() => addManualDoc(doc)}
+                          className={cn(
+                            "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                            selectedDocIds.has(doc.id) ? "bg-[#F5F5F4] font-medium text-[#1C1917]" : "text-[#1C1917] hover:bg-[#FAFAF9]"
+                          )}
+                        >
+                          {doc.title}
+                          {selectedDocIds.has(doc.id) && <span className="ml-2 text-xs text-[#78716C]">已选</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="border-t border-[#E7E5E4] p-4">
+              <button type="button" onClick={() => setShowManualPicker(false)} className="h-9 w-full rounded-lg bg-[#1C1917] px-4 text-sm font-medium text-white hover:bg-[#1C1917]/90">
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
-  );
-}
-
-/* ─── Context row component ─── */
-function ContextRow({
-  icon,
-  label,
-  value,
-  onPick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  onPick: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg bg-[#FAFAF9] px-3 py-2">
-      {icon}
-      <span className="shrink-0 text-xs font-medium text-[#78716C]">{label}：</span>
-      <span className="flex-1 truncate text-xs text-[#1C1917]">{value}</span>
-      <button type="button" onClick={onPick} className="shrink-0 text-xs text-blue-600 hover:underline">
-        换一个
-      </button>
-    </div>
-  );
-}
-
-/* ─── Picker modal ─── */
-function PickerModal({
-  type,
-  brandDocs,
-  knowledgeDocs,
-  taskTemplates,
-  personas,
-  selectedBrandDocIds,
-  selectedKnowledgeDocIds,
-  selectedTaskTemplateId,
-  selectedPersonaId,
-  onSelectBrandDocs,
-  onSelectKnowledgeDocs,
-  onSelectTask,
-  onSelectPersona,
-  onClose,
-}: {
-  type: "brand" | "knowledge" | "task" | "persona";
-  brandDocs: BrandDoc[];
-  knowledgeDocs: KnowledgeDoc[];
-  taskTemplates: TaskTemplate[];
-  personas: PersonaTemplate[];
-  selectedBrandDocIds: string[];
-  selectedKnowledgeDocIds: string[];
-  selectedTaskTemplateId: string | null;
-  selectedPersonaId: string | null;
-  onSelectBrandDocs: (ids: string[]) => void;
-  onSelectKnowledgeDocs: (ids: string[]) => void;
-  onSelectTask: (id: string | null) => void;
-  onSelectPersona: (id: string | null) => void;
-  onClose: () => void;
-}) {
-  const titles: Record<string, string> = { brand: "选择品牌档案", knowledge: "选择知识库文档", task: "选择任务模板", persona: "选择人格模板" };
-
-  const toggleBrand = (id: string) => {
-    const next = selectedBrandDocIds.includes(id)
-      ? selectedBrandDocIds.filter((x) => x !== id)
-      : [...selectedBrandDocIds, id];
-    onSelectBrandDocs(next);
-  };
-
-  const toggleKnowledge = (id: string) => {
-    const next = selectedKnowledgeDocIds.includes(id)
-      ? selectedKnowledgeDocIds.filter((x) => x !== id)
-      : [...selectedKnowledgeDocIds, id];
-    onSelectKnowledgeDocs(next);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-[#1C1917]">{titles[type]}</h3>
-          <button type="button" onClick={onClose} className="rounded p-1 text-[#78716C] hover:bg-[#F5F5F4]"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="max-h-64 space-y-1 overflow-y-auto">
-          {type === "brand" && brandDocs.map((d) => (
-            <label key={d.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 hover:bg-[#F5F5F4]">
-              <input type="checkbox" checked={selectedBrandDocIds.includes(d.id)} onChange={() => toggleBrand(d.id)} className="rounded border-[#E7E5E4]" />
-              <span className="text-sm text-[#1C1917]">{d.title}</span>
-              {d.property_name && <span className="text-xs text-[#A8A29E]">({d.property_name})</span>}
-            </label>
-          ))}
-          {type === "knowledge" && knowledgeDocs.map((d) => (
-            <label key={d.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 hover:bg-[#F5F5F4]">
-              <input type="checkbox" checked={selectedKnowledgeDocIds.includes(d.id)} onChange={() => toggleKnowledge(d.id)} className="rounded border-[#E7E5E4]" />
-              <span className="text-sm text-[#1C1917]">{d.title}</span>
-            </label>
-          ))}
-          {type === "task" && taskTemplates.map((t) => (
-            <button key={t.id} type="button" onClick={() => { onSelectTask(t.id); onClose(); }} className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#F5F5F4]", selectedTaskTemplateId === t.id ? "bg-[#F5F5F4] font-medium text-[#1C1917]" : "text-[#78716C]")}>
-              {t.title}
-              {t.platform && <span className="text-xs text-[#A8A29E]">({t.platform})</span>}
-            </button>
-          ))}
-          {type === "persona" && personas.map((p) => (
-            <button key={p.id} type="button" onClick={() => { onSelectPersona(p.id); onClose(); }} className={cn("flex w-full flex-col rounded-lg px-3 py-2 text-left hover:bg-[#F5F5F4]", selectedPersonaId === p.id ? "bg-[#F5F5F4]" : "")}>
-              <span className={cn("text-sm", selectedPersonaId === p.id ? "font-medium text-[#1C1917]" : "text-[#78716C]")}>{p.title}</span>
-              {p.description && <span className="text-xs text-[#A8A29E]">{p.description}</span>}
-            </button>
-          ))}
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button type="button" onClick={onClose} className="h-8 rounded-lg bg-[#1C1917] px-4 text-xs font-medium text-white hover:bg-[#1C1917]/90">确定</button>
-        </div>
-      </div>
     </div>
   );
 }

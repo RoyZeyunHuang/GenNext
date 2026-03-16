@@ -12,19 +12,12 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const {
-      brand_doc_ids = [],
-      knowledge_doc_ids = [],
-      task_template_id,
-      persona_template_id,
-      user_input = "",
-    } = body as {
-      brand_doc_ids?: string[];
-      knowledge_doc_ids?: string[];
-      task_template_id?: string;
-      persona_template_id?: string;
+    const { selected_doc_ids = [], user_input = "" } = body as {
+      selected_doc_ids?: string[];
       user_input?: string;
     };
+
+    const allDocIds = (Array.isArray(selected_doc_ids) ? selected_doc_ids : []).filter(Boolean);
 
     if (!anthropic.apiKey) {
       return new Response(
@@ -33,63 +26,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch global brand docs for system prompt
-    const { data: globalDocs } = await supabase
-      .from("brand_docs")
-      .select("title, content")
-      .eq("is_global", true);
-
+    let enableWebSearch = false;
     const systemParts: string[] = [
-      "你是一个专业的营销文案师，熟悉地产行业。根据提供的品牌资料、知识库和模板要求，生成高质量的文案内容。",
+      "你是一个专业的营销文案师，熟悉地产行业。根据用户选中的文档（品牌资料、知识库、模板等）和需求，生成高质量的文案内容。",
     ];
-    if (globalDocs?.length) {
-      systemParts.push("\n\n=== 全局品牌资料（始终参考） ===");
-      for (const doc of globalDocs) {
-        systemParts.push(`【${doc.title}】\n${(doc.content ?? "").trim()}`);
+
+    if (allDocIds.length > 0) {
+      const { data: docs } = await supabase
+        .from("docs")
+        .select("id, title, content, category_id")
+        .in("id", allDocIds);
+
+      const byCategory = await (async () => {
+        const { data: categories } = await supabase.from("doc_categories").select("id, name");
+        return new Map((categories ?? []).map((c) => [c.id, c.name]));
+      })();
+
+      systemParts.push("\n\n=== 用户选中的参考资料 ===");
+      for (const doc of docs ?? []) {
+        const catName = byCategory.get(doc.category_id) ?? "";
+        systemParts.push(`【${catName} · ${doc.title}】\n${(doc.content ?? "").trim()}`);
       }
+      const docsList = (docs ?? []) as { id: string; title: string; content: string | null; category_id: string }[];
+      enableWebSearch = docsList.some(
+        (d) => (d.content ?? "").includes("联网搜索") || (d.title ?? "").includes("联网搜索")
+      );
     }
+
+    systemParts.push(`
+重要：只输出最终文案本身，不要输出以下内容：
+- 不要说你搜索了什么
+- 不要说你按照什么模板写的
+- 不要说你用了什么人格
+- 不要做任何前置说明或分析过程
+- 不要在文案前后加任何解释
+- 直接输出标题和正文，第一行就是标题，第二行开始就是正文
+
+格式要求（非常重要，必须严格遵守）：
+- 不要使用 **加粗** 或 markdown 格式
+- 不要使用标题格式（不要 ## 或 **标题**）
+- 段落之间用空行分隔，不要用标题分段
+- 要点用 emoji 开头代替数字编号，如 ✅ 📍 💡 🔑 ⚠️
+- 语气像小红书博主发帖，不像写文章或报告
+- 整体节奏：短句为主，偶尔长句，读起来像在刷手机不是在看文档
+- 每隔2-3段自然加1个 emoji，不要堆砌
+- 不要有任何看起来像 Word 文档或公众号文章的排版痕迹`);
+
     const systemPrompt = systemParts.join("\n");
-
-    // Build user message
-    const userParts: string[] = [];
-
-    if (brand_doc_ids.length > 0) {
-      const { data: brandDocs } = await supabase.from("brand_docs").select("title, content").in("id", brand_doc_ids);
-      if (brandDocs?.length) {
-        userParts.push("=== 品牌档案 ===");
-        for (const d of brandDocs) {
-          userParts.push(`【${d.title}】\n${(d.content ?? "").trim()}`);
-        }
-      }
-    }
-
-    if (knowledge_doc_ids.length > 0) {
-      const { data: knowledgeDocs } = await supabase.from("knowledge_docs").select("title, content").in("id", knowledge_doc_ids);
-      if (knowledgeDocs?.length) {
-        userParts.push("\n=== 知识库参考 ===");
-        for (const d of knowledgeDocs) {
-          userParts.push(`【${d.title}】\n${(d.content ?? "").trim()}`);
-        }
-      }
-    }
-
-    if (task_template_id) {
-      const { data: template } = await supabase.from("task_templates").select("title, content").eq("id", task_template_id).single();
-      if (template) {
-        userParts.push(`\n=== 任务模板：${template.title} ===\n${(template.content ?? "").trim()}`);
-      }
-    }
-
-    if (persona_template_id) {
-      const { data: persona } = await supabase.from("persona_templates").select("title, content").eq("id", persona_template_id).single();
-      if (persona) {
-        userParts.push(`\n=== 人格设定：${persona.title} ===\n${(persona.content ?? "").trim()}`);
-      }
-    }
-
-    userParts.push(`\n=== 用户需求 ===\n${user_input || "无具体需求"}`);
-
-    const userMessage = userParts.join("\n");
+    const userMessage = `=== 用户需求 ===\n${user_input || "无具体需求"}`;
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -100,6 +84,13 @@ export async function POST(req: NextRequest) {
             max_tokens: 4096,
             system: systemPrompt,
             messages: [{ role: "user", content: userMessage }],
+            ...(enableWebSearch
+              ? {
+                  tools: [
+                    { type: "web_search_20250305" as const, name: "web_search" },
+                  ],
+                }
+              : {}),
           });
           for await (const event of response) {
             if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {

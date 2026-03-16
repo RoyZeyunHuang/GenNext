@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, X, MapPin, Building2 } from "lucide-react";
+import { Plus, Search, X, MapPin, Building2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Company = { id: string; name: string };
@@ -51,6 +51,18 @@ export function PropertiesTab() {
     if (res.ok) {
       setShowForm(false);
       fetchList();
+    }
+  };
+
+  const handleDeleteProperty = async (id: string) => {
+    if (!window.confirm("确定要删除该楼盘吗？其关联公司与跟进记录将一并删除，且不可恢复。")) return;
+    const res = await fetch(`/api/crm/properties/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setSelected(null);
+      fetchList();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "删除失败");
     }
   };
 
@@ -130,7 +142,7 @@ export function PropertiesTab() {
       </div>
       <div className="rounded-lg bg-white p-6 shadow-card">
         {selected ? (
-          <PropertyDetail property={selected} />
+          <PropertyDetail property={selected} onDelete={() => handleDeleteProperty(selected.id)} />
         ) : showForm ? (
           <PropertyForm onSubmit={handleCreate} onClose={() => setShowForm(false)} />
         ) : (
@@ -141,7 +153,7 @@ export function PropertiesTab() {
   );
 }
 
-function PropertyDetail({ property: p }: { property: Property }) {
+function PropertyDetail({ property: p, onDelete }: { property: Property; onDelete: () => void }) {
   const roles: Record<string, PropertyCompany[]> = {};
   (p.property_companies ?? []).forEach((pc) => {
     (roles[pc.role] = roles[pc.role] || []).push(pc);
@@ -149,7 +161,17 @@ function PropertyDetail({ property: p }: { property: Property }) {
 
   return (
     <div>
-      <h3 className="text-lg font-semibold text-[#1C1917]">{p.name}</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-lg font-semibold text-[#1C1917]">{p.name}</h3>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="rounded-lg border border-[#FEE2E2] px-3 py-1 text-xs text-[#DC2626] hover:bg-[#FEF2F2] flex items-center gap-1"
+          title="删除楼盘"
+        >
+          <Trash2 className="h-3.5 w-3.5" /> 删除
+        </button>
+      </div>
       <div className="mt-3 grid gap-2 text-sm text-[#78716C]">
         {p.address && <div>地址：{p.address}</div>}
         {p.area && <div>区域：{p.area}</div>}

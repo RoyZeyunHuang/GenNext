@@ -1,12 +1,9 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import * as XLSX from "xlsx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type Row = Record<string, unknown>;
-
-/* ── helpers ────────────────────────────────────────────── */
 
 function toNum(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
@@ -14,319 +11,376 @@ function toNum(v: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
-function normalizeTitle(t: string): string {
-  return (t ?? "")
-    .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "")
-    .replace(/[^a-zA-Z0-9\u4e00-\u9fff|]/g, "")
-    .trim();
+function pctToDecimal(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const s = String(v).trim().replace(/%/g, "");
+  const n = Number(s);
+  if (isNaN(n)) return null;
+  return n / 100;
 }
 
-function normalizePublishTime(pt: string): string {
-  if (!pt) return "";
-  const d = new Date(pt);
-  if (isNaN(d.getTime())) return "";
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-function genKey(prefix: string) {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-async function fetchAllCorePosts() {
-  const all: { post_key: string; title: string | null; title_norm: string | null; publish_time: string | null; publish_time_norm: string | null; note_id: string | null }[] = [];
-  let from = 0;
-  const step = 1000;
-  while (true) {
-    const { data } = await supabase
-      .from("core_posts")
-      .select("post_key, title, title_norm, publish_time, publish_time_norm, note_id")
-      .range(from, from + step - 1);
-    if (!data || data.length === 0) break;
-    all.push(...data);
-    if (data.length < step) break;
-    from += step;
+/** 将日期字符串规范为 YYYY-MM-DD（供投放表 event_date 等使用） */
+function normalizeDateString(v: string): string | null {
+  const s = String(v).trim();
+  if (!s) return null;
+  const slash = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (slash) {
+    const [, y, m, d] = slash;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
-  return all;
+  const cn = s.match(/^(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  if (cn) {
+    const [, y, m, d] = cn;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  return s.slice(0, 10);
 }
 
-/* ── POST handler ───────────────────────────────────────── */
+/** 中文发布日期转成标准格式，如 2026年03月10日04时27分54秒 -> 2026-03-10 04:27:54 */
+function parseChinesePublishTime(v: unknown): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const m = s.match(
+    /(\d{4})年(\d{1,2})月(\d{1,2})日(?:(\d{1,2})时)?(?:(\d{1,2})分)?(?:(\d{1,2})秒)?/
+  );
+  if (m) {
+    const [, y, mo, d, h = "0", min = "0", sec = "0"] = m;
+    const pad = (n: string) => n.padStart(2, "0");
+    return `${y}-${pad(mo)}-${pad(d)} ${pad(h)}:${pad(min)}:${pad(sec)}`;
+  }
+  return s;
+}
+
+function detectUploadType(filename: string): "organic" | "paid" | null {
+  const lower = filename.toLowerCase();
+  if (lower.includes("笔记列表明细")) return "organic";
+  if (lower.includes("笔记投放数据") || lower.includes("投放")) return "paid";
+  return null;
+}
+
+/** dataStartRowIndex: 数据起始行（0-based），1=第2行起，2=第3行起。表头始终为第1行。 */
+function parseCsv(text: string, dataStartRowIndex = 1): Record<string, string>[] {
+  const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const bom = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
+  const lines = bom.split("\n").filter(Boolean);
+  if (lines.length <= dataStartRowIndex) return [];
+  const header = lines[0].split(",").map((c) => c.trim().replace(/^\uFEFF/, ""));
+  const rows: Record<string, string>[] = [];
+  for (let i = dataStartRowIndex; i < lines.length; i++) {
+    const values = lines[i].split(",").map((c) => c.trim());
+    const row: Record<string, string> = {};
+    header.forEach((h, j) => {
+      row[h] = values[j] ?? "";
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+// 笔记列表明细表实际表头：笔记标题、首次发布时间/发布日期、体裁、曝光、观看量、封面点击率、点赞、评论、收藏、涨粉、分享、人均观看时长、弹幕
+const ORGANIC_COL_MAP: Record<string, string> = {
+  笔记标题: "title",
+  首次发布时间: "publish_time",
+  发布日期: "publish_time",
+  体裁: "genre",
+  曝光: "exposure",
+  观看量: "views",
+  封面点击率: "cover_ctr",
+  点赞: "likes",
+  评论: "comments",
+  收藏: "collects",
+  涨粉: "follows",
+  分享: "shares",
+  人均观看时长: "avg_watch_time",
+  弹幕: "danmaku",
+};
+
+const PAID_COL_MAP: Record<string, string> = {
+  时间: "event_date",
+  "笔记/素材ID": "note_id",
+  "笔记/素材链接": "note_link",
+  消费: "spend",
+  展现量: "impressions",
+  点击量: "clicks",
+  点击率: "ctr",
+  平均点击成本: "avg_click_cost",
+  平均千次展示费用: "avg_cpm",
+  互动量: "interactions",
+  平均互动成本: "avg_interaction_cost",
+  "5s播放量": "play_5s",
+  "5s完播率": "completion_5s",
+  私信进线数: "dm_in",
+  私信开口数: "dm_open",
+  私信留资数: "dm_lead",
+  私信进线成本: "dm_in_cost",
+  私信留资成本: "dm_lead_cost",
+  笔记作者ID: "author_id",
+  创作者: "creator",
+  视频播放量: "video_plays",
+  私信留资人数: "dm_lead_persons",
+  私信开口成本: "dm_open_cost",
+  "微信加好友(计费时间)": "wechat_adds",
+  "微信加好友率(计费时间)": "wechat_add_rate",
+};
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { type, rows, snapshot_date } = body as { type: string; rows: Row[]; snapshot_date?: string };
-    if (!rows?.length) return Response.json({ error: "无数据" }, { status: 400 });
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
+    if (!file?.size) return NextResponse.json({ error: "请选择文件" }, { status: 400 });
+    const snapshotDateFromForm = (formData.get("snapshot_date") as string) || "";
+    const snapshotDate =
+      snapshotDateFromForm ||
+      (typeof file.lastModified === "number" && file.lastModified > 0
+        ? new Date(file.lastModified).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10));
 
-    if (type === "organic") return handleOrganic(rows, snapshot_date ?? new Date().toISOString().slice(0, 10));
-    if (type === "paid") return handlePaid(rows);
-    if (type === "ig") return handleInstagram(rows, snapshot_date ?? new Date().toISOString().slice(0, 10));
-
-    return Response.json({ error: "不支持的类型: " + type }, { status: 400 });
-  } catch (e) {
-    return Response.json({ error: e instanceof Error ? e.message : "上传失败" }, { status: 500 });
-  }
-}
-
-/* ── Organic ────────────────────────────────────────────── */
-
-async function handleOrganic(rows: Row[], snapshotDate: string) {
-  const postsList = await fetchAllCorePosts();
-
-  const byTitleAndTime = new Map<string, string>();
-  const byTitleOnly = new Map<string, string[]>();
-
-  for (const p of postsList) {
-    const tn = p.title_norm || normalizeTitle(p.title ?? "");
-    const ptn = p.publish_time_norm || normalizePublishTime(p.publish_time ?? "");
-    if (tn && ptn) byTitleAndTime.set(`${tn}|${ptn}`, p.post_key);
-    if (tn) {
-      const arr = byTitleOnly.get(tn) ?? [];
-      arr.push(p.post_key);
-      byTitleOnly.set(tn, arr);
-    }
-  }
-
-  let newPosts = 0;
-  let suspects = 0;
-  const newCorePosts: Row[] = [];
-  const snapshotRows: Row[] = [];
-
-  for (const row of rows) {
-    const title = String(row.title ?? "").trim();
-    if (!title) continue;
-
-    const publishTime = String(row.publish_time ?? "").trim();
-    const titleNorm = normalizeTitle(title);
-    const ptNorm = normalizePublishTime(publishTime);
-
-    let postKey: string | null = null;
-
-    if (titleNorm && ptNorm) {
-      postKey = byTitleAndTime.get(`${titleNorm}|${ptNorm}`) ?? null;
+    const type = detectUploadType(file.name);
+    if (!type) {
+      return NextResponse.json(
+        { error: "无法识别文件类型，请使用「笔记列表明细」或「笔记投放数据/投放」相关文件名" },
+        { status: 400 }
+      );
     }
 
-    if (!postKey && titleNorm) {
-      const matches = byTitleOnly.get(titleNorm);
-      if (matches?.length === 1) {
-        postKey = matches[0];
-      } else if (matches && matches.length > 1) {
-        suspects++;
-      }
-    }
-
-    if (!postKey) {
-      postKey = genKey("xhs");
-      const np = {
-        post_key: postKey,
-        title,
-        title_norm: titleNorm,
-        publish_time: publishTime,
-        publish_time_norm: ptNorm,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+    if (type === "organic") {
+      const buf = Buffer.from(await file.arrayBuffer());
+      const wb = XLSX.read(buf, { type: "buffer" });
+      const firstSheet = wb.SheetNames[0];
+      const ws = wb.Sheets[firstSheet];
+      const normalize = (s: string) => s.replace(/\s/g, "").replace(/\u200b/g, "").trim();
+      const buildColMap = (headerRow: Record<string, unknown>) => {
+        const colMap: Record<string, string> = {};
+        for (const [colIndex, cellValue] of Object.entries(headerRow || {})) {
+          const label = String(cellValue ?? "").trim();
+          const noSpaces = normalize(label);
+          let mapped = ORGANIC_COL_MAP[label] ?? ORGANIC_COL_MAP[noSpaces];
+          if (!mapped) {
+            for (const [cnKey, dbCol] of Object.entries(ORGANIC_COL_MAP)) {
+              if (label.includes(cnKey) || noSpaces.includes(cnKey) || cnKey.includes(noSpaces)) {
+                mapped = dbCol;
+                break;
+              }
+            }
+          }
+          if (mapped) colMap[mapped] = colIndex;
+        }
+        return colMap;
       };
-      newCorePosts.push(np);
-      if (titleNorm && ptNorm) byTitleAndTime.set(`${titleNorm}|${ptNorm}`, postKey);
-      if (titleNorm) {
-        const arr = byTitleOnly.get(titleNorm) ?? [];
-        arr.push(postKey);
-        byTitleOnly.set(titleNorm, arr);
+      // 先尝试第 2 行为表头（range:1），再尝试第 1 行为表头（range:0）
+      let raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+        range: 1,
+        header: 0,
+        defval: "",
+        raw: false,
+      }) as unknown[];
+      let headerRow = raw[0] as Record<string, unknown>;
+      let colMap = buildColMap(headerRow);
+      let dataStartRow = 1;
+      if (!colMap.title && raw.length > 0) {
+        raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+          range: 0,
+          header: 0,
+          defval: "",
+          raw: false,
+        }) as unknown[];
+        headerRow = raw[0] as Record<string, unknown>;
+        colMap = buildColMap(headerRow);
+        dataStartRow = 1;
       }
-      newPosts++;
-    }
+      if (!raw?.length) {
+        return NextResponse.json(
+          { error: "Excel 未解析到任何行，请确认表头行为：笔记标题、首次发布时间/发布日期、体裁、曝光、观看量等" },
+          { status: 400 }
+        );
+      }
+      if (!colMap.title) {
+        return NextResponse.json(
+          {
+            error: "未能识别表头，请确认表头行为：笔记标题、首次发布时间/发布日期、体裁、曝光、观看量、封面点击率、点赞、评论、收藏、涨粉、分享、人均观看时长、弹幕",
+            debug: { receivedHeaderValues: Object.values(headerRow).slice(0, 20) },
+          },
+          { status: 400 }
+        );
+      }
+      const rows: Record<string, unknown>[] = [];
+      for (let i = dataStartRow; i < raw.length; i++) {
+        const row = raw[i] as Record<string, unknown>;
+        const out: Record<string, unknown> = {};
+        for (const [dbCol, cnCol] of Object.entries(colMap)) {
+          let v = row[cnCol];
+          if (dbCol === "cover_ctr") {
+            const p = pctToDecimal(v);
+            out[dbCol] = p != null ? p : toNum(v);
+          } else if (["exposure", "views", "likes", "comments", "collects", "follows", "shares", "danmaku"].includes(dbCol)) {
+            out[dbCol] = toNum(v);
+          } else if (dbCol === "avg_watch_time") {
+            out[dbCol] = toNum(v) || null;
+          } else if (dbCol === "publish_time") {
+            out[dbCol] = parseChinesePublishTime(v) ?? null;
+          } else {
+            out[dbCol] = v != null && v !== "" ? String(v).trim() : null;
+          }
+        }
+        const title = String(out.title ?? "").trim();
+        if (!title) continue;
+        rows.push({
+          snapshot_date: snapshotDate,
+          title,
+          publish_time: out.publish_time ?? null,
+          genre: out.genre ?? null,
+          exposure: out.exposure ?? 0,
+          views: out.views ?? 0,
+          cover_ctr: out.cover_ctr ?? null,
+          likes: out.likes ?? 0,
+          comments: out.comments ?? 0,
+          collects: out.collects ?? 0,
+          follows: out.follows ?? 0,
+          shares: out.shares ?? 0,
+          avg_watch_time: out.avg_watch_time ?? null,
+          danmaku: out.danmaku ?? 0,
+        });
+      }
+      if (rows.length === 0) {
+        return NextResponse.json(
+          { error: "未解析到有效数据行（需有「笔记标题」且非空），请确认数据从第 3 行起" },
+          { status: 400 }
+        );
+      }
+      const deduped = new Map<string, Record<string, unknown>>();
+      for (const r of rows) {
+        deduped.set(`${r.title}|${snapshotDate}`, r);
+      }
+      const rowsToInsert = Array.from(deduped.values());
 
-    snapshotRows.push({
-      post_key: postKey,
-      snapshot_date: snapshotDate,
-      genre: row.genre ?? null,
-      exposure: toNum(row.exposure),
-      views: toNum(row.views),
-      cover_ctr: toNum(row.cover_ctr),
-      likes: toNum(row.likes),
-      comments: toNum(row.comments),
-      collects: toNum(row.collects),
-      follows: toNum(row.follows),
-      shares: toNum(row.shares),
-      avg_watch_time: toNum(row.avg_watch_time),
-      danmaku: toNum(row.danmaku),
-      run_id: `upload_${Date.now()}`,
-      updated_at: new Date().toISOString(),
-    });
-  }
-
-  // batch insert new core_posts
-  for (let i = 0; i < newCorePosts.length; i += 100) {
-    await supabase.from("core_posts").upsert(newCorePosts.slice(i, i + 100), { onConflict: "post_key" });
-  }
-
-  // GREATEST merge: fetch existing snapshots for this date
-  const uniqueKeys = Array.from(new Set(snapshotRows.map((r) => r.post_key as string)));
-  const existingMap = new Map<string, Row>();
-  for (let i = 0; i < uniqueKeys.length; i += 500) {
-    const batch = uniqueKeys.slice(i, i + 500);
-    const { data } = await supabase
-      .from("xhs_post_metrics_snapshots")
-      .select("*")
-      .eq("snapshot_date", snapshotDate)
-      .in("post_key", batch);
-    for (const s of data ?? []) existingMap.set(s.post_key as string, s);
-  }
-
-  const numFields = ["exposure", "views", "cover_ctr", "likes", "comments", "collects", "follows", "shares", "avg_watch_time", "danmaku"];
-  const merged = snapshotRows.map((row) => {
-    const existing = existingMap.get(row.post_key as string);
-    if (!existing) return row;
-    const result = { ...row };
-    for (const f of numFields) {
-      result[f] = Math.max(toNum(row[f]), toNum(existing[f]));
-    }
-    return result;
-  });
-
-  // batch upsert snapshots
-  let imported = 0;
-  for (let i = 0; i < merged.length; i += 100) {
-    const batch = merged.slice(i, i + 100);
-    const { error } = await supabase.from("xhs_post_metrics_snapshots").upsert(batch, { onConflict: "post_key,snapshot_date" });
-    if (!error) imported += batch.length;
-  }
-
-  return Response.json({ imported, newPosts, suspects, errors: [] });
-}
-
-/* ── Paid ───────────────────────────────────────────────── */
-
-async function handlePaid(rows: Row[]) {
-  const postsList = await fetchAllCorePosts();
-  const noteIdMap = new Map<string, string>();
-  for (const p of postsList) {
-    if (p.note_id) noteIdMap.set(p.note_id, p.post_key);
-  }
-
-  let newPosts = 0;
-  const newCorePosts: Row[] = [];
-  const paidRows: Row[] = [];
-
-  for (const row of rows) {
-    const noteId = String(row.note_id ?? "").trim();
-    if (!noteId) continue;
-
-    let postKey = noteIdMap.get(noteId) ?? null;
-    if (!postKey) {
-      postKey = genKey("xhs");
-      newCorePosts.push({
-        post_key: postKey,
-        note_id: noteId,
-        link: row.link ?? null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      const existingKeys = new Set<string>();
+      const { data: existing, error: fetchError } = await supabase
+        .from("xhs_notes")
+        .select("title, snapshot_date")
+        .eq("snapshot_date", snapshotDate);
+      if (fetchError) {
+        return NextResponse.json(
+          { error: `查询已存在数据失败: ${fetchError.message}，请确认已执行迁移 009 并存在 xhs_notes 表` },
+          { status: 500 }
+        );
+      }
+      for (const r of existing ?? []) {
+        existingKeys.add(`${r.title}|${snapshotDate}`);
+      }
+      const toInsert = rowsToInsert.filter(
+        (r) => !existingKeys.has(`${r.title}|${snapshotDate}`)
+      );
+      let inserted = 0;
+      for (let i = 0; i < toInsert.length; i += 100) {
+        const batch = toInsert.slice(i, i + 100);
+        const { error } = await supabase.from("xhs_notes").insert(batch);
+        if (error) {
+          return NextResponse.json(
+            { error: `写入失败: ${error.message}`, code: error.code },
+            { status: 500 }
+          );
+        }
+        inserted += batch.length;
+      }
+      const skipped = rowsToInsert.length - inserted;
+      return NextResponse.json({
+        type: "organic",
+        snapshot_date: snapshotDate,
+        imported: inserted,
+        skipped,
+        message: `成功导入 ${inserted} 条，跳过 ${skipped} 条重复`,
       });
-      noteIdMap.set(noteId, postKey);
-      newPosts++;
     }
 
-    paidRows.push({
-      post_key: postKey,
-      event_date: String(row.event_date ?? "").trim(),
-      spend: toNum(row.spend),
-      impressions: toNum(row.impressions),
-      clicks: toNum(row.clicks),
-      ctr: toNum(row.ctr),
-      cpc: toNum(row.cpc),
-      cpm: toNum(row.cpm),
-      interactions: toNum(row.interactions),
-      cpe: toNum(row.cpe),
-      play_5s: toNum(row.play_5s),
-      completion_5s: toNum(row.completion_5s),
-      new_seed: toNum(row.new_seed),
-      new_seed_cost: toNum(row.new_seed_cost),
-      new_deep_seed: toNum(row.new_deep_seed),
-      new_deep_seed_cost: toNum(row.new_deep_seed_cost),
-      dm_in: toNum(row.dm_in),
-      dm_open: toNum(row.dm_open),
-      dm_lead: toNum(row.dm_lead),
-      dm_in_cost: toNum(row.dm_in_cost),
-      dm_open_cost: toNum(row.dm_open_cost),
-      dm_lead_cost: toNum(row.dm_lead_cost),
-      run_id: `upload_${Date.now()}`,
-      updated_at: new Date().toISOString(),
-    });
-  }
+    if (type === "paid") {
+      const text = await file.text();
+      // 投放表：表头第1行，数据从第3行开始（跳过第2行）
+      const csvRows = parseCsv(text, 2);
+      const headerKeys = csvRows.length > 0 ? Object.keys(csvRows[0]) : [];
+      const getPaidCol = (possibleNames: string[], row: Record<string, string>) => {
+        for (const name of possibleNames) {
+          const v = row[name];
+          if (v !== undefined && v !== "") return String(v).trim();
+        }
+        return "";
+      };
+      const rows: Record<string, unknown>[] = [];
+      for (const row of csvRows) {
+        const eventDateRaw = getPaidCol(["时间", "日期", "event_date"], row);
+        const eventDate = normalizeDateString(eventDateRaw) || eventDateRaw;
+        const noteId = getPaidCol(["笔记/素材ID", "笔记素材ID", "note_id"], row);
+        if (!eventDate) continue;
+        const get = (cn: string) => row[cn] ?? "";
+        const ctrVal = get("点击率");
+        const completionVal = get("5s完播率");
+        const wechatRateVal = get("微信加好友率(计费时间)");
+        rows.push({
+          event_date: eventDate,
+          note_id: noteId || null,
+          note_link: get("笔记/素材链接") || null,
+          spend: toNum(get("消费")),
+          impressions: toNum(get("展现量")),
+          clicks: toNum(get("点击量")),
+          ctr: pctToDecimal(ctrVal) ?? toNum(ctrVal),
+          avg_click_cost: toNum(get("平均点击成本")),
+          avg_cpm: toNum(get("平均千次展示费用")),
+          interactions: toNum(get("互动量")),
+          avg_interaction_cost: toNum(get("平均互动成本")),
+          play_5s: toNum(get("5s播放量")),
+          completion_5s: pctToDecimal(completionVal) ?? toNum(completionVal),
+          dm_in: toNum(get("私信进线数")),
+          dm_open: toNum(get("私信开口数")),
+          dm_lead: toNum(get("私信留资数")),
+          dm_in_cost: toNum(get("私信进线成本")) || null,
+          dm_lead_cost: toNum(get("私信留资成本")) || null,
+          author_id: get("笔记作者ID") || null,
+          creator: get("创作者") || null,
+          video_plays: toNum(get("视频播放量")),
+          dm_lead_persons: toNum(get("私信留资人数")),
+          dm_open_cost: toNum(get("私信开口成本")) || null,
+          wechat_adds: toNum(get("微信加好友(计费时间)")),
+          wechat_add_rate: (pctToDecimal(wechatRateVal) ?? toNum(wechatRateVal)) || null,
+        });
+      }
 
-  for (let i = 0; i < newCorePosts.length; i += 100) {
-    await supabase.from("core_posts").upsert(newCorePosts.slice(i, i + 100), { onConflict: "post_key" });
-  }
+      if (rows.length === 0) {
+        return NextResponse.json(
+          {
+            error: "未解析到有效数据行，请确认 CSV 第 1 行为表头且包含「时间」或「日期」列",
+            debug: { headerKeys: headerKeys.slice(0, 15) },
+          },
+          { status: 400 }
+        );
+      }
 
-  let imported = 0;
-  for (let i = 0; i < paidRows.length; i += 100) {
-    const batch = paidRows.slice(i, i + 100);
-    const { error } = await supabase.from("paid_metrics_daily").upsert(batch, { onConflict: "post_key,event_date" });
-    if (!error) imported += batch.length;
-  }
-
-  return Response.json({ imported, newPosts, suspects: 0, errors: [] });
-}
-
-/* ── Instagram ──────────────────────────────────────────── */
-
-async function handleInstagram(rows: Row[], snapshotDate: string) {
-  const { data: existing } = await supabase.from("core_ig_posts").select("post_key").limit(50000);
-  const existingSet = new Set((existing ?? []).map((p) => p.post_key));
-
-  let newPosts = 0;
-  const igPosts: Row[] = [];
-  const snapRows: Row[] = [];
-
-  for (const row of rows) {
-    const igPostId = String(row.ig_post_id ?? "").trim();
-    if (!igPostId) continue;
-    const postKey = `ig:${igPostId}`;
-
-    igPosts.push({
-      post_key: postKey,
-      ig_post_id: igPostId,
-      account_id: row.account_id ?? null,
-      account_username: row.account_username ?? null,
-      account_name: row.account_name ?? null,
-      description: row.description ?? null,
-      duration_sec: toNum(row.duration_sec) || null,
-      publish_time: row.publish_time ?? null,
-      permalink: row.permalink ?? null,
-      post_type: row.post_type ?? null,
-      updated_at: new Date().toISOString(),
-    });
-
-    if (!existingSet.has(postKey)) {
-      newPosts++;
-      existingSet.add(postKey);
+      let upserted = 0;
+      for (let i = 0; i < rows.length; i += 100) {
+        const batch = rows.slice(i, i + 100);
+        const { error } = await supabase.from("xhs_paid_daily").upsert(batch, {
+          onConflict: "note_id,event_date",
+        });
+        if (error) {
+          return NextResponse.json(
+            { error: `写入失败: ${error.message}`, code: error.code },
+            { status: 500 }
+          );
+        }
+        upserted += batch.length;
+      }
+      return NextResponse.json({
+        type: "paid",
+        imported: upserted,
+        message: `成功导入 ${upserted} 条`,
+      });
     }
 
-    snapRows.push({
-      post_key: postKey,
-      snapshot_date: snapshotDate,
-      views: toNum(row.views),
-      reach: toNum(row.reach),
-      likes: toNum(row.likes),
-      comments: toNum(row.comments),
-      saves: toNum(row.saves),
-      shares: toNum(row.shares),
-      follows: toNum(row.follows),
-      run_id: `upload_${Date.now()}`,
-      updated_at: new Date().toISOString(),
-    });
+    return NextResponse.json({ error: "未知类型" }, { status: 400 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json(
+      { error: msg || "上传失败" },
+      { status: 500 }
+    );
   }
-
-  for (let i = 0; i < igPosts.length; i += 100) {
-    await supabase.from("core_ig_posts").upsert(igPosts.slice(i, i + 100), { onConflict: "post_key" });
-  }
-
-  let imported = 0;
-  for (let i = 0; i < snapRows.length; i += 100) {
-    const batch = snapRows.slice(i, i + 100);
-    const { error } = await supabase.from("ig_post_metrics_snapshots").upsert(batch, { onConflict: "post_key,snapshot_date" });
-    if (!error) imported += batch.length;
-  }
-
-  return Response.json({ imported, newPosts, suspects: 0, errors: [] });
 }
