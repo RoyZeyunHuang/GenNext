@@ -14,6 +14,6 @@ function getSupabase(): SupabaseClient {
 /** Lazy-initialized so Vercel build (no env) does not call createClient at import time. */
 export const supabase = new Proxy({} as SupabaseClient, {
   get(_, prop) {
-    return (getSupabase() as Record<string, unknown>)[prop as string];
+    return (getSupabase() as unknown as Record<string, unknown>)[prop as string];
   },
 });
