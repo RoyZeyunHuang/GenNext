@@ -1,27 +1,36 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Building2, Target, Trophy, Percent, Clock } from "lucide-react";
+import { Building2, Target, Trophy, Percent, Clock, AlertCircle } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
-const STATUS_COLORS: Record<string, string> = {
+const STAGE_COLORS: Record<string, string> = {
   "Not Started": "#8a7f74",
-  "Contacted": "#4a90d9",
-  "Meeting Scheduled": "#e6b422",
-  "Proposal Sent": "#e67e22",
-  "Won": "#21c354",
-  "Lost": "#ff4b4b",
+  Pitched: "#4a90d9",
+  Meeting: "#e6b422",
+  Negotiating: "#e67e22",
+  Won: "#21c354",
+  Lost: "#ff4b4b",
 };
 
-const STATUS_ORDER = ["Not Started", "Contacted", "Meeting Scheduled", "Proposal Sent", "Won", "Lost"];
+const STAGE_ORDER = ["Not Started", "Pitched", "Meeting", "Negotiating", "Won", "Lost"];
+const STAGE_LABELS: Record<string, string> = {
+  "Not Started": "Not Started",
+  Pitched: "Pitched",
+  Meeting: "Meeting",
+  Negotiating: "Negotiating",
+  Won: "Won",
+  Lost: "Dropped",
+};
 
 type Stats = {
   totalProperties: number;
   activeOutreach: number;
+  needFollowUpCount?: number;
   wonCount: number;
   winRate: number;
   avgDays: number;
@@ -44,12 +53,13 @@ export function PipelineTab() {
   if (loading) return <p className="py-12 text-center text-sm text-[#78716C]">加载中…</p>;
   if (!stats) return <p className="py-12 text-center text-sm text-[#78716C]">加载失败</p>;
 
-  const funnelData = STATUS_ORDER.map((s) => ({ name: s, value: stats.statusCounts[s] ?? 0, fill: STATUS_COLORS[s] }));
+  const funnelData = STAGE_ORDER.map((s) => ({ name: STAGE_LABELS[s] ?? s, value: stats.statusCounts[s] ?? 0, fill: STAGE_COLORS[s] ?? "#8a7f74" }));
   const pieData = funnelData.filter((d) => d.value > 0);
 
   const kpis = [
     { label: "总楼盘数", value: stats.totalProperties, icon: Building2 },
-    { label: "活跃外联", value: stats.activeOutreach, icon: Target },
+    { label: "活跃交易", value: stats.activeOutreach, icon: Target },
+    { label: "需跟进", value: stats.needFollowUpCount ?? 0, icon: AlertCircle },
     { label: "Won", value: stats.wonCount, icon: Trophy },
     { label: "胜率", value: `${stats.winRate}%`, icon: Percent },
     { label: "平均成交天数", value: stats.avgDays, icon: Clock },
@@ -57,7 +67,7 @@ export function PipelineTab() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         {kpis.map((k) => {
           const Icon = k.icon;
           return (
@@ -121,7 +131,7 @@ export function PipelineTab() {
             ) : (
               stats.recent.map((r) => (
                 <div key={r.id} className="flex items-center gap-2 rounded border border-[#E7E5E4] bg-[#FAFAF9] px-2 py-1.5 text-xs">
-                  <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STATUS_COLORS[r.status] ?? "#8a7f74" }} />
+                  <div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STAGE_COLORS[r.status] ?? "#8a7f74" }} />
                   <span className="text-[#1C1917]">{r.status}</span>
                   <span className="ml-auto text-[#A8A29E]">{new Date(r.updated_at).toLocaleDateString("zh-CN")}</span>
                 </div>

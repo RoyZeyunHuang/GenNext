@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
         const title = String(out.title ?? "").trim();
         if (!title) continue;
         rows.push({
-          snapshot_date: snapshotDate,
+      snapshot_date: snapshotDate,
           title,
           publish_time: out.publish_time ?? null,
           genre: out.genre ?? null,

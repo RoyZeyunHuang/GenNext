@@ -517,13 +517,13 @@ export function CopywriterClient() {
               <h3 className="text-sm font-medium text-[#1C1917]">从任意类别选择文档</h3>
               <button type="button" onClick={() => setShowManualPicker(false)} className="rounded p-1 text-[#78716C] hover:bg-[#F5F5F4]">
                 <X className="h-5 w-5" />
-              </button>
-            </div>
+      </button>
+    </div>
             <div className="max-h-[60vh] overflow-y-auto p-4">
               {categories.map((cat) => {
                 const docsInCat = allDocs.filter((d) => d.category_id === cat.id);
                 if (docsInCat.length === 0) return null;
-                return (
+  return (
                   <div key={cat.id} className="mb-4">
                     <p className="mb-2 text-xs font-medium text-[#78716C]">{cat.icon} {cat.name}</p>
                     <div className="space-y-1">
@@ -539,9 +539,9 @@ export function CopywriterClient() {
                         >
                           {doc.title}
                           {selectedDocIds.has(doc.id) && <span className="ml-2 text-xs text-[#78716C]">已选</span>}
-                        </button>
-                      ))}
-                    </div>
+            </button>
+          ))}
+        </div>
                   </div>
                 );
               })}

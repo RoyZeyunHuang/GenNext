@@ -23,7 +23,7 @@ const navItems = [
   { href: "/copywriter", label: "内容创作", icon: PenLine },
   { href: "/planning", label: "内容排期", icon: CalendarRange },
   { href: "/calendar", label: "AI日历", icon: Calendar },
-  { href: "/crm", label: "BD CRM", icon: Users },
+  { href: "/crm", label: "BRM", icon: Users },
   { href: "/kpi", label: "KPI", icon: BarChart3 },
   { href: "/news", label: "新闻摘要", icon: Newspaper },
   { href: "/settings", label: "设置", icon: Settings },

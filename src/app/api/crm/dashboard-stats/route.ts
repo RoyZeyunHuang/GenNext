@@ -7,15 +7,20 @@ export async function GET() {
   try {
     const [propsRes, outreachRes] = await Promise.all([
       supabase.from("properties").select("id", { count: "exact", head: true }),
-      supabase.from("outreach").select("id, status, created_at, updated_at"),
+      supabase.from("outreach").select("id, stage, deal_status, created_at, updated_at"),
     ]);
 
     const totalProperties = propsRes.count ?? 0;
     const outreach = outreachRes.data ?? [];
     const totalOutreach = outreach.length;
-    const won = outreach.filter((o) => o.status === "Won");
-    const lost = outreach.filter((o) => o.status === "Lost");
-    const active = outreach.filter((o) => o.status !== "Won" && o.status !== "Lost");
+    const won = outreach.filter((o) => (o as { stage?: string }).stage === "Won");
+    const lost = outreach.filter((o) => (o as { stage?: string }).stage === "Lost");
+    const active = outreach.filter(
+      (o) =>
+        (o as { stage?: string; deal_status?: string }).deal_status === "Active" &&
+        !["Won", "Lost"].includes((o as { stage?: string }).stage ?? "")
+    );
+    const needFollowUp = outreach.filter((o) => (o as { deal_status?: string }).deal_status === "Need Follow Up");
     const winRate = won.length + lost.length > 0 ? Math.round((won.length / (won.length + lost.length)) * 100) : 0;
 
     const avgDays =
@@ -31,7 +36,8 @@ export async function GET() {
 
     const statusCounts: Record<string, number> = {};
     outreach.forEach((o) => {
-      statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
+      const stage = (o as { stage?: string }).stage ?? "Not Started";
+      statusCounts[stage] = (statusCounts[stage] || 0) + 1;
     });
 
     const now = new Date();
@@ -51,12 +57,13 @@ export async function GET() {
     const recent = outreach
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 10)
-      .map((o) => ({ id: o.id, status: o.status, updated_at: o.updated_at }));
+      .map((o) => ({ id: o.id, status: (o as { stage?: string }).stage ?? "Not Started", updated_at: o.updated_at }));
 
     return Response.json({
       totalProperties,
       totalOutreach,
       activeOutreach: active.length,
+      needFollowUpCount: needFollowUp.length,
       wonCount: won.length,
       winRate,
       avgDays,
