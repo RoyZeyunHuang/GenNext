@@ -44,9 +44,10 @@ export function BrmSummaryCard() {
       .catch(() => {});
   }, []);
 
-  const pieData =
-    stats?.statusCounts &&
-    STAGE_ORDER.map((s) => ({ name: s, value: stats.statusCounts[s] ?? 0 })).filter((d) => d.value > 0);
+  const statusCounts = stats?.statusCounts ?? {};
+  const pieData = stats
+    ? STAGE_ORDER.map((s) => ({ name: s, value: statusCounts[s] ?? 0 })).filter((d) => d.value > 0)
+    : [];
 
   return (
     <Link
