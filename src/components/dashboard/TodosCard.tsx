@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 export function TodosCard({ todos: initialTodos }: { todos: TodoType[] }) {
   const [open, setOpen] = useState(false);
   const [todos, setTodos] = useState(initialTodos);
-  const router = useRouter();
 
   useEffect(() => {
     setTodos(initialTodos);
@@ -28,7 +27,6 @@ export function TodosCard({ todos: initialTodos }: { todos: TodoType[] }) {
     const res = await fetch(`/api/todos/${id}`, { method: "DELETE" });
     if (res.ok) {
       setTodos((prev) => prev.filter((t) => t.id !== id));
-      router.refresh();
     }
   }
 

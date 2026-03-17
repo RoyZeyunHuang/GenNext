@@ -19,7 +19,7 @@ const STAGE_LABELS: Record<string, string> = {
   Meeting: "Meeting",
   Negotiating: "Negotiating",
   Won: "Won",
-  Lost: "Dropped",
+  Lost: "终止",
 };
 const DEAL_STATUS_LABELS: Record<string, string> = {
   Active: "正常推进",
