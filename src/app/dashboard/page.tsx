@@ -1,9 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { DateGreeting } from "@/components/dashboard/DateGreeting";
 import { CalendarCard } from "@/components/dashboard/CalendarCard";
-import { NewsCard } from "@/components/dashboard/NewsCard";
+import { BrmSummaryCard } from "@/components/dashboard/BrmSummaryCard";
 import { TodosCard } from "@/components/dashboard/TodosCard";
 import { MonthlyOverviewCard } from "@/components/dashboard/MonthlyOverviewCard";
+import { DashboardNewsBlock } from "@/components/dashboard/DashboardNewsBlock";
 
 function getThisWeekRange(): { start: string; end: string } {
   const d = new Date();
@@ -47,9 +48,12 @@ export default async function DashboardPage() {
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <CalendarCard />
-        <NewsCard />
+        <BrmSummaryCard />
         <TodosCard todos={todos ?? []} />
         <MonthlyOverviewCard />
+      </div>
+      <div className="mt-6">
+        <DashboardNewsBlock />
       </div>
     </div>
   );

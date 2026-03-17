@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -11,5 +12,6 @@ export async function DELETE(
   const { id } = await params;
   const { error } = await supabase.from("todos").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  revalidatePath("/dashboard");
   return NextResponse.json({ ok: true });
 }

@@ -12,6 +12,12 @@ function getLocalToday(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function getLocalDateOffsetDays(offsetDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function formatTime(t: string | null): string {
   if (!t) return "";
   if (t.length <= 5) return t;
@@ -24,11 +30,15 @@ export function CalendarCard() {
   const [open, setOpen] = useState(false);
 
   const fetchEvents = () => {
+    setLoading(true);
     const today = getLocalToday();
-    fetch(`/api/calendar/today?date=${today}`)
+    const endDate = getLocalDateOffsetDays(6);
+    fetch(`/api/calendar/today?date=${today}&end_date=${endDate}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { if (Array.isArray(d)) setEvents(d); })
-      .catch(() => {})
+      .then((d) => {
+        setEvents(Array.isArray(d) ? d : []);
+      })
+      .catch(() => setEvents([]))
       .finally(() => setLoading(false));
   };
 
@@ -39,7 +49,7 @@ export function CalendarCard() {
       <div className="mb-4 flex items-center justify-between">
         <span className="flex items-center gap-2 text-sm font-medium text-[#1C1917]">
           <CalendarIcon className="h-4 w-4 text-[#78716C]" />
-          今日日历事项
+          日历事项（今日起 7 天）
         </span>
         <Button
           type="button"
@@ -57,13 +67,14 @@ export function CalendarCard() {
           加载中…
         </div>
       ) : events.length === 0 ? (
-        <p className="text-sm text-[#78716C]">今日暂无安排</p>
+        <p className="text-sm text-[#78716C]">近 7 日暂无安排</p>
       ) : (
         <ul className="space-y-2">
           {events.map((e) => (
             <li key={e.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
               <span className="shrink-0 text-[#78716C]">
-                {formatTime(e.start_time) || "—"}
+                {e.date}
+                {formatTime(e.start_time) ? ` ${formatTime(e.start_time)}` : ""}
                 {e.end_time ? ` - ${formatTime(e.end_time)}` : ""}
               </span>
               <span className="text-[#1C1917]">{e.title}</span>
