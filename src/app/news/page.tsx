@@ -6,16 +6,29 @@ import { RefreshCw, Sparkles, Loader2, Newspaper, Flame, CheckCircle } from "luc
 type ExecNews = { title: string; source: string; summary: string };
 type ViralNews = { title: string; hook: string; source: string };
 type TodayData = { date: string; executive_news: ExecNews[]; social_viral_news: ViralNews[] };
+type HistoryItem = {
+  id: string;
+  title: string | null;
+  content: string | null;
+  category: string | null;
+  tags: string[] | null;
+  publish_date: string | null;
+  created_at: string | null;
+};
 
 export default function NewsPage() {
   const [today, setToday] = useState<TodayData | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchNews = useCallback(async () => {
-    setLoading(true);
+  const fetchNews = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     try {
       const res = await fetch("/api/news/daily");
       const data = await res.json();
@@ -23,11 +36,23 @@ export default function NewsPage() {
         setToday(data.today);
         setLastUpdated(new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }));
       }
+      setHistory(Array.isArray(data.history) ? data.history : []);
     } catch { /* ignore */ }
-    setLoading(false);
+    if (!silent) setLoading(false);
+    setRefreshing(false);
   }, []);
 
-  useEffect(() => { fetchNews(); }, [fetchNews]);
+  useEffect(() => {
+    fetchNews();
+  }, [fetchNews]);
+
+  useEffect(() => {
+    const intervalMs = 60_000;
+    const id = window.setInterval(() => {
+      fetchNews({ silent: true });
+    }, intervalMs);
+    return () => window.clearInterval(id);
+  }, [fetchNews]);
 
   const saveAsInspiration = async (key: string, sourceUrl: string, summaryZh: string, tag: string) => {
     if (saved.has(key)) return;
@@ -44,6 +69,8 @@ export default function NewsPage() {
   };
 
   const todayDate = today?.date || new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+  const hasToday =
+    (today?.executive_news?.length ?? 0) > 0 || (today?.social_viral_news?.length ?? 0) > 0;
 
   return (
     <div className="p-6">
@@ -57,11 +84,11 @@ export default function NewsPage() {
           {lastUpdated && <span className="text-xs text-[#A8A29E]">更新于 {lastUpdated}</span>}
           <button
             type="button"
-            onClick={fetchNews}
-            disabled={loading}
+            onClick={() => fetchNews()}
+            disabled={loading || refreshing}
             className="flex h-9 items-center gap-1.5 rounded-lg border border-[#E7E5E4] px-4 text-xs font-medium text-[#1C1917] hover:bg-[#F5F5F4] disabled:opacity-50"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${(loading || refreshing) ? "animate-spin" : ""}`} />
             刷新新闻
           </button>
         </div>
@@ -72,7 +99,7 @@ export default function NewsPage() {
           <Loader2 className="h-6 w-6 animate-spin text-[#78716C]" />
           <span className="ml-2 text-sm text-[#78716C]">加载新闻中…</span>
         </div>
-      ) : (
+      ) : hasToday ? (
         <div className="grid gap-6 lg:grid-cols-2">
           {/* executive news */}
           <div>
@@ -173,6 +200,53 @@ export default function NewsPage() {
               )}
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-card">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-[#1C1917]">
+              <Newspaper className="h-4.5 w-4.5 text-[#78716C]" />
+              今日源为空，展示入库历史
+            </div>
+            {lastUpdated && <span className="text-xs text-[#A8A29E]">更新于 {lastUpdated}</span>}
+          </div>
+          {history.length === 0 ? (
+            <p className="py-10 text-center text-sm text-[#78716C]">
+              暂无历史新闻。请确认抓取器已写入 Supabase 的 `news_items`。
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {history.map((it) => (
+                <div key={it.id} className="rounded-lg bg-[#FAFAF9] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-[#1C1917]">{it.title ?? "(无标题)"}</p>
+                      <p className="mt-1 text-xs text-[#A8A29E]">
+                        {it.publish_date ?? it.created_at ?? ""}{it.category ? ` · ${it.category}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  {it.content ? (
+                    <p className="mt-2 text-xs leading-relaxed text-[#44403C]">{it.content}</p>
+                  ) : (
+                    <p className="mt-2 text-xs text-[#78716C]">（无内容）</p>
+                  )}
+                  {(it.tags ?? []).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(it.tags ?? []).slice(0, 6).map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full border border-[#E7E5E4] bg-white px-2 py-0.5 text-[10px] text-[#78716C]"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
