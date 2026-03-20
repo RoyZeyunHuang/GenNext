@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const propertyId = req.nextUrl.searchParams.get("property_id");
   let q = supabase
     .from("outreach")
-    .select("*, properties(id, name, address, property_companies(role, companies(name)))")
+    .select("*, properties(id, name, address, property_companies(role, company_id, companies(id, name)))")
     .order("updated_at", { ascending: false });
   if (propertyId) q = q.eq("property_id", propertyId);
   const { data, error } = await q;

@@ -4,14 +4,16 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/contexts/LocaleContext";
 
 export function PlanningTabs({ planId }: { planId: string }) {
+  const { t } = useLocale();
   const pathname = usePathname();
   const base = `/planning/${planId}`;
   const tabs = [
-    { path: `${base}/strategy`, label: "策略" },
-    { path: `${base}/schedule`, label: "排期" },
-    { path: `${base}/overview`, label: "概览" },
+    { path: `${base}/strategy`, labelKey: "planning.tabStrategy" },
+    { path: `${base}/schedule`, labelKey: "planning.tabSchedule" },
+    { path: `${base}/overview`, labelKey: "planning.tabOverview" },
   ];
 
   useEffect(() => {
@@ -26,18 +28,18 @@ export function PlanningTabs({ planId }: { planId: string }) {
 
   return (
     <div className="mb-6 flex gap-1 border-b border-[#E7E5E4]">
-      {tabs.map((t) => (
+      {tabs.map((tabItem) => (
         <Link
-          key={t.path}
-          href={t.path}
+          key={tabItem.path}
+          href={tabItem.path}
           className={cn(
             "border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
-            pathname === t.path
+            pathname === tabItem.path
               ? "border-[#1C1917] text-[#1C1917]"
               : "border-transparent text-[#78716C] hover:text-[#1C1917]"
           )}
         >
-          {t.label}
+          {t(tabItem.labelKey)}
         </Link>
       ))}
     </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, X, Loader2, MessageSquare, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BatchEmailModal } from "@/components/crm/BatchEmailModal";
 
 const STAGES = ["Pitched", "Meeting", "Negotiating", "Won", "Lost"] as const;
 const STAGE_COLORS: Record<string, string> = {
@@ -50,15 +51,30 @@ type OutreachItem = {
   contact_name: string | null;
   contact_info: string | null;
   notes: string | null;
+  ai_summary: string | null;
+  needs_attention: boolean;
+  last_email_at: string | null;
   created_at: string;
   updated_at: string;
   properties: {
     id: string;
     name: string;
     address: string | null;
-    property_companies?: { role: string; companies: { name: string } | null }[];
+    property_companies?: {
+      role: string;
+      company_id?: string | null;
+      companies: { id?: string; name: string } | null;
+    }[];
   } | null;
 };
+
+function getDeveloperCompanyId(item: OutreachItem): string | null {
+  const pcs = item.properties?.property_companies ?? [];
+  const dev = pcs.find((pc) => pc.role === "developer");
+  if (dev?.company_id) return dev.company_id;
+  if (dev?.companies?.id) return dev.companies.id;
+  return null;
+}
 
 function extractLatestNote(notes: string | null): string {
   if (!notes) return "";
@@ -86,6 +102,11 @@ export function OutreachTab() {
   const [importing, setImporting] = useState(false);
   const [importToast, setImportToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [batchEmailOpen, setBatchEmailOpen] = useState(false);
+  const [onlyAttention, setOnlyAttention] = useState(false);
+  const [emailSummary, setEmailSummary] = useState<
+    Record<string, { latest_received_ai_summary: string | null; created_at: string }>
+  >({});
 
   const fetchAll = useCallback(async () => {
     const res = await fetch("/api/crm/outreach");
@@ -96,6 +117,9 @@ export function OutreachTab() {
         ...o,
         stage: (o.stage ?? o.status ?? "Not Started") as string,
         deal_status: (o.deal_status ?? "Active") as string,
+        ai_summary: (o.ai_summary ?? null) as string | null,
+        needs_attention: Boolean(o.needs_attention),
+        last_email_at: (o.last_email_at ?? null) as string | null,
       })) as OutreachItem[]
     );
     setLoading(false);
@@ -104,6 +128,30 @@ export function OutreachTab() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        items
+          .map((i) => getDeveloperCompanyId(i))
+          .filter((x): x is string => Boolean(x))
+      )
+    );
+    if (ids.length === 0) {
+      setEmailSummary({});
+      return;
+    }
+    fetch("/api/email/summary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company_ids: ids }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && typeof data === "object" && !data.error) setEmailSummary(data);
+      })
+      .catch(() => setEmailSummary({}));
+  }, [items]);
 
   const updateItem = useCallback((updated: OutreachItem) => {
     setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
@@ -151,13 +199,40 @@ export function OutreachTab() {
 
   if (loading) return <p className="py-12 text-center text-sm text-[#78716C]">加载中…</p>;
 
-  const grouped = STAGES.map((s) => ({ stage: s, items: items.filter((i) => i.stage === s) }));
+  const attentionCount = items.filter((i) => i.needs_attention).length;
+  const baseItems = onlyAttention ? items.filter((i) => i.needs_attention) : items;
+  const grouped = STAGES.map((s) => ({
+    stage: s,
+    items: baseItems.filter((i) => i.stage === s),
+  }));
 
   return (
     <div className="relative">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium text-[#1C1917]">外联看板</span>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOnlyAttention((v) => !v)}
+            className={cn(
+              "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+              onlyAttention
+                ? "border-[#DC2626] bg-[#FEF2F2] text-[#DC2626]"
+                : "border-[#E7E5E4] bg-white text-[#78716C] hover:bg-[#FAFAF9]"
+            )}
+          >
+            需要介入：
+            <span className="ml-1 font-semibold text-[#DC2626]">
+              {attentionCount}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setBatchEmailOpen(true)}
+            className="flex items-center gap-1 rounded-lg border border-[#E7E5E4] bg-white px-3 py-1.5 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9]"
+          >
+            📧 批量发送
+          </button>
           <button
             type="button"
             onClick={() => setShowForm(true)}
@@ -205,37 +280,78 @@ export function OutreachTab() {
                   tabIndex={0}
                   onClick={() => setDrawerItem(item)}
                   className="cursor-grab rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-left transition-colors hover:border-[#1C1917]/30 active:cursor-grabbing"
+                  style={item.needs_attention ? { borderLeft: "3px solid #ff4b4b" } : undefined}
                 >
                   <div className="font-semibold text-[#1C1917]">{item.properties?.name ?? "未知楼盘"}</div>
-                  {(() => {
-                    const dev = item.properties?.property_companies?.find((pc) => pc.role === "developer")?.companies?.name;
-                    if (!dev) return null;
-                    return <div className="mt-0.5 text-xs text-[#78716C]">{dev}</div>;
-                  })()}
+
+                  {item.needs_attention && (
+                    <div className="mt-1 inline-flex items-center rounded bg-[#FEF2F2] px-2 py-0.5 text-[10px] font-medium text-[#DC2626]">
+                      ⚠️ 需要回复
+                    </div>
+                  )}
+
                   <div className="mt-1 flex flex-wrap gap-1">
-                    <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-medium", DEAL_STATUS_CARD_CLASS[item.deal_status] ?? DEAL_STATUS_CARD_CLASS.Active)}>
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        DEAL_STATUS_CARD_CLASS[item.deal_status] ??
+                          DEAL_STATUS_CARD_CLASS.Active
+                      )}
+                    >
                       {DEAL_STATUS_LABELS[item.deal_status] ?? item.deal_status}
                     </span>
                   </div>
+
                   {(item.price || item.term) && (
                     <div className="mt-0.5 text-[10px] text-[#A8A29E]">
                       {[item.price, item.term].filter(Boolean).join(" · ")}
                     </div>
                   )}
+
+                  {item.ai_summary ? (
+                    <div className="mt-1 line-clamp-2 text-xs italic text-gray-500">
+                      🤖 {item.ai_summary}
+                    </div>
+                  ) : null}
+
                   {item.notes && (
                     <div className="mt-1 line-clamp-2 text-xs text-[#78716C]">
                       {lastNotePreview(item.notes)}
                     </div>
                   )}
-                  {item.notes && item.contact_name && (
-                    <div className="mt-1 text-[10px] text-[#78716C]">主要联系人：{item.contact_name}</div>
-                  )}
-                  <div className="mt-1 text-[10px] text-[#A8A29E]">{new Date(item.updated_at).toLocaleDateString("zh-CN")}</div>
+
+                  {item.needs_attention && (() => {
+                    const cid = getDeveloperCompanyId(item);
+                    const em = cid ? emailSummary[cid] : null;
+                    if (!em?.latest_received_ai_summary) return null;
+                    return (
+                      <div className="mt-1 line-clamp-2 text-xs italic text-[#DC2626]">
+                        最新收到：{em.latest_received_ai_summary}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="mt-1 text-[10px] text-[#A8A29E]">
+                    {new Date(item.updated_at).toLocaleDateString("zh-CN")}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={async () => {
+            await fetch("/api/email/sync", { method: "POST" });
+            fetchAll();
+          }}
+          className="rounded-lg border border-[#E7E5E4] bg-white px-3 py-1.5 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9]"
+        >
+          🔄 同步收件箱
+        </button>
       </div>
 
       {lostModal && (
@@ -257,6 +373,16 @@ export function OutreachTab() {
           item={drawerItem}
           onClose={() => setDrawerItem(null)}
           onUpdate={updateItem}
+        />
+      )}
+
+      {batchEmailOpen && (
+        <BatchEmailModal
+          onClose={() => setBatchEmailOpen(false)}
+          onDone={(r) => {
+            fetchAll();
+            if (r.failed === 0) setBatchEmailOpen(false);
+          }}
         />
       )}
     </div>

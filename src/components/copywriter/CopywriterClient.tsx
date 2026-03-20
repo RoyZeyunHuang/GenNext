@@ -4,8 +4,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { Copy, Star, Loader2, Sparkles, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { composeOutputWithTitle, parseTitleVariantsAndBody } from "@/lib/parse-title-variants";
 
 const SINGLE_SELECT_CATEGORIES = ["人格模板", "任务模板"];
+const TITLE_PATTERN_CATEGORY = "标题套路";
 const MULTI_SELECT_CATEGORIES = ["品牌档案", "知识库"];
 
 type Category = { id: string; name: string; icon: string; is_auto_include?: boolean };
@@ -94,9 +96,14 @@ export function CopywriterClient() {
   const [starred, setStarred] = useState(false);
   const [showManualPicker, setShowManualPicker] = useState(false);
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
+  const [openTitlePatternPicker, setOpenTitlePatternPicker] = useState(false);
+  const [titlePatternDocId, setTitlePatternDocId] = useState<string | null>(null);
+  const [titlePatternUserCleared, setTitlePatternUserCleared] = useState(false);
+  const [selectedTitleIdx, setSelectedTitleIdx] = useState(0);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const outputRef = useRef<HTMLDivElement>(null);
   const pickerAnchorRef = useRef<HTMLDivElement>(null);
+  const titlePatternPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     Promise.all([
@@ -109,6 +116,16 @@ export function CopywriterClient() {
       setHistory(Array.isArray(hist) ? hist.slice(0, 10) : []);
     });
   }, []);
+
+  useEffect(() => {
+    if (titlePatternUserCleared) return;
+    const cat = categories.find((c) => c.name === TITLE_PATTERN_CATEGORY);
+    if (!cat) return;
+    const inCat = allDocs.filter((d) => d.category_id === cat.id);
+    if (inCat.length === 0) return;
+    const preferred = inCat.find((d) => d.title === "默认标题套路") ?? inCat[0];
+    setTitlePatternDocId((prev) => (prev === null ? preferred.id : prev));
+  }, [allDocs, categories, titlePatternUserCleared]);
 
   const categoryNameById = useCallback((id: string) => categories.find((c) => c.id === id)?.name ?? "", [categories]);
   const categoryIconById = useCallback((id: string) => categories.find((c) => c.id === id)?.icon ?? "📁", [categories]);
@@ -231,6 +248,7 @@ export function CopywriterClient() {
         body: JSON.stringify({
           selected_doc_ids: docIds,
           user_input: userInput,
+          title_pattern_doc_id: titlePatternDocId,
         }),
       });
       if (!res.ok) {
@@ -259,11 +277,27 @@ export function CopywriterClient() {
     } finally {
       setGenerating(false);
     }
-  }, [selectedDocIds, userInput]);
+  }, [selectedDocIds, userInput, titlePatternDocId]);
+
+  const parsedOutput = parseTitleVariantsAndBody(output);
+  const showTitleVariants = !generating && parsedOutput.variants.length > 0;
+  const maxTitleIdx = Math.max(0, parsedOutput.variants.length - 1);
+  const safeTitleIdx = Math.min(selectedTitleIdx, maxTitleIdx);
+  const selectedVariant = parsedOutput.variants[safeTitleIdx];
+  const effectiveTitleForCopy = selectedVariant
+    ? selectedVariant.text || `【${selectedVariant.label}】`
+    : "";
+  const copyPayload = showTitleVariants
+    ? composeOutputWithTitle(effectiveTitleForCopy, parsedOutput.body)
+    : output;
+
+  useEffect(() => {
+    setSelectedTitleIdx(0);
+  }, [output]);
 
   const copyToClipboard = async () => {
     if (!output) return;
-    await navigator.clipboard.writeText(output);
+    await navigator.clipboard.writeText(copyPayload || output);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -271,6 +305,7 @@ export function CopywriterClient() {
   const handleStar = async () => {
     if (!output || starred) return;
     const docIds = Array.from(selectedDocIds);
+    const out = copyPayload || output;
     await fetch("/api/generated-copies", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -278,7 +313,7 @@ export function CopywriterClient() {
         user_input: userInput,
         doc_ids: docIds,
         detected_intent: intent,
-        output,
+        output: out,
         platform: null,
         starred: true,
       }),
@@ -334,9 +369,16 @@ export function CopywriterClient() {
         </div>
 
         {canShowBlock && (
-          <div className={cn("rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm", openPicker && "relative z-[50]")}>
-            {openPicker && (
-              <div className="fixed inset-0 z-[40]" onClick={() => setOpenPicker(null)} aria-hidden />
+          <div className={cn("rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm", (openPicker || openTitlePatternPicker) && "relative z-[50]")}>
+            {(openPicker || openTitlePatternPicker) && (
+              <div
+                className="fixed inset-0 z-[40]"
+                onClick={() => {
+                  setOpenPicker(null);
+                  setOpenTitlePatternPicker(false);
+                }}
+                aria-hidden
+              />
             )}
             <h3 className="mb-3 text-sm font-medium text-[#1C1917]">AI 将使用</h3>
 
@@ -437,6 +479,78 @@ export function CopywriterClient() {
                   </div>
                 );
               })}
+
+              {(() => {
+                const cat = categories.find((c) => c.name === TITLE_PATTERN_CATEGORY);
+                if (!cat) return null;
+                const docsInCat = allDocs.filter((d) => d.category_id === cat.id);
+                if (docsInCat.length === 0) return null;
+                if (titlePatternDocId === null && titlePatternUserCleared) {
+                  return (
+                    <div key="title-pattern-enable">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTitlePatternUserCleared(false);
+                          const preferred = docsInCat.find((d) => d.title === "默认标题套路") ?? docsInCat[0];
+                          setTitlePatternDocId(preferred.id);
+                        }}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        + 启用标题套路（成套标题）
+                      </button>
+                    </div>
+                  );
+                }
+                if (titlePatternDocId === null) return null;
+                const selectedTp = docsInCat.find((d) => d.id === titlePatternDocId);
+                return (
+                  <div key="title-pattern" className="relative">
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 text-base">🏷️</span>
+                      <span className="w-20 shrink-0 text-sm text-[#78716C]">标题套路：</span>
+                      <div className="relative min-w-0 flex-1" ref={titlePatternPickerRef}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenTitlePatternPicker((o) => !o)}
+                          className={cn(
+                            "flex h-9 w-full items-center justify-between rounded-lg border border-[#E7E5E4] px-3 text-left text-sm hover:bg-[#FAFAF9]",
+                            selectedTp ? "text-[#1C1917]" : "text-[#A8A29E]"
+                          )}
+                        >
+                          <span className="truncate">{selectedTp?.title ?? "点击选择"}</span>
+                          <span className="shrink-0 text-[#A8A29E]">▾</span>
+                        </button>
+                        {openTitlePatternPicker && (
+                          <DocPickerDropdown
+                            categoryName={TITLE_PATTERN_CATEGORY}
+                            docs={docsInCat}
+                            currentId={titlePatternDocId}
+                            searchPlaceholder="搜索标题套路文档…"
+                            onSelect={(doc) => {
+                              setTitlePatternDocId(doc.id);
+                              setOpenTitlePatternPicker(false);
+                            }}
+                            onClose={() => setOpenTitlePatternPicker(false)}
+                          />
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTitlePatternDocId(null);
+                          setTitlePatternUserCleared(true);
+                          setOpenTitlePatternPicker(false);
+                        }}
+                        className="shrink-0 rounded p-1 text-[#78716C] hover:bg-[#F5F5F4] hover:text-red-600"
+                        aria-label="移除标题套路"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {selectedDocs.length === 0 && selectedDocIds.size === 0 && (
@@ -485,7 +599,38 @@ export function CopywriterClient() {
             ref={outputRef}
             className="min-h-[200px] max-h-[400px] overflow-y-auto rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-4 text-sm text-[#1C1917] whitespace-pre-wrap"
           >
-            {output ? output : generating ? "..." : "生成结果将显示在此处"}
+            {!output && !generating && "生成结果将显示在此处"}
+            {generating && !output && "..."}
+            {output && !showTitleVariants && output}
+            {output && showTitleVariants && (
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-xs font-medium text-[#78716C]">标题变体（点击选择最终标题）</p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    {parsedOutput.variants.map((v, idx) => (
+                      <button
+                        key={`${v.label}-${idx}`}
+                        type="button"
+                        onClick={() => setSelectedTitleIdx(idx)}
+                        className={cn(
+                          "max-w-full rounded-lg border px-3 py-2.5 text-left text-sm transition-colors",
+                          selectedTitleIdx === idx
+                            ? "border-[#1C1917] bg-[#1C1917] text-white"
+                            : "border-[#E7E5E4] bg-white text-[#1C1917] hover:border-[#A8A29E]"
+                        )}
+                      >
+                        <span className="block text-[10px] font-medium opacity-80">【{v.label}】</span>
+                        <span className="mt-0.5 block whitespace-pre-wrap">{v.text || "（无标题文案）"}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-medium text-[#78716C]">正文</p>
+                  <div className="whitespace-pre-wrap text-[#1C1917]">{parsedOutput.body || "（无正文）"}</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

@@ -9,15 +9,26 @@ const anthropic = new Anthropic({
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const TITLE_PATTERN_CATEGORY_NAME = "标题套路";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { selected_doc_ids = [], user_input = "" } = body as {
+    const {
+      selected_doc_ids = [],
+      user_input = "",
+      title_pattern_doc_id: titlePatternDocIdRaw = null,
+    } = body as {
       selected_doc_ids?: string[];
       user_input?: string;
+      title_pattern_doc_id?: string | null;
     };
 
     const allDocIds = (Array.isArray(selected_doc_ids) ? selected_doc_ids : []).filter(Boolean);
+    const titlePatternDocId =
+      typeof titlePatternDocIdRaw === "string" && titlePatternDocIdRaw.trim()
+        ? titlePatternDocIdRaw.trim()
+        : null;
 
     if (!anthropic.apiKey) {
       return new Response(
@@ -53,7 +64,61 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    systemParts.push(`
+    let titlePatternContent: string | null = null;
+    if (titlePatternDocId) {
+      const { data: cat } = await supabase
+        .from("doc_categories")
+        .select("id")
+        .eq("name", TITLE_PATTERN_CATEGORY_NAME)
+        .maybeSingle();
+      if (cat?.id) {
+        const { data: tpDoc } = await supabase
+          .from("docs")
+          .select("id, content, category_id")
+          .eq("id", titlePatternDocId)
+          .maybeSingle();
+        if (tpDoc && tpDoc.category_id === cat.id && (tpDoc.content ?? "").trim()) {
+          titlePatternContent = (tpDoc.content ?? "").trim();
+        }
+      }
+    }
+
+    if (titlePatternContent) {
+      systemParts.push(`
+重要：只输出最终文案本身，不要输出以下内容：
+- 不要说你搜索了什么
+- 不要说你按照什么模板写的
+- 不要说你用了什么人格
+- 不要做任何前置说明或分析过程
+- 不要在文案前后加任何解释
+
+同时为这篇内容生成多个标题变体。
+
+${titlePatternContent}
+
+输出格式：
+先输出所有标题变体，每个标题前标注类型名：
+【悬念型】xxx
+【数据型】xxx
+【情绪型】xxx
+【反转型】xxx
+【对话型】xxx
+
+然后空一行，输出正文。
+
+（具体类型名称以「标题套路」文档中的定义为准；若文档中增减了类型，按文档输出对应行数。）
+
+正文部分格式要求（非常重要，必须严格遵守）：
+- 不要使用 **加粗** 或 markdown 格式
+- 不要使用标题格式（不要 ## 或 **标题**）
+- 段落之间用空行分隔，不要用标题分段
+- 要点用 emoji 开头代替数字编号，如 ✅ 📍 💡 🔑 ⚠️
+- 语气像小红书博主发帖，不像写文章或报告
+- 整体节奏：短句为主，偶尔长句，读起来像在刷手机不是在看文档
+- 每隔2-3段自然加1个 emoji，不要堆砌
+- 不要有任何看起来像 Word 文档或公众号文章的排版痕迹`);
+    } else {
+      systemParts.push(`
 重要：只输出最终文案本身，不要输出以下内容：
 - 不要说你搜索了什么
 - 不要说你按照什么模板写的
@@ -71,6 +136,7 @@ export async function POST(req: NextRequest) {
 - 整体节奏：短句为主，偶尔长句，读起来像在刷手机不是在看文档
 - 每隔2-3段自然加1个 emoji，不要堆砌
 - 不要有任何看起来像 Word 文档或公众号文章的排版痕迹`);
+    }
 
     const systemPrompt = systemParts.join("\n");
     const userMessage = `=== 用户需求 ===\n${user_input || "无具体需求"}`;

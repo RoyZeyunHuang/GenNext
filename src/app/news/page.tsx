@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Sparkles, Loader2, Newspaper, Flame, CheckCircle } from "lucide-react";
+import { useLocale } from "@/contexts/LocaleContext";
+import { PageHeader } from "@/components/PageHeader";
 
 type ExecNews = { title: string; source: string; summary: string };
 type ViralNews = { title: string; hook: string; source: string };
@@ -17,6 +19,7 @@ type HistoryItem = {
 };
 
 export default function NewsPage() {
+  const { t } = useLocale();
   const [today, setToday] = useState<TodayData | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,14 +77,11 @@ export default function NewsPage() {
 
   return (
     <div className="p-6">
-      {/* header */}
+      <PageHeader titleKey="news.title" pageTitleKey="pages.news" />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#1C1917]">每日新闻</h1>
-          <p className="mt-1 text-sm text-[#78716C]">{todayDate}</p>
-        </div>
+        <p className="mt-1 text-sm text-[#78716C]">{todayDate}</p>
         <div className="flex items-center gap-3">
-          {lastUpdated && <span className="text-xs text-[#A8A29E]">更新于 {lastUpdated}</span>}
+          {lastUpdated && <span className="text-xs text-[#A8A29E]">{t("news.updatedAt")} {lastUpdated}</span>}
           <button
             type="button"
             onClick={() => fetchNews()}
@@ -89,7 +89,7 @@ export default function NewsPage() {
             className="flex h-9 items-center gap-1.5 rounded-lg border border-[#E7E5E4] px-4 text-xs font-medium text-[#1C1917] hover:bg-[#F5F5F4] disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${(loading || refreshing) ? "animate-spin" : ""}`} />
-            刷新新闻
+            {t("news.refresh")}
           </button>
         </div>
       </div>
@@ -97,7 +97,7 @@ export default function NewsPage() {
       {loading && !today ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-[#78716C]" />
-          <span className="ml-2 text-sm text-[#78716C]">加载新闻中…</span>
+          <span className="ml-2 text-sm text-[#78716C]">{t("news.loading")}</span>
         </div>
       ) : hasToday ? (
         <div className="grid gap-6 lg:grid-cols-2">
@@ -105,12 +105,12 @@ export default function NewsPage() {
           <div>
             <div className="mb-4 flex items-center gap-2">
               <Newspaper className="h-4.5 w-4.5 text-[#78716C]" />
-              <h2 className="text-sm font-medium text-[#1C1917]">📊 行业简报</h2>
+              <h2 className="text-sm font-medium text-[#1C1917]">📊 {t("news.sectionExecutive")}</h2>
               <span className="text-xs text-[#A8A29E]">({today?.executive_news?.length ?? 0})</span>
             </div>
             <div className="space-y-3">
               {(today?.executive_news ?? []).length === 0 ? (
-                <p className="py-8 text-center text-sm text-[#78716C]">暂无行业简报</p>
+                <p className="py-8 text-center text-sm text-[#78716C]">{t("news.emptyExecutive")}</p>
               ) : (
                 (today?.executive_news ?? []).map((item, i) => {
                   const key = `exec_${i}`;
@@ -124,7 +124,7 @@ export default function NewsPage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => saveAsInspiration(key, item.source, `${item.title}\n${item.summary}`, "行业简报")}
+                          onClick={() => saveAsInspiration(key, item.source, `${item.title}\n${item.summary}`, t("news.tagExecutive"))}
                           disabled={saving === key || isSaved}
                           className={`flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-medium transition-colors ${
                             isSaved
@@ -139,7 +139,7 @@ export default function NewsPage() {
                           ) : (
                             <Sparkles className="h-3 w-3" />
                           )}
-                          {isSaved ? "已保存" : "转为文案灵感"}
+                          {isSaved ? t("news.saved") : t("news.saveAsInspiration")}
                         </button>
                       </div>
                       <p className="mt-3 text-xs leading-relaxed text-[#44403C]">{item.summary}</p>
@@ -154,12 +154,12 @@ export default function NewsPage() {
           <div>
             <div className="mb-4 flex items-center gap-2">
               <Flame className="h-4.5 w-4.5 text-[#78716C]" />
-              <h2 className="text-sm font-medium text-[#1C1917]">🔥 社媒选题</h2>
+              <h2 className="text-sm font-medium text-[#1C1917]">🔥 {t("news.sectionViral")}</h2>
               <span className="text-xs text-[#A8A29E]">({today?.social_viral_news?.length ?? 0})</span>
             </div>
             <div className="space-y-3">
               {(today?.social_viral_news ?? []).length === 0 ? (
-                <p className="py-8 text-center text-sm text-[#78716C]">暂无社媒选题</p>
+                <p className="py-8 text-center text-sm text-[#78716C]">{t("news.emptyViral")}</p>
               ) : (
                 (today?.social_viral_news ?? []).map((item, i) => {
                   const key = `viral_${i}`;
@@ -173,7 +173,7 @@ export default function NewsPage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => saveAsInspiration(key, item.source, `${item.title}\n${item.hook}`, "社媒选题")}
+                          onClick={() => saveAsInspiration(key, item.source, `${item.title}\n${item.hook}`, t("news.tagViral"))}
                           disabled={saving === key || isSaved}
                           className={`flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-medium transition-colors ${
                             isSaved
@@ -188,7 +188,7 @@ export default function NewsPage() {
                           ) : (
                             <Sparkles className="h-3 w-3" />
                           )}
-                          {isSaved ? "已保存" : "转为文案灵感"}
+                          {isSaved ? t("news.saved") : t("news.saveAsInspiration")}
                         </button>
                       </div>
                       <div className="mt-3 rounded-lg bg-[#FFF7ED] px-3 py-2">
@@ -206,13 +206,13 @@ export default function NewsPage() {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-medium text-[#1C1917]">
               <Newspaper className="h-4.5 w-4.5 text-[#78716C]" />
-              今日源为空，展示入库历史
+              {t("news.todaySourceEmpty")}
             </div>
-            {lastUpdated && <span className="text-xs text-[#A8A29E]">更新于 {lastUpdated}</span>}
+            {lastUpdated && <span className="text-xs text-[#A8A29E]">{t("news.updatedAt")} {lastUpdated}</span>}
           </div>
           {history.length === 0 ? (
             <p className="py-10 text-center text-sm text-[#78716C]">
-              暂无历史新闻。请确认抓取器已写入 Supabase 的 `news_items`。
+              {t("news.noHistory")}
             </p>
           ) : (
             <div className="space-y-3">
@@ -220,7 +220,7 @@ export default function NewsPage() {
                 <div key={it.id} className="rounded-lg bg-[#FAFAF9] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-[#1C1917]">{it.title ?? "(无标题)"}</p>
+                      <p className="text-sm font-semibold text-[#1C1917]">{it.title ?? t("news.noTitle")}</p>
                       <p className="mt-1 text-xs text-[#A8A29E]">
                         {it.publish_date ?? it.created_at ?? ""}{it.category ? ` · ${it.category}` : ""}
                       </p>
@@ -229,7 +229,7 @@ export default function NewsPage() {
                   {it.content ? (
                     <p className="mt-2 text-xs leading-relaxed text-[#44403C]">{it.content}</p>
                   ) : (
-                    <p className="mt-2 text-xs text-[#78716C]">（无内容）</p>
+                    <p className="mt-2 text-xs text-[#78716C]">{t("news.noContent")}</p>
                   )}
                   {(it.tags ?? []).length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">

@@ -16,29 +16,34 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/contexts/LocaleContext";
+
+/** 左侧导航可见页面；要恢复隐藏入口时把对应 key 加回此数组即可 */
+export const VISIBLE_PAGES = ["dashboard", "documents", "copywriter", "news"] as const;
 
 const navItems = [
-  { href: "/dashboard", label: "概览", icon: LayoutDashboard },
-  { href: "/documents", label: "内容工厂", icon: FolderOpen },
-  { href: "/copywriter", label: "内容创作", icon: PenLine },
-  { href: "/planning", label: "内容排期", icon: CalendarRange },
-  { href: "/calendar", label: "AI日历", icon: Calendar },
-  { href: "/crm", label: "BRM", icon: Users },
-  { href: "/kpi", label: "KPI", icon: BarChart3 },
-  { href: "/news", label: "新闻摘要", icon: Newspaper },
-  { href: "/settings", label: "设置", icon: Settings },
+  { href: "/dashboard", pageKey: "dashboard" as const, labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { href: "/documents", pageKey: "documents" as const, labelKey: "nav.documents", icon: FolderOpen },
+  { href: "/copywriter", pageKey: "copywriter" as const, labelKey: "nav.copywriter", icon: PenLine },
+  { href: "/planning", pageKey: "planning" as const, labelKey: "nav.planning", icon: CalendarRange },
+  { href: "/calendar", pageKey: "calendar" as const, labelKey: "nav.calendar", icon: Calendar },
+  { href: "/crm", pageKey: "crm" as const, labelKey: "nav.crm", icon: Users },
+  { href: "/kpi", pageKey: "kpi" as const, labelKey: "nav.kpi", icon: BarChart3 },
+  { href: "/news", pageKey: "news" as const, labelKey: "nav.news", icon: Newspaper },
+  { href: "/settings", pageKey: "settings" as const, labelKey: "nav.settings", icon: Settings },
 ] as const;
 
-type Locale = "zh" | "en";
+const visibleSet = new Set<string>(VISIBLE_PAGES);
 
-export function Sidebar({
-  locale = "zh",
-  onLocaleChange,
-}: {
-  locale?: Locale;
-  onLocaleChange?: (locale: Locale) => void;
-}) {
+function isNavVisible(pageKey: string): boolean {
+  return visibleSet.has(pageKey);
+}
+
+export function Sidebar() {
   const pathname = usePathname();
+  const { locale, setLocale, t } = useLocale();
+
+  const filteredNav = navItems.filter((item) => isNavVisible(item.pageKey));
 
   return (
     <aside className="flex h-screen w-56 flex-col border-r border-[#E7E5E4] bg-sidebar">
@@ -50,9 +55,8 @@ export function Sidebar({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2 flex flex-col">
-        <div className="flex-1">
-        {navItems.slice(0, -1).map(({ href, label, icon: Icon }) => {
+      <nav className="flex flex-1 flex-col space-y-0.5 overflow-y-auto p-2">
+        {filteredNav.map(({ href, labelKey, icon: Icon }) => {
           const isActive =
             pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
           return (
@@ -67,29 +71,10 @@ export function Sidebar({
               )}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              {label}
+              {t(labelKey)}
             </Link>
           );
         })}
-        </div>
-        <div className="mt-auto border-t border-[#E7E5E4] pt-2">
-        {navItems.slice(-1).map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive ? "bg-[#1C1917] text-white" : "text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]"
-              )}
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {label}
-            </Link>
-          );
-        })}
-        </div>
       </nav>
 
       {/* Language switch */}
@@ -99,7 +84,7 @@ export function Sidebar({
             variant={locale === "zh" ? "secondary" : "ghost"}
             size="sm"
             className="flex-1 gap-1.5"
-            onClick={() => onLocaleChange?.("zh")}
+            onClick={() => setLocale("zh")}
           >
             <Languages className="h-4 w-4" />
             中文
@@ -108,7 +93,7 @@ export function Sidebar({
             variant={locale === "en" ? "secondary" : "ghost"}
             size="sm"
             className="flex-1 gap-1.5"
-            onClick={() => onLocaleChange?.("en")}
+            onClick={() => setLocale("en")}
           >
             <Languages className="h-4 w-4" />
             EN

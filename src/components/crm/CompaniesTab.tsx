@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, X, Trash2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CompanyEmailSection } from "@/components/crm/CompanyEmailSection";
 
 type Contact = { id: string; name: string; title: string | null; phone: string | null; email: string | null; linkedin_url: string | null; is_primary: boolean };
 type PropertyLink = { id: string; role: string; properties: { id: string; name: string; address: string | null; area: string | null } | null };
@@ -302,6 +303,8 @@ function CompanyDetail({
           ))
         )}
       </div>
+
+      <CompanyEmailSection company={company} />
 
       {(company.property_companies ?? []).length > 0 && (
         <div className="mt-4">
