@@ -21,8 +21,8 @@ const faviconSvg = "data:image/svg+xml," + encodeURIComponent(
 );
 
 export const metadata: Metadata = {
-  title: "Ops Hub",
-  description: "Ops Hub - 运营工作台",
+  title: "GenNext",
+  description: "GenNext - 运营工作台",
   icons: { icon: { url: faviconSvg, type: "image/svg+xml" } },
 };
 

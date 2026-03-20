@@ -8,8 +8,8 @@ export function DocumentTitle({ titleKey }: { titleKey: string }) {
   const { t } = useLocale();
   useEffect(() => {
     const title = t(titleKey);
-    document.title = title ? `${title} | Ops Hub` : "Ops Hub";
-    return () => { document.title = "Ops Hub"; };
+    document.title = title ? `${title} | GenNext` : "GenNext";
+    return () => { document.title = "GenNext"; };
   }, [titleKey, t]);
   return null;
 }

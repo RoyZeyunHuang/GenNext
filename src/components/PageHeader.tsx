@@ -15,8 +15,8 @@ export function PageHeader({ titleKey, subtitleKey, pageTitleKey }: Props) {
   useEffect(() => {
     if (!pageTitleKey) return;
     const title = t(pageTitleKey);
-    document.title = title ? `${title} | Ops Hub` : "Ops Hub";
-    return () => { document.title = "Ops Hub"; };
+    document.title = title ? `${title} | GenNext` : "GenNext";
+    return () => { document.title = "GenNext"; };
   }, [pageTitleKey, t]);
   return (
     <div className="mb-6">

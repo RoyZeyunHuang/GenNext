@@ -21,7 +21,7 @@ export function buildIcsContent(events: IcsEvent[]): string {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Ops Hub//Calendar//EN",
+    "PRODID:-//GenNext//Calendar//EN",
     "CALSCALE:GREGORIAN",
   ];
   events.forEach((evt, i) => {
