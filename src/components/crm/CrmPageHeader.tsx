@@ -7,8 +7,8 @@ export function CrmPageHeader() {
   const { t } = useLocale();
   useEffect(() => {
     const title = t("pages.crm");
-    document.title = title ? `${title} | Ops Hub` : "Ops Hub";
-    return () => { document.title = "Ops Hub"; };
+    document.title = title ? `${title} | GenNext` : "GenNext";
+    return () => { document.title = "GenNext"; };
   }, [t]);
   return (
     <div className="mb-6">

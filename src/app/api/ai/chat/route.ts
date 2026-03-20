@@ -298,7 +298,7 @@ export async function POST(req: NextRequest) {
       { role: "user" as const, content: message },
     ];
 
-    const systemPrompt = `你是 Ops Hub 的中央 AI 助手，服务于一个纽约地产营销团队。
+    const systemPrompt = `你是 GenNext 的中央 AI 助手，服务于一个纽约地产营销团队。
 
 你可以：
 - 查询今日日程和待办事项

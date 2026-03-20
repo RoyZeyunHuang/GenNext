@@ -7,12 +7,6 @@ import { TodosCard } from "@/components/dashboard/TodosCard";
 import { MonthlyOverviewCard } from "@/components/dashboard/MonthlyOverviewCard";
 import { DashboardNewsBlock } from "@/components/dashboard/DashboardNewsBlock";
 
-/** 为 false 时隐藏「📊 本月数据概览」等 KPI 相关卡片，并改用精简首页；改回 true 恢复原先 2×2 + 新闻 */
-const SHOW_KPI_CARD = false;
-
-/** 仅在精简首页（SHOW_KPI_CARD === false）生效：是否显示「今日日历」卡片 */
-const SHOW_CALENDAR_CARD = false;
-
 function getThisWeekRange(): { start: string; end: string } {
   const d = new Date();
   const day = d.getDay();
@@ -34,14 +28,12 @@ export default async function DashboardPage() {
 
   const [{ data: todos }] = await Promise.all([
     supabase.from("todos").select("*").order("created_at", { ascending: false }),
-    SHOW_KPI_CARD
-      ? supabase
-          .from("kpi_entries")
-          .select("*")
-          .gte("created_at", weekStart)
-          .lte("created_at", weekEnd)
-          .order("created_at", { ascending: false })
-      : Promise.resolve({ data: null }),
+    supabase
+      .from("kpi_entries")
+      .select("*")
+      .gte("created_at", weekStart)
+      .lte("created_at", weekEnd)
+      .order("created_at", { ascending: false }),
   ]);
 
   return (
@@ -50,34 +42,15 @@ export default async function DashboardPage() {
       <div className="mb-6">
         <DateGreeting />
       </div>
-
-      {SHOW_KPI_CARD ? (
-        <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <CalendarCard />
-            <BrmSummaryCard />
-            <TodosCard todos={todos ?? []} />
-            <MonthlyOverviewCard />
-          </div>
-          <div className="mt-6">
-            <DashboardNewsBlock />
-          </div>
-        </>
-      ) : (
-        <div className="space-y-4">
-          {SHOW_CALENDAR_CARD ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <CalendarCard />
-              <DashboardNewsBlock />
-            </div>
-          ) : (
-            <DashboardNewsBlock />
-          )}
-          <div className="w-full">
-            <TodosCard todos={todos ?? []} />
-          </div>
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <CalendarCard />
+        <BrmSummaryCard />
+        <TodosCard todos={todos ?? []} />
+        <MonthlyOverviewCard />
+      </div>
+      <div className="mt-6">
+        <DashboardNewsBlock />
+      </div>
     </div>
   );
 }
