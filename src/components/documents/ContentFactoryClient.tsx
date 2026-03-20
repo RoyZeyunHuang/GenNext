@@ -24,7 +24,7 @@ type Doc = {
   metadata?: Record<string, unknown>;
 };
 
-const ICON_OPTIONS = ["📋", "📚", "📝", "🎭", "📁", "📄", "📌", "🔖"];
+const ICON_OPTIONS = ["📋", "📚", "📝", "🎭", "🏷️", "📁", "📄", "📌", "🔖"];
 
 export function ContentFactoryClient() {
   const [categories, setCategories] = useState<Category[]>([]);

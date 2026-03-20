@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Plus, Pencil, Trash2, X } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, X, Loader2, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmailTemplatesClient } from "@/components/settings/EmailTemplatesClient";
 
 const COLORS = ["#4a90d9", "#21c354", "#e67e22", "#9b59b6", "#e74c3c", "#1abc9c", "#f39c12", "#3498db"];
 
@@ -16,6 +17,13 @@ type Account = {
 };
 
 export function SettingsClient() {
+  const [mailStatus, setMailStatus] = useState<{
+    gmail_authorized: boolean;
+    gmail_email: string | null;
+  } | null>(null);
+  const [mailLoading, setMailLoading] = useState(true);
+  const [syncLoading, setSyncLoading] = useState(false);
+
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -35,6 +43,36 @@ export function SettingsClient() {
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
+
+  const fetchMailSettings = useCallback(async () => {
+    setMailLoading(true);
+    const res = await fetch("/api/settings/email");
+    const data = await res.json();
+    setMailStatus({
+      gmail_authorized: Boolean(data.gmail_authorized),
+      gmail_email: data.gmail_email ?? null,
+    });
+    setMailLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchMailSettings();
+  }, [fetchMailSettings]);
+
+  const syncInbox = async () => {
+    setSyncLoading(true);
+    try {
+      const res = await fetch("/api/email/sync", { method: "POST" });
+      const data = await res.json();
+      alert(
+        data.error
+          ? data.error
+          : `同步完成：写入 ${data.synced ?? 0} 封，跳过 ${data.skipped ?? 0}`
+      );
+    } finally {
+      setSyncLoading(false);
+    }
+  };
 
   const saveNew = async () => {
     if (!form.name.trim()) return;
@@ -81,6 +119,55 @@ export function SettingsClient() {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      <div className="rounded-xl border border-[#E7E5E4] bg-white p-6">
+        <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#1C1917]">
+          <Mail className="h-5 w-5 text-[#78716C]" />
+          邮件设置
+        </h2>
+        {mailLoading ? (
+          <p className="text-sm text-[#78716C]">加载中…</p>
+        ) : (
+          <div className="space-y-4 text-sm">
+            <div>
+              <span className="text-[#78716C]">Gmail 授权状态：</span>
+              {mailStatus?.gmail_authorized ? (
+                <span className="ml-2 font-medium text-emerald-700">已授权 ✅</span>
+              ) : (
+                <span className="ml-2 font-medium text-[#78716C]">未授权</span>
+              )}
+            </div>
+            {mailStatus?.gmail_email && (
+              <div className="text-[#44403C]">
+                已授权邮箱：<span className="font-medium">{mailStatus.gmail_email}</span>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/api/auth/google"
+                className="inline-flex items-center rounded-lg bg-[#1C1917] px-4 py-2 text-xs font-medium text-white hover:bg-[#1C1917]/90"
+              >
+                授权 Gmail
+              </a>
+              <button
+                type="button"
+                onClick={syncInbox}
+                disabled={syncLoading || !mailStatus?.gmail_authorized}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#E7E5E4] px-4 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
+              >
+                {syncLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                同步收件箱
+              </button>
+            </div>
+            <p className="text-xs text-[#A8A29E]">
+              Gmail 发送使用你在 <code className="rounded bg-[#F5F5F4] px-1">.env.local</code>{" "}
+              填写的 <code className="rounded bg-[#F5F5F4] px-1">SENDER_EMAIL</code>。
+            </p>
+          </div>
+        )}
+      </div>
+
+      <EmailTemplatesClient />
+
       <div className="rounded-xl border border-[#E7E5E4] bg-white p-6">
         <h2 className="text-base font-semibold text-[#1C1917] mb-4">账号管理</h2>
         <div className="mb-4 relative max-w-xs">

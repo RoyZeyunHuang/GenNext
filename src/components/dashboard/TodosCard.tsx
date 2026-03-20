@@ -7,8 +7,10 @@ import type { Todo as TodoType } from "@/types/dashboard";
 import { addTodo, toggleTodo } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/contexts/LocaleContext";
 
 export function TodosCard({ todos: initialTodos }: { todos: TodoType[] }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [todos, setTodos] = useState(initialTodos);
 
@@ -35,7 +37,7 @@ export function TodosCard({ todos: initialTodos }: { todos: TodoType[] }) {
       <div className="mb-4 flex items-center justify-between">
         <span className="flex items-center gap-2 text-sm font-medium text-[#1C1917]">
           <CheckSquare className="h-4 w-4 text-[#78716C]" />
-          待办事项 To-do
+          {t("dashboard.todosTitle")}
         </span>
         <Button
           type="button"
@@ -48,7 +50,7 @@ export function TodosCard({ todos: initialTodos }: { todos: TodoType[] }) {
         </Button>
       </div>
       {todos.length === 0 ? (
-        <p className="text-sm text-[#78716C]">暂无待办</p>
+        <p className="text-sm text-[#78716C]">{t("dashboard.todosEmpty")}</p>
       ) : (
         <ul className="space-y-1">
           {todos.map((t) => (
@@ -101,6 +103,7 @@ function QuickAddTodo({
   onSuccess: () => void;
 }) {
   const router = useRouter();
+  const { t } = useLocale();
 
   async function submit(formData: FormData) {
     await addTodo(formData);
@@ -118,21 +121,21 @@ function QuickAddTodo({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-4 text-base font-semibold text-[#1C1917]">
-          添加待办
+          {t("dashboard.todosAdd")}
         </h3>
         <form action={submit} className="space-y-3">
           <input
             name="content"
-            placeholder="待办内容"
+            placeholder={t("dashboard.todosContentPlaceholder")}
             required
             className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] placeholder:text-[#78716C] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
           />
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>
-              取消
+              {t("common.cancel")}
             </Button>
             <Button type="submit" className="bg-[#1C1917] text-white hover:bg-[#1C1917]/90">
-              添加
+              {t("common.add")}
             </Button>
           </div>
         </form>

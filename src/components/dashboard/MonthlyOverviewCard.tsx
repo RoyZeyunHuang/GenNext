@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BarChart3 } from "lucide-react";
+import { useLocale } from "@/contexts/LocaleContext";
 
 type PaidKpi = {
   kpi?: {
@@ -19,6 +21,7 @@ function formatShortNumber(value: number): string {
 }
 
 export function MonthlyOverviewCard() {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [paid, setPaid] = useState<PaidKpi | null>(null);
 
@@ -56,32 +59,35 @@ export function MonthlyOverviewCard() {
 
   return (
     <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
-      <h3 className="mb-3 text-sm font-medium text-[#1C1917]">📊 本月投广 KPI</h3>
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-[#1C1917]">
+        <BarChart3 className="h-4 w-4 text-[#78716C]" />
+        {t("dashboard.paidKpiTitle")}
+      </h3>
       {loading ? (
-        <p className="text-xs text-[#78716C]">加载中…</p>
+        <p className="text-xs text-[#78716C]">{t("common.loading")}</p>
       ) : !hasData ? (
         <a href="/kpi" className="text-xs text-blue-600 hover:underline">
-          暂无本月投广数据，上传数据 →
+          {t("dashboard.paidKpiUpload")}
         </a>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg bg-[#FAFAF9] p-3">
-            <div className="text-xs text-gray-400">笔记篇数</div>
+            <div className="text-xs text-gray-400">{t("dashboard.paidKpiNotes")}</div>
             <div className="text-xl font-bold text-[#1C1917]">{distinctNotes.toLocaleString()}</div>
-            <div className="text-xs text-gray-400">篇</div>
+            <div className="text-xs text-gray-400">{t("dashboard.unitPiece")}</div>
           </div>
           <div className="rounded-lg bg-[#FAFAF9] p-3">
-            <div className="text-xs text-gray-400">本月展现</div>
+            <div className="text-xs text-gray-400">{t("dashboard.paidKpiImpressions")}</div>
             <div className="text-xl font-bold text-[#1C1917]">{formatShortNumber(totalImpressions)}</div>
-            <div className="text-xs text-gray-400">次</div>
+            <div className="text-xs text-gray-400">{t("dashboard.unitTimes")}</div>
           </div>
           <div className="rounded-lg bg-[#FAFAF9] p-3">
-            <div className="text-xs text-gray-400">本月互动</div>
+            <div className="text-xs text-gray-400">{t("dashboard.paidKpiInteractions")}</div>
             <div className="text-xl font-bold text-[#1C1917]">{totalInteractions.toLocaleString()}</div>
-            <div className="text-xs text-gray-400">次</div>
+            <div className="text-xs text-gray-400">{t("dashboard.unitTimes")}</div>
           </div>
           <div className="rounded-lg bg-[#FAFAF9] p-3">
-            <div className="text-xs text-gray-400">本月消费</div>
+            <div className="text-xs text-gray-400">{t("dashboard.paidKpiSpend")}</div>
             <div className="text-xl font-bold text-[#1C1917]">
               ¥{totalSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </div>

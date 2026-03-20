@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { BarChart3, DollarSign, Leaf, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/contexts/LocaleContext";
 import { NotesTab } from "./NotesTab";
 import { PaidTab } from "./PaidTab";
 import { NaturalTab } from "./NaturalTab";
@@ -10,9 +11,9 @@ import { UploadModal } from "./UploadModal";
 import { AddAccountModal, type GlobalAccount } from "@/components/planning/AddAccountModal";
 
 const TABS = [
-  { key: "notes", label: "全量笔记", icon: BarChart3 },
-  { key: "paid", label: "投放效果", icon: DollarSign },
-  { key: "natural", label: "自然流量估算", icon: Leaf },
+  { key: "notes", labelKey: "kpi.tabNotes", icon: BarChart3 },
+  { key: "paid", labelKey: "kpi.tabPaid", icon: DollarSign },
+  { key: "natural", labelKey: "kpi.tabNatural", icon: Leaf },
 ] as const;
 
 export type KpiFilters = {
@@ -22,6 +23,7 @@ export type KpiFilters = {
 };
 
 export function KpiClient() {
+  const { t } = useLocale();
   const [tab, setTab] = useState<"notes" | "paid" | "natural">("notes");
   const [filters, setFilters] = useState<KpiFilters>({
     from_date: "",
@@ -94,19 +96,19 @@ export function KpiClient() {
           prev_token: prev,
           next_token: next,
         });
-        setRefreshToast(`已触发全量笔记刷新 #${next}`);
+        setRefreshToast(`${t("kpi.refreshToast")} #${next}`);
         window.setTimeout(() => setRefreshToast(null), 2200);
         return next;
       });
     },
-    []
+    [t]
   );
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-[#78716C]">日期范围</span>
+          <span className="text-sm text-[#78716C]">{t("kpi.dateRange")}</span>
           <input
             type="date"
             value={filters.from_date}
@@ -126,7 +128,7 @@ export function KpiClient() {
           />
           {tab === "notes" && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[#78716C]">账号</span>
+              <span className="text-sm text-[#78716C]">{t("kpi.account")}</span>
               <select
                 multiple
                 value={filters.account_names}
@@ -135,21 +137,21 @@ export function KpiClient() {
                   setFilters((p) => ({ ...p, account_names: selected }));
                 }}
                 className={cn(inputCls, "min-w-[140px] max-w-[220px] py-1.5")}
-                title="按住 Ctrl/Cmd 多选"
+                title={t("kpi.accountMultiSelectHint")}
               >
                 {accounts.map((a) => (
                   <option key={a.id} value={a.name}>{a.name}</option>
                 ))}
               </select>
               {filters.account_names.length > 0 && (
-                <span className="text-xs text-[#78716C]">已选 {filters.account_names.length}</span>
+                <span className="text-xs text-[#78716C]">{t("kpi.selectedCount")} {filters.account_names.length}</span>
               )}
               <button
                 type="button"
                 onClick={() => setNotesAddAccountOpen(true)}
                 className="text-xs text-blue-600 hover:underline"
               >
-                + 新增账号
+                {t("kpi.addAccount")}
               </button>
             </div>
           )}
@@ -159,33 +161,33 @@ export function KpiClient() {
           onClick={() => setUploadOpen(true)}
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[#E7E5E4] bg-white px-4 py-2 text-sm font-medium text-[#1C1917] hover:bg-[#FAFAF9]"
         >
-          <Upload className="h-4 w-4" /> 上传数据
+          <Upload className="h-4 w-4" /> {t("kpi.uploadData")}
         </button>
       </div>
 
       <div className="mb-3 text-xs text-[#78716C]">
         {compareInfo?.start_date && compareInfo?.end_date
-          ? `对比：${compareInfo.start_date} → ${compareInfo.end_date}${compareInfo.no_comparison ? "（暂无对比数据）" : ""}`
-          : "对比：暂无可用快照"}
+          ? `${t("kpi.compareLabel")}${compareInfo.start_date} → ${compareInfo.end_date}${compareInfo.no_comparison ? t("kpi.compareNoData") : ""}`
+          : t("kpi.compareLabel") + t("kpi.compareNone")}
       </div>
 
       <div className="mb-6 flex gap-1 border-b border-[#E7E5E4]">
-        {TABS.map((t) => {
-          const Icon = t.icon;
+        {TABS.map((tabItem) => {
+          const Icon = tabItem.icon;
           return (
             <button
-              key={t.key}
+              key={tabItem.key}
               type="button"
-              onClick={() => setTab(t.key)}
+              onClick={() => setTab(tabItem.key)}
               className={cn(
                 "flex shrink-0 items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
-                tab === t.key
+                tab === tabItem.key
                   ? "border-[#1C1917] text-[#1C1917]"
                   : "border-transparent text-[#78716C] hover:text-[#1C1917]"
               )}
             >
               <Icon className="h-4 w-4" />
-              {t.label}
+              {t(tabItem.labelKey)}
             </button>
           );
         })}

@@ -6,6 +6,7 @@ import { Calendar as CalendarIcon, Plus, Loader2 } from "lucide-react";
 import type { CalendarEvent as CalendarEventType } from "@/types/dashboard";
 import { addCalendarEvent } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/contexts/LocaleContext";
 
 function getLocalToday(): string {
   const d = new Date();
@@ -25,6 +26,7 @@ function formatTime(t: string | null): string {
 }
 
 export function CalendarCard() {
+  const { t } = useLocale();
   const [events, setEvents] = useState<CalendarEventType[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -49,7 +51,7 @@ export function CalendarCard() {
       <div className="mb-4 flex items-center justify-between">
         <span className="flex items-center gap-2 text-sm font-medium text-[#1C1917]">
           <CalendarIcon className="h-4 w-4 text-[#78716C]" />
-          日历事项（今日起 7 天）
+          {t("dashboard.calendarTitle")}
         </span>
         <Button
           type="button"
@@ -64,10 +66,10 @@ export function CalendarCard() {
       {loading ? (
         <div className="flex items-center gap-2 py-2 text-sm text-[#78716C]">
           <Loader2 className="h-4 w-4 animate-spin" />
-          加载中…
+          {t("common.loading")}
         </div>
       ) : events.length === 0 ? (
-        <p className="text-sm text-[#78716C]">近 7 日暂无安排</p>
+        <p className="text-sm text-[#78716C]">{t("dashboard.calendarEmpty")}</p>
       ) : (
         <ul className="space-y-2">
           {events.map((e) => (
@@ -96,6 +98,7 @@ export function CalendarCard() {
 
 function QuickAddCalendar({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const router = useRouter();
+  const { t } = useLocale();
   const today = getLocalToday();
 
   async function submit(formData: FormData) {
@@ -107,18 +110,18 @@ function QuickAddCalendar({ onClose, onSuccess }: { onClose: () => void; onSucce
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
       <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-card" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-4 text-base font-semibold text-[#1C1917]">添加日程</h3>
+        <h3 className="mb-4 text-base font-semibold text-[#1C1917]">{t("dashboard.calendarAdd")}</h3>
         <form action={submit} className="space-y-3">
-          <input name="title" placeholder="标题" required className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] placeholder:text-[#78716C] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
+          <input name="title" placeholder={t("common.titlePlaceholder")} required className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] placeholder:text-[#78716C] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
           <input name="date" type="date" defaultValue={today} required className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
           <div className="flex gap-2">
             <input name="start_time" type="time" className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
             <input name="end_time" type="time" className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
           </div>
-          <input name="location" placeholder="地点" className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] placeholder:text-[#78716C] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
+          <input name="location" placeholder={t("common.locationPlaceholder")} className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] placeholder:text-[#78716C] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" onClick={onClose}>取消</Button>
-            <Button type="submit" className="bg-[#1C1917] text-white hover:bg-[#1C1917]/90">添加</Button>
+            <Button type="button" variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
+            <Button type="submit" className="bg-[#1C1917] text-white hover:bg-[#1C1917]/90">{t("common.add")}</Button>
           </div>
         </form>
       </div>

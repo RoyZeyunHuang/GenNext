@@ -3,6 +3,9 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { Newspaper, Loader2 } from "lucide-react";
+import { useLocale } from "@/contexts/LocaleContext";
+
+const UNCATEGORIZED_KEY = "__uncategorized__";
 
 type NewsItem = {
   id: string;
@@ -28,13 +31,14 @@ function pillColor(tag: string, index: number): string {
 }
 
 export function DashboardNewsBlock() {
+  const { t } = useLocale();
   const [list, setList] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const byCategory = useMemo(() => {
     const map = new Map<string, NewsItem[]>();
     for (const it of list) {
-      const cat = it.category?.trim() || "未分类";
+      const cat = it.category?.trim() || UNCATEGORIZED_KEY;
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(it);
     }
@@ -70,30 +74,30 @@ export function DashboardNewsBlock() {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-medium text-[#1C1917]">
           <Newspaper className="h-4 w-4 text-[#78716C]" />
-          今日新闻
+          {t("dashboard.newsTitle")}
         </div>
         <Link href="/news" className="text-xs text-[#78716C] hover:text-[#1C1917]">
-          查看全部 →
+          {t("dashboard.newsViewAll")}
         </Link>
       </div>
       {loading ? (
         <div className="flex items-center gap-2 py-8 text-sm text-[#78716C]">
           <Loader2 className="h-4 w-4 animate-spin" />
-          加载中…
+          {t("dashboard.newsLoading")}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {byCategory.keys.length === 0 ? (
-            <p className="col-span-full py-4 text-sm text-[#78716C]">暂无新闻</p>
+            <p className="col-span-full py-4 text-sm text-[#78716C]">{t("dashboard.newsEmpty")}</p>
           ) : (
             byCategory.keys.map((cat) => (
               <section key={cat}>
                 <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-[#78716C]">
-                  {cat}
+                  {cat === UNCATEGORIZED_KEY ? t("dashboard.newsCategoryNone") : cat}
                 </h4>
                 <ul className="space-y-3">
                   {(byCategory.map.get(cat) ?? []).length === 0 ? (
-                    <li className="text-xs text-[#78716C]">暂无</li>
+                    <li className="text-xs text-[#78716C]">{t("common.noData")}</li>
                   ) : (
                     (byCategory.map.get(cat) ?? []).slice(0, 3).map((it) => (
                       <li
