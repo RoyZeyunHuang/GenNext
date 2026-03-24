@@ -6,10 +6,15 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const refresh = process.env.GMAIL_REFRESH_TOKEN?.trim();
+  const senderEmail = process.env.SENDER_EMAIL?.trim() ?? null;
+  const resendConfigured = Boolean(process.env.RESEND_API_KEY?.trim());
+
   if (!refresh) {
     return NextResponse.json({
       gmail_authorized: false,
       gmail_email: null,
+      sender_email: senderEmail,
+      resend_configured: resendConfigured,
     });
   }
 
@@ -23,6 +28,8 @@ export async function GET() {
     return NextResponse.json({
       gmail_authorized: false,
       gmail_email: null,
+      sender_email: senderEmail,
+      resend_configured: resendConfigured,
     });
   }
 
@@ -39,11 +46,15 @@ export async function GET() {
     return NextResponse.json({
       gmail_authorized: true,
       gmail_email: (data?.email as string | undefined) ?? null,
+      sender_email: senderEmail,
+      resend_configured: resendConfigured,
     });
   } catch {
     return NextResponse.json({
       gmail_authorized: true,
       gmail_email: null,
+      sender_email: senderEmail,
+      resend_configured: resendConfigured,
     });
   }
 }

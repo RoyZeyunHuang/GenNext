@@ -6,9 +6,18 @@ import { Phone, ChevronRight, Loader2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useLocale } from "@/contexts/LocaleContext";
 
-const STAGE_ORDER = ["Not Started", "Pitched", "Meeting", "Negotiating", "Won", "Lost"];
+const STAGE_ORDER = [
+  "Not Started",
+  "Email Pitched",
+  "Pitched",
+  "Meeting",
+  "Negotiating",
+  "Won",
+  "Lost",
+];
 const STAGE_LABEL_KEYS: Record<string, string> = {
   "Not Started": "dashboard.stageNotStarted",
+  "Email Pitched": "dashboard.stageEmailPitched",
   Pitched: "dashboard.stagePitched",
   Meeting: "dashboard.stageMeeting",
   Negotiating: "dashboard.stageNegotiating",
@@ -16,12 +25,13 @@ const STAGE_LABEL_KEYS: Record<string, string> = {
   Lost: "dashboard.stageLost",
 };
 const STAGE_COLORS: Record<string, string> = {
-  "Not Started": "#a8a29e",
-  Pitched: "#94a3b8",
-  Meeting: "#fcd34d",
-  Negotiating: "#fdba74",
-  Won: "#86efac",
-  Lost: "#fca5a5",
+  "Not Started": "#8a7f74",
+  "Email Pitched": "#6366f1",
+  Pitched: "#4a90d9",
+  Meeting: "#e6b422",
+  Negotiating: "#e67e22",
+  Won: "#21c354",
+  Lost: "#ff4b4b",
 };
 
 export function BrmSummaryCard() {

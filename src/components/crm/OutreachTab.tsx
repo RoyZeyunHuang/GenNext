@@ -4,10 +4,20 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, X, Loader2, MessageSquare, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BatchEmailModal } from "@/components/crm/BatchEmailModal";
+import { ResendPropertyStatusModal } from "@/components/crm/ResendPropertyStatusModal";
 
-const STAGES = ["Pitched", "Meeting", "Negotiating", "Won", "Lost"] as const;
+const STAGES = [
+  "Not Started",
+  "Email Pitched",
+  "Pitched",
+  "Meeting",
+  "Negotiating",
+  "Won",
+  "Lost",
+] as const;
 const STAGE_COLORS: Record<string, string> = {
   "Not Started": "#8a7f74",
+  "Email Pitched": "#6366f1",
   Pitched: "#4a90d9",
   Meeting: "#e6b422",
   Negotiating: "#e67e22",
@@ -15,22 +25,25 @@ const STAGE_COLORS: Record<string, string> = {
   Lost: "#ff4b4b",
 };
 const STAGE_LABELS: Record<string, string> = {
-  "Not Started": "Not Started",
-  Pitched: "Pitched",
-  Meeting: "Meeting",
-  Negotiating: "Negotiating",
-  Won: "Won",
+  "Not Started": "未开始",
+  "Email Pitched": "Email Pitched",
+  Pitched: "已发方案",
+  Meeting: "已约见面",
+  Negotiating: "谈判中",
+  Won: "已签约",
   Lost: "终止",
 };
 const DEAL_STATUS_LABELS: Record<string, string> = {
   Active: "正常推进",
   "Need Follow Up": "需要跟进",
   "On Hold": "暂停",
+  bounced: "退信",
 };
 const DEAL_STATUS_CARD_CLASS: Record<string, string> = {
   Active: "bg-emerald-100 text-emerald-800",
   "Need Follow Up": "bg-amber-100 text-amber-800",
   "On Hold": "bg-[#E7E5E4] text-[#44403C]",
+  bounced: "bg-red-100 text-red-800",
 };
 const LOST_REASONS = [
   { value: "Signed w/ Others", label: "被别人签了" },
@@ -54,6 +67,8 @@ type OutreachItem = {
   ai_summary: string | null;
   needs_attention: boolean;
   last_email_at: string | null;
+  /** 该楼盘最近一封发出邮件的 status（用于 bounce 标签） */
+  latest_sent_email_status?: string | null;
   created_at: string;
   updated_at: string;
   properties: {
@@ -83,12 +98,18 @@ function extractLatestNote(notes: string | null): string {
   return withoutTimestamp.trim();
 }
 
-function lastNotePreview(notes: string | null, maxLines = 2): string {
+function lastNotePreview(notes: string | null): string {
   const base = extractLatestNote(notes);
   if (!base) return "";
-  const lines = base.split("\n").filter(Boolean);
-  const joined = lines.slice(0, maxLines).join(" ");
-  return joined.slice(0, 80) + (joined.length > 80 ? "…" : "");
+  let text = base;
+  // Resend 同步：首行是系统标记，预览从第二行起展示已送达/退信联系人
+  if (text.startsWith("（系统）自 Resend")) {
+    const lines = text.split("\n").filter(Boolean);
+    text = lines.slice(1).join("\n").trim() || lines[0] || "";
+  }
+  const lines = text.split("\n").filter(Boolean);
+  const joined = lines.slice(0, 5).join(" ");
+  return joined.slice(0, 220) + (joined.length > 220 ? "…" : "");
 }
 
 export function OutreachTab() {
@@ -103,6 +124,8 @@ export function OutreachTab() {
   const [importToast, setImportToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [batchEmailOpen, setBatchEmailOpen] = useState(false);
+  const [resendStatusOpen, setResendStatusOpen] = useState(false);
+  const [checkStatusLoading, setCheckStatusLoading] = useState(false);
   const [onlyAttention, setOnlyAttention] = useState(false);
   const [emailSummary, setEmailSummary] = useState<
     Record<string, { latest_received_ai_summary: string | null; created_at: string }>
@@ -120,6 +143,7 @@ export function OutreachTab() {
         ai_summary: (o.ai_summary ?? null) as string | null,
         needs_attention: Boolean(o.needs_attention),
         last_email_at: (o.last_email_at ?? null) as string | null,
+        latest_sent_email_status: (o.latest_sent_email_status ?? null) as string | null,
       })) as OutreachItem[]
     );
     setLoading(false);
@@ -210,7 +234,37 @@ export function OutreachTab() {
     <div className="relative">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium text-[#1C1917]">外联看板</span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={checkStatusLoading}
+            onClick={async () => {
+              setCheckStatusLoading(true);
+              try {
+                const res = await fetch("/api/email/check-bounces", { method: "POST" });
+                const data = await res.json().catch(() => ({}));
+                if (data?.message) alert(data.message);
+                await fetchAll();
+              } finally {
+                setCheckStatusLoading(false);
+              }
+            }}
+            className="flex items-center gap-1 rounded-lg border border-[#E7E5E4] bg-white px-3 py-1.5 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
+          >
+            {checkStatusLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              "🔄"
+            )}
+            检查邮件状态
+          </button>
+          <button
+            type="button"
+            onClick={() => setResendStatusOpen(true)}
+            className="rounded-lg border border-[#E7E5E4] bg-white px-3 py-1.5 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9]"
+          >
+            Resend 送达
+          </button>
           <button
             type="button"
             onClick={() => setOnlyAttention((v) => !v)}
@@ -280,9 +334,19 @@ export function OutreachTab() {
                   tabIndex={0}
                   onClick={() => setDrawerItem(item)}
                   className="cursor-grab rounded-lg border border-[#E7E5E4] bg-white p-2.5 text-left transition-colors hover:border-[#1C1917]/30 active:cursor-grabbing"
-                  style={item.needs_attention ? { borderLeft: "3px solid #ff4b4b" } : undefined}
+                  style={
+                    item.needs_attention || item.latest_sent_email_status === "bounced"
+                      ? { borderLeft: "3px solid #ff4b4b" }
+                      : undefined
+                  }
                 >
                   <div className="font-semibold text-[#1C1917]">{item.properties?.name ?? "未知楼盘"}</div>
+
+                  {item.latest_sent_email_status === "bounced" && (
+                    <div className="mt-1 inline-flex items-center rounded bg-[#FEF2F2] px-2 py-0.5 text-[10px] font-medium text-[#DC2626]">
+                      ⚠️ Email Bounced
+                    </div>
+                  )}
 
                   {item.needs_attention && (
                     <div className="mt-1 inline-flex items-center rounded bg-[#FEF2F2] px-2 py-0.5 text-[10px] font-medium text-[#DC2626]">
@@ -315,7 +379,14 @@ export function OutreachTab() {
                   ) : null}
 
                   {item.notes && (
-                    <div className="mt-1 line-clamp-2 text-xs text-[#78716C]">
+                    <div
+                      className={cn(
+                        "mt-1 text-xs text-[#78716C]",
+                        extractLatestNote(item.notes).startsWith("（系统）自 Resend")
+                          ? "line-clamp-4"
+                          : "line-clamp-2"
+                      )}
+                    >
                       {lastNotePreview(item.notes)}
                     </div>
                   )}
@@ -385,6 +456,14 @@ export function OutreachTab() {
           }}
         />
       )}
+
+      <ResendPropertyStatusModal
+        open={resendStatusOpen}
+        onClose={() => setResendStatusOpen(false)}
+        onSynced={() => {
+          fetchAll();
+        }}
+      />
     </div>
   );
 }
@@ -548,7 +627,7 @@ function OutreachDrawer({
           <div className="mb-4">
             <label className="mb-1 block text-xs font-medium text-[#78716C]">Deal Status</label>
             <div className="flex gap-2">
-              {(["Active", "Need Follow Up", "On Hold"] as const).map((s) => (
+              {(["Active", "Need Follow Up", "On Hold", "bounced"] as const).map((s) => (
                 <button
                   key={s}
                   type="button"

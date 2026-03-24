@@ -15,6 +15,7 @@ import {
   resolveRecipientEmail,
   type CompanyWithContacts,
 } from "@/lib/email-helpers";
+import { INVO_DECK_FILENAME } from "@/lib/email-attachments";
 
 type EmailRow = {
   id: string;
@@ -49,10 +50,16 @@ export function CompanyEmailSection({ company }: { company: CompanyWithContacts 
 
   const [composeOpen, setComposeOpen] = useState(false);
   const [to, setTo] = useState("");
+  const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [aiReplyLoading, setAiReplyLoading] = useState(false);
+  /** true：wrapEmailHtml；false：纯文本 + 系统签名 */
+  const [sendAsHtml, setSendAsHtml] = useState(true);
+  /** 默认附带 public/invo-deck.pdf */
+  const [attachInvoDeck, setAttachInvoDeck] = useState(true);
 
   const defaultTo = useMemo(() => resolveRecipientEmail(company) ?? "", [company]);
   const firstPropertyId = useMemo(() => {
@@ -77,6 +84,8 @@ export function CompanyEmailSection({ company }: { company: CompanyWithContacts 
 
   const openWrite = () => {
     setTo(defaultTo);
+    setCc("");
+    setBcc("");
     setSubject("");
     setBody("");
     setComposeOpen(true);
@@ -115,7 +124,12 @@ export function CompanyEmailSection({ company }: { company: CompanyWithContacts 
           subject: subject.trim(),
           body: body.trim(),
           company_id: company.id,
-          property_id: firstPropertyId,
+          property_id: firstPropertyId ?? null,
+          property_ids: firstPropertyId ? [firstPropertyId] : [],
+          is_html: sendAsHtml,
+          attachment_path: attachInvoDeck ? INVO_DECK_FILENAME : null,
+          cc: cc.trim() || null,
+          bcc: bcc.trim() || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -165,7 +179,8 @@ export function CompanyEmailSection({ company }: { company: CompanyWithContacts 
         <ul className="space-y-2">
           {emails.map((e) => {
             const isSent = e.direction === "sent";
-            const statusStyle = STATUS_STYLE[e.status ?? "sent"] ?? STATUS_STYLE.sent;
+            const statusStyle =
+              STATUS_STYLE[e.status ?? "sent"] ?? STATUS_STYLE.sent;
             return (
               <li
                 key={e.id}
@@ -250,6 +265,28 @@ export function CompanyEmailSection({ company }: { company: CompanyWithContacts 
               </div>
               <div>
                 <div className="mb-0.5 text-[10px] font-medium text-[#78716C]">
+                  抄送 Cc（可选，多个用逗号分隔）
+                </div>
+                <input
+                  value={cc}
+                  onChange={(ev) => setCc(ev.target.value)}
+                  className="h-9 w-full rounded-lg border border-[#E7E5E4] px-2 text-sm"
+                  placeholder="a@example.com, b@example.com"
+                />
+              </div>
+              <div>
+                <div className="mb-0.5 text-[10px] font-medium text-[#78716C]">
+                  密送 Bcc（可选）
+                </div>
+                <input
+                  value={bcc}
+                  onChange={(ev) => setBcc(ev.target.value)}
+                  className="h-9 w-full rounded-lg border border-[#E7E5E4] px-2 text-sm"
+                  placeholder="仅收件人看不到彼此"
+                />
+              </div>
+              <div>
+                <div className="mb-0.5 text-[10px] font-medium text-[#78716C]">
                   主题
                 </div>
                 <input
@@ -269,6 +306,24 @@ export function CompanyEmailSection({ company }: { company: CompanyWithContacts 
                   className="w-full rounded-lg border border-[#E7E5E4] px-2 py-2 text-sm"
                 />
               </div>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-[#57534E]">
+                <input
+                  type="checkbox"
+                  checked={sendAsHtml}
+                  onChange={(ev) => setSendAsHtml(ev.target.checked)}
+                  className="rounded border-[#E7E5E4]"
+                />
+                HTML 发送（品牌信纸样式）；关闭则纯文本并自动加签名
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-[#57534E]">
+                <input
+                  type="checkbox"
+                  checked={attachInvoDeck}
+                  onChange={(ev) => setAttachInvoDeck(ev.target.checked)}
+                  className="rounded border-[#E7E5E4]"
+                />
+                附加 PDF：{INVO_DECK_FILENAME}
+              </label>
             </div>
 
             <div className="mt-4 flex justify-end gap-2">

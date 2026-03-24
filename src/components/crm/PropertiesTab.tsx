@@ -27,33 +27,21 @@ function getRegionForArea(area: string | null): string {
 
 const OUTREACH_STAGE_MAP: Record<string, string> = {
   "Not Started": "未开始",
+  "Email Pitched": "Email Pitched",
   Pitched: "已发方案",
   Meeting: "已约见面",
   Negotiating: "谈判中",
   Won: "已签约",
   Lost: "未成功",
 };
-const OUTREACH_STAGE_ORDER = ["Not Started", "Pitched", "Meeting", "Negotiating", "Won", "Lost"];
-const OUTREACH_STAGE_DOT_COLOR: Record<string, string> = {
-  "Not Started": "#8a7f74",
-  Pitched: "#4a90d9",
-  Meeting: "#e6b422",
-  Negotiating: "#e67e22",
-  Won: "#21c354",
-  Lost: "#ff4b4b",
-};
 const OUTREACH_STAGE_CARD_COLOR: Record<string, string> = {
   "Not Started": "bg-[#E7E5E4] text-[#44403C]",
+  "Email Pitched": "bg-indigo-100 text-indigo-800",
   Pitched: "bg-blue-100 text-blue-800",
   Meeting: "bg-amber-100 text-amber-800",
   Negotiating: "bg-orange-100 text-orange-800",
   Won: "bg-emerald-100 text-emerald-800",
   Lost: "bg-red-100 text-red-800",
-};
-const DEAL_STATUS_LABELS: Record<string, string> = {
-  Active: "正常推进",
-  "Need Follow Up": "需要跟进",
-  "On Hold": "暂停",
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -205,15 +193,6 @@ export function PropertiesTab() {
     }
   };
 
-  const handleOutreachUpdate = useCallback((propertyId: string, outreach: OutreachRow | null) => {
-    setOutreachByProperty((prev) => {
-      const next = { ...prev };
-      if (outreach) next[propertyId] = outreach;
-      else delete next[propertyId];
-      return next;
-    });
-  }, []);
-
   const subAreaOptions = selectedRegion && selectedRegion !== "全部" && selectedRegion !== "其他" ? AREA_MAP[selectedRegion] ?? [] : [];
 
   return (
@@ -329,8 +308,6 @@ export function PropertiesTab() {
         {selected ? (
           <PropertyDetail
             property={selected}
-            outreach={outreachByProperty[selected.id]}
-            onOutreachUpdate={handleOutreachUpdate}
             onDelete={() => handleDeleteProperty(selected.id)}
             onRefresh={refetchListAndKeepSelection}
           />
@@ -350,14 +327,10 @@ type EditContactRow = { id?: string; company_id: string; name: string; title: st
 
 function PropertyDetail({
   property: p,
-  outreach,
-  onOutreachUpdate,
   onDelete,
   onRefresh,
 }: {
   property: Property;
-  outreach: OutreachRow | undefined;
-  onOutreachUpdate: (propertyId: string, o: OutreachRow | null) => void;
   onDelete: () => void;
   onRefresh?: () => void | Promise<void>;
 }) {
@@ -365,13 +338,8 @@ function PropertyDetail({
   const [detailLoading, setDetailLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [outreachRecord, setOutreachRecord] = useState<OutreachRow | null>(outreach ?? null);
   const [logs, setLogs] = useState<LogRow[]>([]);
   const [logLoading, setLogLoading] = useState(false);
-  const [quickDate, setQuickDate] = useState(new Date().toISOString().slice(0, 10));
-  const [quickChannel, setQuickChannel] = useState("email");
-  const [quickContent, setQuickContent] = useState("");
-  const [quickNext, setQuickNext] = useState("");
 
   const [editForm, setEditForm] = useState<{
     name: string;
@@ -401,10 +369,6 @@ function PropertyDetail({
       })
       .catch(() => setDetailLoading(false));
   }, [p.id]);
-
-  useEffect(() => {
-    setOutreachRecord(outreach ?? null);
-  }, [outreach]);
 
   const startEditing = useCallback(() => {
     const d = (detail ?? p) as DetailProperty;
@@ -526,96 +490,17 @@ function PropertyDetail({
   }, [editForm, p.id, detail, onRefresh]);
 
   const fetchLogs = useCallback(async () => {
-    if (!outreachRecord?.id && !p.id) return;
+    if (!p.id) return;
     setLogLoading(true);
-    const res = await fetch(
-      `/api/crm/communication-logs?${outreachRecord?.id ? `outreach_id=${outreachRecord.id}` : `property_id=${p.id}`}`
-    );
+    const res = await fetch(`/api/crm/communication-logs?property_id=${encodeURIComponent(p.id)}`);
     const data = await res.json().catch(() => []);
     setLogs(Array.isArray(data) ? data : []);
     setLogLoading(false);
-  }, [outreachRecord?.id, p.id]);
-
-  useEffect(() => {
-    setOutreachRecord(outreach ?? null);
-  }, [outreach]);
+  }, [p.id]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
-
-  const setStage = async (stage: string) => {
-    if (outreachRecord) {
-      const res = await fetch(`/api/crm/outreach/${outreachRecord.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stage }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const next: OutreachRow = { id: data.id, property_id: data.property_id, stage: data.stage, status: data.stage, deal_status: data.deal_status, price: data.price, term: data.term };
-        setOutreachRecord(next);
-        onOutreachUpdate(p.id, next);
-      }
-    } else {
-      const res = await fetch("/api/crm/outreach", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ property_id: p.id, stage }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const next: OutreachRow = { id: data.id, property_id: data.property_id, stage: data.stage, status: data.stage, deal_status: data.deal_status, price: data.price, term: data.term };
-        setOutreachRecord(next);
-        onOutreachUpdate(p.id, next);
-      }
-    }
-  };
-
-  const saveDealFields = async (updates: { deal_status?: string; price?: string | null; term?: string | null }) => {
-    if (!outreachRecord?.id) return;
-    const res = await fetch(`/api/crm/outreach/${outreachRecord.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const next: OutreachRow = { ...outreachRecord, deal_status: data.deal_status, price: data.price, term: data.term };
-      setOutreachRecord(next);
-      onOutreachUpdate(p.id, next);
-    }
-  };
-
-  const addLog = async () => {
-    const payload = {
-      outreach_id: outreachRecord?.id ?? null,
-      property_id: p.id,
-      date: quickDate,
-      channel: quickChannel,
-      content: quickContent.trim() || null,
-      next_action: quickNext.trim() || null,
-    };
-    const res = await fetch("/api/crm/communication-logs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (res.ok) {
-      setQuickContent("");
-      setQuickNext("");
-      fetchLogs();
-    }
-  };
-
-  const currentStage = outreachRecord?.stage ?? outreachRecord?.status ?? "Not Started";
-  const currentDealStatus = outreachRecord?.deal_status ?? "Active";
-  const isTerminal = currentStage === "Won" || currentStage === "Lost";
-  const roles: Record<string, PropertyCompany[]> = {};
-  (display.property_companies ?? []).forEach((pc) => {
-    const role = pc.role || "other";
-    (roles[role] = roles[role] || []).push(pc);
-  });
 
   if (detailLoading && !detail) {
     return (
@@ -947,122 +832,7 @@ function PropertyDetail({
       ) : null}
 
       <div className="mt-6 border-t border-[#E7E5E4] pt-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-sm font-medium text-[#1C1917]">BD 追踪</h4>
-          {outreachRecord ? (
-            <button
-              type="button"
-              onClick={async () => {
-                if (!window.confirm("确定取消追踪？沟通记录将保留。")) return;
-                const res = await fetch(`/api/crm/outreach?property_id=${p.id}`, { method: "DELETE" });
-                if (res.ok) {
-                  setOutreachRecord(null);
-                  onOutreachUpdate(p.id, null);
-                  fetchLogs();
-                }
-              }}
-              className="text-xs font-medium text-[#DC2626] hover:underline"
-            >
-              取消追踪
-            </button>
-          ) : null}
-        </div>
-
-        {outreachRecord ? (
-          <>
-            <div className="mb-3 flex flex-wrap items-center gap-1 rounded-lg bg-[#FAFAF9] p-2">
-              {OUTREACH_STAGE_ORDER.map((stage) => {
-                const label = OUTREACH_STAGE_MAP[stage];
-                const dotColor = OUTREACH_STAGE_DOT_COLOR[stage];
-                const isCurrent = currentStage === stage;
-                return (
-                  <button
-                    key={stage}
-                    type="button"
-                    onClick={() => setStage(stage)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
-                      isCurrent ? "bg-[#1C1917] text-white" : "text-[#78716C] hover:bg-[#E7E5E4]"
-                    )}
-                    title={label}
-                  >
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: isCurrent ? "#fff" : dotColor }} />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="text-xs font-medium text-[#78716C]">Deal Status</span>
-              <div className="flex gap-1.5">
-                {(["Active", "Need Follow Up", "On Hold"] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    disabled={isTerminal}
-                    onClick={() => saveDealFields({ deal_status: s })}
-                    className={cn(
-                      "rounded-md border px-2 py-1 text-xs font-medium transition-colors",
-                      currentDealStatus === s ? "border-[#1C1917] bg-[#1C1917] text-white" : "border-[#E7E5E4] bg-white text-[#78716C] hover:bg-[#F5F5F4]",
-                      isTerminal && "cursor-not-allowed opacity-50"
-                    )}
-                  >
-                    {DEAL_STATUS_LABELS[s]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
-              <label className="flex items-center gap-1.5">
-                <span className="text-[#78716C]">Price</span>
-                <input
-                  type="text"
-                  value={outreachRecord.price ?? ""}
-                  onChange={(e) => setOutreachRecord((prev) => (prev ? { ...prev, price: e.target.value || null } : null))}
-                  onBlur={() => saveDealFields({ price: outreachRecord?.price ?? null })}
-                  placeholder="$1,299"
-                  className="w-24 rounded border border-[#E7E5E4] px-2 py-1 text-xs"
-                />
-              </label>
-              <label className="flex items-center gap-1.5">
-                <span className="text-[#78716C]">Term</span>
-                <input
-                  type="text"
-                  value={outreachRecord.term ?? ""}
-                  onChange={(e) => setOutreachRecord((prev) => (prev ? { ...prev, term: e.target.value || null } : null))}
-                  onBlur={() => saveDealFields({ term: outreachRecord?.term ?? null })}
-                  placeholder="2 Weeks"
-                  className="w-24 rounded border border-[#E7E5E4] px-2 py-1 text-xs"
-                />
-              </label>
-            </div>
-          </>
-        ) : (
-          <div className="mb-4 rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-3">
-            <button
-              type="button"
-              onClick={async () => {
-                const res = await fetch("/api/crm/outreach", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ property_id: p.id, stage: "Not Started" }),
-                });
-                if (res.ok) {
-                  const data = await res.json();
-                  const next: OutreachRow = { id: data.id, property_id: data.property_id, stage: data.stage, status: data.stage, deal_status: data.deal_status, price: data.price, term: data.term };
-                  setOutreachRecord(next);
-                  onOutreachUpdate(p.id, next);
-                  fetchLogs();
-                }
-              }}
-              className="rounded-lg bg-[#1C1917] px-3 py-2 text-xs font-medium text-white hover:bg-[#1C1917]/90"
-            >
-              开始追踪
-            </button>
-          </div>
-        )}
-
-        <div className="mb-3 text-xs font-medium text-[#78716C]">沟通记录</div>
+        <h4 className="mb-3 text-sm font-medium text-[#1C1917]">沟通记录</h4>
         {logLoading ? (
           <p className="py-4 text-center text-xs text-[#78716C]">加载中…</p>
         ) : logs.length === 0 ? (
@@ -1099,91 +869,55 @@ function PropertyDetail({
             ))}
           </div>
         )}
-
-        <div className="rounded-lg border border-[#E7E5E4] bg-white p-3">
-          <div className="mb-2 text-xs font-medium text-[#1C1917]">快速添加</div>
-          <div className="grid gap-2">
-            <div className="flex flex-wrap gap-2">
-              <input
-                type="date"
-                value={quickDate}
-                onChange={(e) => setQuickDate(e.target.value)}
-                className="rounded border border-[#E7E5E4] px-2 py-1.5 text-xs"
-              />
-              <select
-                value={quickChannel}
-                onChange={(e) => setQuickChannel(e.target.value)}
-                className="rounded border border-[#E7E5E4] px-2 py-1.5 text-xs"
-              >
-                {Object.entries(CHANNEL_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <input
-              value={quickContent}
-              onChange={(e) => setQuickContent(e.target.value)}
-              placeholder="内容"
-              className="w-full rounded border border-[#E7E5E4] px-2 py-1.5 text-sm"
-            />
-            <input
-              value={quickNext}
-              onChange={(e) => setQuickNext(e.target.value)}
-              placeholder="下一步行动"
-              className="w-full rounded border border-[#E7E5E4] px-2 py-1.5 text-sm"
-            />
-            <button
-              type="button"
-              onClick={addLog}
-              className="rounded-lg bg-[#1C1917] py-2 text-xs font-medium text-white hover:bg-[#1C1917]/90"
-            >
-              添加
-            </button>
-          </div>
-        </div>
       </div>
 
       {!isEditing && (
-        <>
-          {Object.keys(roles).length > 0 && (
-            <div className="mt-6 border-t border-[#E7E5E4] pt-4">
-              <h4 className="mb-2 text-sm font-medium text-[#1C1917]">关联公司</h4>
-              <div className="space-y-1">
-                {(display.property_companies ?? []).map((pc) => (
-                  <div key={pc.id} className="text-sm text-[#1C1917]">
-                    <span className="rounded bg-[#E7E5E4] px-1.5 py-0.5 text-xs font-medium uppercase text-[#78716C]">
-                      {PROPERTY_COMPANY_ROLE_LABELS[pc.role] ?? pc.role}
-                    </span>{" "}
-                    {pc.companies?.name ?? "未知公司"}
+        <div className="mt-6 border-t border-[#E7E5E4] pt-4">
+          <h4 className="mb-3 text-sm font-medium text-[#1C1917]">公司与联系人</h4>
+          {(display.property_companies ?? []).length === 0 ? (
+            <p className="text-sm text-[#78716C]">暂无关联公司</p>
+          ) : (
+            <div className="space-y-4">
+              {(display.property_companies ?? []).map((pc) => {
+                const contacts = pc.companies?.contacts ?? [];
+                const roleLabel =
+                  PROPERTY_COMPANY_ROLE_LABELS[pc.role] ?? (pc.role ? String(pc.role).toUpperCase() : "—");
+                return (
+                  <div
+                    key={pc.id}
+                    className="rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-3"
+                  >
+                    <div className="mb-2 flex flex-wrap items-center gap-2 border-b border-[#E7E5E4] pb-2">
+                      <span className="rounded bg-[#E7E5E4] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#57534E]">
+                        {roleLabel}
+                      </span>
+                      <span className="text-sm font-medium text-[#1C1917]">
+                        {pc.companies?.name ?? "未知公司"}
+                      </span>
+                    </div>
+                    {contacts.length === 0 ? (
+                      <p className="text-xs text-[#A8A29E]">该公司在本楼盘下暂无联系人</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {contacts.map((c) => (
+                          <li
+                            key={c.id}
+                            className="rounded-md border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917]"
+                          >
+                            <span className="font-medium">{c.name}</span>
+                            {c.title && <span className="text-[#78716C]"> · {c.title}</span>}
+                            {c.phone && <span className="text-[#78716C]"> · {c.phone}</span>}
+                            {c.email && <span className="text-[#78716C]"> · {c.email}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
-          <div className="mt-6 border-t border-[#E7E5E4] pt-4">
-            <h4 className="mb-2 text-sm font-medium text-[#1C1917]">联系人</h4>
-            {(() => {
-              const allContacts = (display.property_companies ?? []).flatMap((pc) =>
-                (pc.companies?.contacts ?? []).map((c) => ({ ...c, companyName: pc.companies?.name ?? "" }))
-              );
-              if (allContacts.length === 0) {
-                return <p className="text-sm text-[#78716C]">暂无联系人</p>;
-              }
-              return (
-                <div className="space-y-2">
-                  {allContacts.map((c) => (
-                    <div key={c.id} className="rounded border border-[#E7E5E4] bg-[#FAFAF9] px-3 py-2 text-sm text-[#1C1917]">
-                      <span className="font-medium">{c.name}</span>
-                      {c.title && <span className="text-[#78716C]"> / {c.title}</span>}
-                      {c.phone && <span className="text-[#78716C]"> / {c.phone}</span>}
-                      {c.email && <span className="text-[#78716C]"> / {c.email}</span>}
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-        </>
+        </div>
       )}
     </div>
   );

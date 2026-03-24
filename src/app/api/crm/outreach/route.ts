@@ -13,7 +13,43 @@ export async function GET(req: NextRequest) {
   if (propertyId) q = q.eq("property_id", propertyId);
   const { data, error } = await q;
   if (error) return Response.json({ error: error.message }, { status: 500 });
-  return Response.json(data ?? []);
+  const rows = data ?? [];
+  const propertyIds = Array.from(
+    new Set(
+      rows
+        .map((o: { property_id?: string }) => o.property_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  const latestByProperty = new Map<string, string>();
+  if (propertyIds.length > 0) {
+    const { data: emailRows } = await supabase
+      .from("emails")
+      .select("property_id, status, created_at")
+      .in("property_id", propertyIds)
+      .eq("direction", "sent");
+
+    const best = new Map<string, { t: number; status: string }>();
+    for (const er of emailRows ?? []) {
+      const pid = (er as { property_id?: string }).property_id;
+      if (!pid) continue;
+      const t = new Date((er as { created_at: string }).created_at).getTime();
+      const status = (er as { status?: string }).status ?? "sent";
+      const prev = best.get(pid);
+      if (!prev || t > prev.t) best.set(pid, { t, status });
+    }
+    for (const [pid, v] of Array.from(best.entries())) latestByProperty.set(pid, v.status);
+  }
+
+  const enriched = rows.map((o: Record<string, unknown>) => ({
+    ...o,
+    latest_sent_email_status: o.property_id
+      ? latestByProperty.get(o.property_id as string) ?? null
+      : null,
+  }));
+
+  return Response.json(enriched);
 }
 
 export async function POST(req: NextRequest) {

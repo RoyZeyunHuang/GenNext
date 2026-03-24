@@ -10,6 +10,7 @@ import {
 
 const STAGE_COLORS: Record<string, string> = {
   "Not Started": "#8a7f74",
+  "Email Pitched": "#6366f1",
   Pitched: "#4a90d9",
   Meeting: "#e6b422",
   Negotiating: "#e67e22",
@@ -17,13 +18,22 @@ const STAGE_COLORS: Record<string, string> = {
   Lost: "#ff4b4b",
 };
 
-const STAGE_ORDER = ["Not Started", "Pitched", "Meeting", "Negotiating", "Won", "Lost"];
+const STAGE_ORDER = [
+  "Not Started",
+  "Email Pitched",
+  "Pitched",
+  "Meeting",
+  "Negotiating",
+  "Won",
+  "Lost",
+];
 const STAGE_LABELS: Record<string, string> = {
-  "Not Started": "Not Started",
-  Pitched: "Pitched",
-  Meeting: "Meeting",
-  Negotiating: "Negotiating",
-  Won: "Won",
+  "Not Started": "未开始",
+  "Email Pitched": "Email Pitched",
+  Pitched: "已发方案",
+  Meeting: "已约见面",
+  Negotiating: "谈判中",
+  Won: "已签约",
   Lost: "终止",
 };
 
