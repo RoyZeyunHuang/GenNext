@@ -85,7 +85,8 @@ export function EmailTemplatesClient() {
   };
 
   const varHint = useMemo(
-    () => "变量：{{company_name}} {{contact_name}} {{property_name}}",
+    () =>
+      "变量：{{company_name}} {{contact_name}} {{property_name}} {{company_role}} — 批量发信可选 INVO — Established / New Buildings 两套模版",
     []
   );
 

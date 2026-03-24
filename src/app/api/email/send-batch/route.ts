@@ -3,13 +3,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import {
   applyTemplate,
+  buildDeveloperBatchTemplateVars,
+  contactFirstName,
+  dedupePropertiesByIdPreferHigherUnits,
+  isInvoManagedEmailTemplateName,
+  invoBaseTemplateNameFromBuildYears,
   resolveContactName,
+  resolveInvoMultiDeveloperTemplateName,
   resolveRecipientEmail,
   sleep,
+  type BatchPropertyForTemplate,
   type CompanyWithContacts,
 } from "@/lib/email-helpers";
-import { sendEmail } from "@/lib/gmail";
+import { sendEmail } from "@/lib/resend";
 import { wrapEmailHtml } from "@/lib/email-template";
+import { updateOutreachAfterEmailSent } from "@/lib/outreach-after-send";
+import { mergeRecipientList } from "@/lib/email-recipients";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,17 +60,28 @@ export async function POST(req: NextRequest) {
       subject: customSubject,
       body: customBody,
       previews,
+      is_html = true,
+      attachment_path,
+      cc: bodyCc,
+      bcc: bodyBcc,
     } = body as {
       company_ids: string[];
       email_template_id?: string | null;
       subject?: string;
       body?: string;
+      /** 默认 true；false 时按纯文本发送（含签名） */
+      is_html?: boolean;
+      /** 相对 public/，如 invo-deck.pdf */
+      attachment_path?: string | null;
+      cc?: string | null;
+      bcc?: string | null;
       previews?: Array<{
         company_id: string;
         to: string;
         subject: string;
         body: string;
         property_id?: string | null;
+        property_ids?: string[] | null;
         property_name?: string | null;
         sender_name?: string;
       }>;
@@ -70,6 +90,21 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(company_ids) || company_ids.length === 0) {
       return NextResponse.json({ error: "company_ids 不能为空" }, { status: 400 });
     }
+
+    const useHtml = Boolean(is_html);
+    const attach =
+      typeof attachment_path === "string" && attachment_path.trim()
+        ? attachment_path.trim()
+        : undefined;
+
+    const ccMerged = mergeRecipientList(
+      typeof bodyCc === "string" ? bodyCc : null,
+      process.env.DEFAULT_CC_EMAIL
+    );
+    const bccMerged = mergeRecipientList(
+      typeof bodyBcc === "string" ? bodyBcc : null,
+      process.env.DEFAULT_BCC_EMAIL
+    );
 
     const from = (process.env.SENDER_EMAIL || "").trim();
     if (!from) {
@@ -90,23 +125,40 @@ export async function POST(req: NextRequest) {
           continue;
         }
         try {
+          const outreachIds =
+            Array.isArray(p.property_ids) && p.property_ids.length > 0
+              ? Array.from(
+                  new Set(p.property_ids.map((id) => String(id).trim()).filter(Boolean))
+                )
+              : p.property_id
+                ? [String(p.property_id).trim()]
+                : [];
+          const primaryPropertyId = (outreachIds[0] ?? p.property_id) || null;
+
           const senderName =
             p.sender_name?.trim() ||
             process.env.SENDER_NAME?.trim() ||
             "Royce Huang";
-          const htmlBody = wrapEmailHtml(
-            p.body,
-            undefined,
-            undefined,
-            p.property_name ?? undefined,
+          const outgoing = useHtml
+            ? wrapEmailHtml(
+                p.body,
+                undefined,
+                undefined,
+                p.property_name ?? undefined,
+                senderName,
+                from
+              )
+            : p.body;
+          const sendResult = await sendEmail(to, p.subject, outgoing, from, useHtml, {
             senderName,
-            from
-          );
-          const sendResult = await sendEmail(to, p.subject, htmlBody, from, true);
+            attachmentPath: attach,
+            cc: ccMerged,
+            bcc: bccMerged,
+          });
           const ai_summary = await summarizeSentEmail(p.body);
           await supabase.from("emails").insert({
             company_id: p.company_id,
-            property_id: p.property_id || null,
+            property_id: primaryPropertyId,
             direction: "sent",
             from_email: from,
             to_email: to,
@@ -114,17 +166,11 @@ export async function POST(req: NextRequest) {
             body: p.body,
             ai_summary,
             status: "sent",
-            gmail_message_id: (sendResult as any)?.id ?? null,
-            resend_id: null,
+            gmail_message_id: null,
+            resend_id: sendResult?.id ?? null,
           });
-          if (p.property_id) {
-            await supabase
-              .from("outreach")
-              .update({
-                last_email_at: new Date().toISOString(),
-                needs_attention: false,
-              })
-              .eq("property_id", p.property_id);
+          for (const pid of outreachIds) {
+            await updateOutreachAfterEmailSent(supabase, pid);
           }
           success++;
         } catch (e) {
@@ -138,18 +184,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success, skipped, failed, errors, failures });
     }
 
-    let template: { subject: string; body: string } | null = null;
+    let baseTemplateRow: { name: string; subject: string; body: string } | null = null;
     if (email_template_id) {
       const { data: t } = await supabase
         .from("email_templates")
-        .select("subject, body")
+        .select("name, subject, body")
         .eq("id", email_template_id)
         .single();
-      if (t) template = t;
+      if (t) baseTemplateRow = t as { name: string; subject: string; body: string };
     }
 
     const useCustom = Boolean(customSubject && customBody);
-    if (!template && !useCustom) {
+    if (!baseTemplateRow && !useCustom) {
       return NextResponse.json(
         { error: "请提供 email_template_id 或 subject+body 或 previews" },
         { status: 400 }
@@ -159,7 +205,9 @@ export async function POST(req: NextRequest) {
     for (const cid of company_ids) {
       const { data: company } = await supabase
         .from("companies")
-        .select("*, contacts(*), property_companies(*, properties(id, name))")
+        .select(
+          "*, contacts(*), property_companies(role, properties(id, name, units, city, build_year, address, area))"
+        )
         .eq("id", cid)
         .single();
 
@@ -170,7 +218,16 @@ export async function POST(req: NextRequest) {
 
       const c = company as CompanyWithContacts & {
         property_companies?: Array<{
-          properties?: { id: string; name: string } | null;
+          role?: string;
+          properties?: {
+            id: string;
+            name: string;
+            units?: number | null;
+            city?: string | null;
+            build_year?: number | null;
+            address?: string | null;
+            area?: string | null;
+          } | null;
         }>;
       };
 
@@ -180,34 +237,116 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const prop =
-        c.property_companies?.find((pc) => pc.properties)?.properties ?? null;
-      const propertyName = prop?.name ?? "your portfolio";
-      const propertyId = prop?.id ?? null;
-      const vars = {
-        company_name: c.name,
-        contact_name: resolveContactName(c),
-        property_name: propertyName,
-      };
+      const rawList: BatchPropertyForTemplate[] = [];
+      for (const pc of c.property_companies ?? []) {
+        const pr = pc.properties;
+        if (!pr?.id || !pr?.name) continue;
+        rawList.push({
+          property_id: pr.id,
+          property_name: pr.name,
+          units: pr.units ?? null,
+          city: pr.city ?? null,
+          address: pr.address ?? null,
+          area: pr.area ?? null,
+          build_year: pr.build_year ?? null,
+          company_role: pc.role ?? "",
+        });
+      }
 
-      const subject = useCustom
-        ? applyTemplate(customSubject!, vars)
-        : applyTemplate(template!.subject, vars);
-      const emailBody = useCustom
-        ? applyTemplate(customBody!, vars)
-        : applyTemplate(template!.body, vars);
+      const list =
+        rawList.length > 0
+          ? dedupePropertiesByIdPreferHigherUnits(rawList)
+          : [];
+
+      const contactName = contactFirstName(resolveContactName(c));
+
+      let vars: Record<string, string>;
+      let propertyNameForHeader: string;
+      if (list.length === 1) {
+        const lone = list[0]!;
+        vars = {
+          company_name: c.name ?? "",
+          company_role: lone.company_role ?? "",
+          property_name: lone.property_name,
+          contact_name: contactName,
+        };
+        propertyNameForHeader = lone.property_name;
+      } else if (list.length >= 2) {
+        const baseVars = buildDeveloperBatchTemplateVars(list, {
+          company_name: c.name ?? "",
+          company_role: list[0]?.company_role ?? "",
+        });
+        vars = { ...baseVars, contact_name: contactName };
+        propertyNameForHeader = baseVars.property_name || "your portfolio";
+      } else {
+        vars = {
+          company_name: c.name ?? "",
+          company_role: "",
+          property_name: "your portfolio",
+          contact_name: contactName,
+        };
+        propertyNameForHeader = "your portfolio";
+      }
+
+      const propertyId = list[0]?.property_id ?? null;
+
+      let effectiveBaseTemplateRow = baseTemplateRow;
+      if (!useCustom && baseTemplateRow && isInvoManagedEmailTemplateName(baseTemplateRow.name)) {
+        const targetName = invoBaseTemplateNameFromBuildYears(list.map((r) => r.build_year));
+        const { data: swapped } = await supabase
+          .from("email_templates")
+          .select("name, subject, body")
+          .eq("name", targetName)
+          .maybeSingle();
+        if (swapped) {
+          effectiveBaseTemplateRow = swapped as typeof baseTemplateRow;
+        }
+      }
+
+      let subject: string;
+      let emailBody: string;
+      if (useCustom) {
+        subject = applyTemplate(customSubject!, vars);
+        emailBody = applyTemplate(customBody!, vars);
+      } else {
+        let subjectTpl = effectiveBaseTemplateRow!.subject;
+        let bodyTpl = effectiveBaseTemplateRow!.body;
+        if (list.length >= 2 && effectiveBaseTemplateRow!.name) {
+          const multiName = resolveInvoMultiDeveloperTemplateName(effectiveBaseTemplateRow!.name);
+          if (multiName) {
+            const { data: multiRow } = await supabase
+              .from("email_templates")
+              .select("subject, body")
+              .eq("name", multiName)
+              .maybeSingle();
+            if (multiRow) {
+              subjectTpl = multiRow.subject;
+              bodyTpl = multiRow.body;
+            }
+          }
+        }
+        subject = applyTemplate(subjectTpl, vars);
+        emailBody = applyTemplate(bodyTpl, vars);
+      }
 
       try {
         const senderName = process.env.SENDER_NAME?.trim() || "Royce Huang";
-        const htmlBody = wrapEmailHtml(
-          emailBody,
-          undefined,
-          undefined,
-          propertyName,
+        const outgoing = useHtml
+          ? wrapEmailHtml(
+              emailBody,
+              undefined,
+              undefined,
+              propertyNameForHeader,
+              senderName,
+              from
+            )
+          : emailBody;
+        const sendResult = await sendEmail(to, subject, outgoing, from, useHtml, {
           senderName,
-          from
-        );
-        const sendResult = await sendEmail(to, subject, htmlBody, from, true);
+          attachmentPath: attach,
+          cc: ccMerged,
+          bcc: bccMerged,
+        });
         const ai_summary = await summarizeSentEmail(emailBody);
         await supabase.from("emails").insert({
           company_id: cid,
@@ -219,17 +358,11 @@ export async function POST(req: NextRequest) {
           body: emailBody,
           ai_summary,
           status: "sent",
-          gmail_message_id: (sendResult as any)?.id ?? null,
-          resend_id: null,
+          gmail_message_id: null,
+          resend_id: sendResult?.id ?? null,
         });
-        if (propertyId) {
-          await supabase
-            .from("outreach")
-            .update({
-              last_email_at: new Date().toISOString(),
-              needs_attention: false,
-            })
-            .eq("property_id", propertyId);
+        for (const row of list) {
+          await updateOutreachAfterEmailSent(supabase, row.property_id);
         }
         success++;
       } catch (e) {

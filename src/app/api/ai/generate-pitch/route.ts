@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { contactFirstName } from "@/lib/email-helpers";
 import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -151,7 +152,9 @@ export async function POST(req: NextRequest) {
       const historySummaries = await fetchEmailHistorySummaries(companyId, propertyId);
 
       const companyRole = (sel.company_role ?? "").trim().toLowerCase();
-      const hiName = (sel.contact_name ?? sel.company_name ?? "there").trim();
+      const hiName = sel.contact_name?.trim()
+        ? contactFirstName(sel.contact_name)
+        : contactFirstName(sel.company_name ?? null, "there");
       const propertyBlock = `${sel.property_name ?? ""}${sel.area ? `（${sel.area}）` : ""}${
         sel.address ? `｜${sel.address}` : ""
       }\nBuild Year：${sel.build_year ?? "—"}｜Units：${sel.units ?? "—"}`;
@@ -179,7 +182,7 @@ ${propertyBlock}
 关联公司：
 ${sel.company_name ?? ""}（角色：${sel.company_role ?? ""}）
 
-联系人：${sel.contact_name ?? ""}
+联系人（称呼用名）：${sel.contact_name?.trim() ? contactFirstName(sel.contact_name) : ""}
 收件邮箱：${toEmail}
 
 当前 BD 阶段：${stage}

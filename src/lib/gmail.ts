@@ -1,5 +1,4 @@
 import { google } from "googleapis";
-import { getPlainTextSignature } from "@/lib/email-signature";
 
 function getOAuth2Client() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -29,7 +28,6 @@ export function buildGoogleAuthUrl(): string {
     access_type: "offline",
     prompt: "consent",
     scope: [
-      "https://www.googleapis.com/auth/gmail.send",
       "https://www.googleapis.com/auth/gmail.readonly",
       "https://www.googleapis.com/auth/gmail.modify",
       "https://www.googleapis.com/auth/userinfo.email",
@@ -39,7 +37,6 @@ export function buildGoogleAuthUrl(): string {
 }
 
 function base64UrlToBuffer(base64Url: string) {
-  // Gmail API returns base64url; Buffer expects base64
   const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
   const pad = base64.length % 4;
   const padded = pad ? base64 + "=".repeat(4 - pad) : base64;
@@ -51,51 +48,44 @@ function findHeader(headers: Array<{ name?: string | null; value?: string | null
   return h?.value ?? "";
 }
 
-export async function sendEmail(
-  to: string,
-  subject: string,
-  body: string,
-  from?: string,
-  isHtml: boolean = false,
-  options?: { senderName?: string }
-) {
-  const gmail = await getGmailClient();
-  const senderEmail = (from || process.env.SENDER_EMAIL || "").trim();
-  if (!senderEmail) {
-    throw new Error("未配置 SENDER_EMAIL");
-  }
-
-  const senderName =
-    options?.senderName?.trim() || process.env.SENDER_NAME?.trim() || undefined;
-
-  const finalBody =
-    isHtml
-      ? body
-      : body + getPlainTextSignature(senderName, senderEmail || undefined);
-
-  const message = [
-    `From: ${senderEmail}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    `Content-Type: ${isHtml ? "text/html" : "text/plain"}; charset=utf-8`,
-    "",
-    finalBody,
-  ].join("\n");
-
-  const encodedMessage = Buffer.from(message, "utf-8")
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-
-  const result = await gmail.users.messages.send({
-    userId: "me",
-    requestBody: { raw: encodedMessage },
-  });
-
-  return result.data;
+function stripHtmlToPlain(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
+/** Gmail payload.parts 可能多层嵌套（multipart），用于 bounce 解析等 */
+type GmailPart = {
+  mimeType?: string | null;
+  body?: { data?: string | null; size?: number | null };
+  parts?: GmailPart[];
+};
+
+function collectPlainBodies(parts: GmailPart[] | undefined, acc: string[]): void {
+  if (!parts?.length) return;
+  for (const p of parts) {
+    if (p.mimeType === "text/plain" && p.body?.data) {
+      acc.push(base64UrlToBuffer(p.body.data).toString("utf-8"));
+    } else if (p.mimeType === "text/html" && p.body?.data) {
+      acc.push(stripHtmlToPlain(base64UrlToBuffer(p.body.data).toString("utf-8")));
+    }
+    if (p.parts?.length) collectPlainBodies(p.parts, acc);
+  }
+}
+
+export function extractPlainTextFromGmailPayload(payload: GmailPart | undefined): string {
+  if (!payload) return "";
+  const acc: string[] = [];
+  if (payload.body?.data) {
+    acc.push(base64UrlToBuffer(payload.body.data).toString("utf-8"));
+  }
+  collectPlainBodies(payload.parts, acc);
+  return acc.join("\n\n");
+}
+
+/** 搜索收件箱（同步、退信检测等）；发信请使用 @/lib/resend */
 export async function searchEmails(query: string, maxResults: number = 10) {
   const gmail = await getGmailClient();
 
@@ -125,16 +115,7 @@ export async function searchEmails(query: string, maxResults: number = 10) {
       const subject = findHeader(headers, "Subject");
       const date = findHeader(headers, "Date");
 
-      let body = "";
-      // Prefer plain text part if present
-      if (payload?.body?.data) {
-        body = base64UrlToBuffer(payload.body.data).toString("utf-8");
-      } else if (payload?.parts?.length) {
-        const textPart = payload.parts.find((p) => p.mimeType === "text/plain");
-        if (textPart?.body?.data) {
-          body = base64UrlToBuffer(textPart.body.data).toString("utf-8");
-        }
-      }
+      const body = extractPlainTextFromGmailPayload(payload as GmailPart);
 
       return {
         gmail_message_id: id,

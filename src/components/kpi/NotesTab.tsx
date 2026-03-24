@@ -12,43 +12,13 @@ import {
   Legend,
 } from "recharts";
 import type { KpiFilters } from "./KpiClient";
-
-type Kpi = {
-  total_notes: number;
-  total_exposure: number;
-  total_views: number;
-  total_interactions: number;
-  total_follows: number;
-  avg_interaction_rate: number;
-  avg_collect_rate: number;
-  avg_cover_ctr: number;
-  follow_efficiency: number;
-  paid_ratio: number;
-};
-type ChangeMetric = { change: number; change_rate: number };
-type TrendPoint = { date: string; exposure: number; interactions: number; interaction_rate: number };
-type NotesComparison = {
-  start_date: string | null;
-  end_date: string | null;
-  current: Kpi | null;
-  changes: Record<string, ChangeMetric> | null;
-  trend: TrendPoint[];
-  no_comparison: boolean;
-};
-type ByGenre = {
-  video: { count: number; avg_interaction_rate: number; avg_collect_rate: number };
-  image: { count: number; avg_interaction_rate: number; avg_collect_rate: number };
-};
-type TopRow = {
-  rank: number;
-  title: string;
-  genre: string;
-  exposure: number;
-  interaction_rate: number;
-  collect_rate: number;
-  follows: number;
-  is_paid: boolean;
-};
+import {
+  loadNotesReportData,
+  type ByGenre,
+  type ChangeMetric,
+  type NotesComparison,
+  type TopRow,
+} from "@/lib/kpiNotesReportData";
 
 function formatValue(value: number, isPercent = false): string {
   return isPercent ? `${(value * 100).toFixed(2)}%` : value.toLocaleString();
@@ -123,56 +93,22 @@ export function NotesTab({
   const fetchData = useCallback(async () => {
     if (!filters.from_date || !filters.to_date) return;
     setLoading(true);
-    const comparisonParams = new URLSearchParams({
+    const result = await loadNotesReportData({
       from_date: filters.from_date,
       to_date: filters.to_date,
+      account_names: filters.account_names ?? [],
     });
-    (filters.account_names ?? []).forEach((name) => comparisonParams.append("account", name));
-    const comparisonRes = await fetch(
-      `/api/kpi/notes-comparison?${comparisonParams}`,
-      { cache: "no-store" }
-    );
-    const comparisonData = await comparisonRes.json().catch(() => ({}));
-    if (!comparisonRes.ok || comparisonData.error) {
+    if (!result.ok) {
       setComparison(null);
       setByGenre(null);
       setTop10([]);
       setLoading(false);
       return;
     }
-    setComparison({
-      start_date: comparisonData.start_date ?? null,
-      end_date: comparisonData.end_date ?? null,
-      current: comparisonData.current ?? null,
-      changes: comparisonData.changes ?? null,
-      trend: Array.isArray(comparisonData.trend) ? comparisonData.trend : [],
-      no_comparison: !!comparisonData.no_comparison,
-    });
-
-    if (!comparisonData.end_date) {
-      setByGenre(null);
-      setTop10([]);
-      setLoading(false);
-      return;
-    }
-
-    const statsParams = new URLSearchParams({
-      snapshot_date: comparisonData.end_date,
-      from_date: filters.from_date,
-      to_date: filters.to_date,
-    });
-    (filters.account_names ?? []).forEach((name) => statsParams.append("account", name));
-    const statsRes = await fetch(`/api/kpi/notes-stats?${statsParams}`, {
-      cache: "no-store",
-    });
-    const statsData = await statsRes.json().catch(() => ({}));
-    if (!statsRes.ok || statsData.error) {
-      setByGenre(null);
-      setTop10([]);
-    } else {
-      setByGenre(statsData.by_genre ?? null);
-      setTop10(statsData.top10 ?? []);
-    }
+    const { comparison, byGenre, top10 } = result.data;
+    setComparison(comparison);
+    setByGenre(byGenre);
+    setTop10(top10);
     setLoading(false);
   }, [filters.from_date, filters.to_date, filters.account_names, refreshToken]);
 

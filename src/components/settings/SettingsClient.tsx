@@ -20,8 +20,22 @@ export function SettingsClient() {
   const [mailStatus, setMailStatus] = useState<{
     gmail_authorized: boolean;
     gmail_email: string | null;
+    sender_email?: string | null;
+    resend_configured?: boolean;
   } | null>(null);
   const [mailLoading, setMailLoading] = useState(true);
+  const [testOpen, setTestOpen] = useState(false);
+  const [testTo, setTestTo] = useState("");
+  const [testCc, setTestCc] = useState("");
+  const [testBcc, setTestBcc] = useState("");
+  const [testSending, setTestSending] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const tid = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(tid);
+  }, [toast]);
   const [syncLoading, setSyncLoading] = useState(false);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -51,6 +65,8 @@ export function SettingsClient() {
     setMailStatus({
       gmail_authorized: Boolean(data.gmail_authorized),
       gmail_email: data.gmail_email ?? null,
+      sender_email: data.sender_email ?? null,
+      resend_configured: Boolean(data.resend_configured),
     });
     setMailLoading(false);
   }, []);
@@ -141,6 +157,22 @@ export function SettingsClient() {
                 已授权邮箱：<span className="font-medium">{mailStatus.gmail_email}</span>
               </div>
             )}
+            <div className="text-[#44403C]">
+              发件邮箱：
+              <span className="font-medium">
+                {mailStatus?.sender_email?.trim()
+                  ? mailStatus.sender_email
+                  : "（未配置 SENDER_EMAIL）"}
+              </span>
+            </div>
+            <div className="text-[#44403C]">
+              Resend API：
+              {mailStatus?.resend_configured ? (
+                <span className="ml-2 font-medium text-emerald-700">已配置 ✅</span>
+              ) : (
+                <span className="ml-2 font-medium text-amber-800">未配置 RESEND_API_KEY</span>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               <a
                 href="/api/auth/google"
@@ -157,11 +189,102 @@ export function SettingsClient() {
                 {syncLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 同步收件箱
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTestTo("");
+                  setTestCc("");
+                  setTestBcc("");
+                  setTestOpen(true);
+                }}
+                disabled={
+                  !mailStatus?.sender_email?.trim() || !mailStatus?.resend_configured
+                }
+                className="inline-flex items-center gap-1 rounded-lg border border-[#E7E5E4] px-4 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
+              >
+                发送测试邮件
+              </button>
             </div>
             <p className="text-xs text-[#A8A29E]">
-              Gmail 发送使用你在 <code className="rounded bg-[#F5F5F4] px-1">.env.local</code>{" "}
-              填写的 <code className="rounded bg-[#F5F5F4] px-1">SENDER_EMAIL</code>。
+              发信使用 Resend，需配置 <code className="rounded bg-[#F5F5F4] px-1">RESEND_API_KEY</code>{" "}
+              与 <code className="rounded bg-[#F5F5F4] px-1">SENDER_EMAIL</code>（已在 Resend 验证的域名）。
+              收件同步仍用下方 Gmail 授权。
             </p>
+          </div>
+        )}
+        {testOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-sm rounded-xl border border-[#E7E5E4] bg-white p-4 shadow-lg">
+              <h3 className="text-sm font-semibold text-[#1C1917]">发送测试邮件</h3>
+              <p className="mt-1 text-xs text-[#78716C]">将发送到下方收件人邮箱</p>
+              <input
+                type="email"
+                value={testTo}
+                onChange={(e) => setTestTo(e.target.value)}
+                placeholder="收件人邮箱"
+                className="mt-3 h-10 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm"
+              />
+              <input
+                value={testCc}
+                onChange={(e) => setTestCc(e.target.value)}
+                placeholder="Cc（可选，逗号分隔）"
+                className="mt-2 h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm"
+              />
+              <input
+                value={testBcc}
+                onChange={(e) => setTestBcc(e.target.value)}
+                placeholder="Bcc（可选）"
+                className="mt-2 h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm"
+              />
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTestOpen(false)}
+                  className="rounded-lg border border-[#E7E5E4] px-3 py-1.5 text-xs text-[#78716C] hover:bg-[#F5F5F4]"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  disabled={testSending || !testTo.trim()}
+                  onClick={async () => {
+                    setTestSending(true);
+                    try {
+                      const res = await fetch("/api/email/send", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          is_test: true,
+                          to: testTo.trim(),
+                          subject: "INVO Email Test",
+                          body: "This is a test email from INVO Ops Hub.",
+                          is_html: false,
+                          cc: testCc.trim() || null,
+                          bcc: testBcc.trim() || null,
+                        }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok || data?.error) throw new Error(data?.error || "发送失败");
+                      setToast("测试邮件已发送");
+                      setTestOpen(false);
+                    } catch (e) {
+                      alert(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setTestSending(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg bg-[#1C1917] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {testSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  发送
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {toast && (
+          <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg bg-[#1C1917] px-4 py-2 text-sm text-white shadow-lg">
+            {toast}
           </div>
         )}
       </div>

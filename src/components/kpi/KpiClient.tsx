@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { BarChart3, DollarSign, Leaf, Upload } from "lucide-react";
+import { BarChart3, DollarSign, Leaf, Target, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/contexts/LocaleContext";
 import { NotesTab } from "./NotesTab";
 import { PaidTab } from "./PaidTab";
 import { NaturalTab } from "./NaturalTab";
+import { CampaignReportTab } from "./CampaignReportTab";
 import { UploadModal } from "./UploadModal";
 import { AddAccountModal, type GlobalAccount } from "@/components/planning/AddAccountModal";
 
@@ -14,6 +15,7 @@ const TABS = [
   { key: "notes", labelKey: "kpi.tabNotes", icon: BarChart3 },
   { key: "paid", labelKey: "kpi.tabPaid", icon: DollarSign },
   { key: "natural", labelKey: "kpi.tabNatural", icon: Leaf },
+  { key: "campaign", labelKey: "kpi.tabCampaign", icon: Target },
 ] as const;
 
 export type KpiFilters = {
@@ -24,7 +26,7 @@ export type KpiFilters = {
 
 export function KpiClient() {
   const { t } = useLocale();
-  const [tab, setTab] = useState<"notes" | "paid" | "natural">("notes");
+  const [tab, setTab] = useState<"notes" | "paid" | "natural" | "campaign">("notes");
   const [filters, setFilters] = useState<KpiFilters>({
     from_date: "",
     to_date: "",
@@ -59,6 +61,7 @@ export function KpiClient() {
   }, []);
 
   useEffect(() => {
+    if (tab === "campaign") return;
     if (!filters.from_date || !filters.to_date) return;
     const loadCompareInfo = async () => {
       const params = new URLSearchParams({
@@ -81,7 +84,7 @@ export function KpiClient() {
       }
     };
     loadCompareInfo();
-  }, [filters.from_date, filters.to_date, filters.account_names, notesRefreshToken]);
+  }, [tab, filters.from_date, filters.to_date, filters.account_names, notesRefreshToken]);
 
   const inputCls =
     "h-9 rounded-lg border border-[#E7E5E4] bg-white px-3 text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20";
@@ -108,24 +111,28 @@ export function KpiClient() {
     <div>
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-[#78716C]">{t("kpi.dateRange")}</span>
-          <input
-            type="date"
-            value={filters.from_date}
-            onChange={(e) =>
-              setFilters((p) => ({ ...p, from_date: e.target.value }))
-            }
-            className={inputCls}
-          />
-          <span className="text-[#A8A29E]">→</span>
-          <input
-            type="date"
-            value={filters.to_date}
-            onChange={(e) =>
-              setFilters((p) => ({ ...p, to_date: e.target.value }))
-            }
-            className={inputCls}
-          />
+          {tab !== "campaign" && (
+            <>
+              <span className="text-sm text-[#78716C]">{t("kpi.dateRange")}</span>
+              <input
+                type="date"
+                value={filters.from_date}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, from_date: e.target.value }))
+                }
+                className={inputCls}
+              />
+              <span className="text-[#A8A29E]">→</span>
+              <input
+                type="date"
+                value={filters.to_date}
+                onChange={(e) =>
+                  setFilters((p) => ({ ...p, to_date: e.target.value }))
+                }
+                className={inputCls}
+              />
+            </>
+          )}
           {tab === "notes" && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-[#78716C]">{t("kpi.account")}</span>
@@ -165,11 +172,13 @@ export function KpiClient() {
         </button>
       </div>
 
-      <div className="mb-3 text-xs text-[#78716C]">
-        {compareInfo?.start_date && compareInfo?.end_date
-          ? `${t("kpi.compareLabel")}${compareInfo.start_date} → ${compareInfo.end_date}${compareInfo.no_comparison ? t("kpi.compareNoData") : ""}`
-          : t("kpi.compareLabel") + t("kpi.compareNone")}
-      </div>
+      {tab !== "campaign" && (
+        <div className="mb-3 text-xs text-[#78716C]">
+          {compareInfo?.start_date && compareInfo?.end_date
+            ? `${t("kpi.compareLabel")}${compareInfo.start_date} → ${compareInfo.end_date}${compareInfo.no_comparison ? t("kpi.compareNoData") : ""}`
+            : t("kpi.compareLabel") + t("kpi.compareNone")}
+        </div>
+      )}
 
       <div className="mb-6 flex gap-1 border-b border-[#E7E5E4]">
         {TABS.map((tabItem) => {
@@ -198,6 +207,7 @@ export function KpiClient() {
       )}
       {tab === "paid" && <PaidTab filters={filters} />}
       {tab === "natural" && <NaturalTab filters={filters} />}
+      {tab === "campaign" && <CampaignReportTab />}
 
       {uploadOpen && (
         <UploadModal
