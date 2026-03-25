@@ -137,6 +137,10 @@ export function NotesTab({
 
   const kpi = comparison?.current;
   const hasNoData = !kpi || kpi.total_notes === 0;
+  const vsPeriod =
+    comparison?.start_date && comparison?.end_date
+      ? `${comparison.start_date} → ${comparison.end_date}`
+      : comparison?.start_date ?? null;
 
   return (
     <div className="space-y-6">
@@ -153,21 +157,21 @@ export function NotesTab({
               label="笔记总数"
               value={kpi.total_notes}
               change={comparison.changes?.total_notes}
-              vsDate={comparison.start_date}
+              vsDate={vsPeriod}
               noComparison={comparison.no_comparison}
             />
             <KpiCardWithChange
               label="总曝光"
               value={kpi.total_exposure}
               change={comparison.changes?.total_exposure}
-              vsDate={comparison.start_date}
+              vsDate={vsPeriod}
               noComparison={comparison.no_comparison}
             />
             <KpiCardWithChange
               label="总互动"
               value={kpi.total_interactions}
               change={comparison.changes?.total_interactions}
-              vsDate={comparison.start_date}
+              vsDate={vsPeriod}
               noComparison={comparison.no_comparison}
             />
             <KpiCardWithChange
@@ -175,7 +179,7 @@ export function NotesTab({
               value={kpi.avg_interaction_rate}
               isPercent
               change={comparison.changes?.avg_interaction_rate}
-              vsDate={comparison.start_date}
+              vsDate={vsPeriod}
               noComparison={comparison.no_comparison}
             />
           </div>
@@ -184,14 +188,14 @@ export function NotesTab({
               label="总涨粉"
               value={kpi.total_follows}
               change={comparison.changes?.total_follows}
-              vsDate={comparison.start_date}
+              vsDate={vsPeriod}
               noComparison={comparison.no_comparison}
             />
             <KpiCardWithChange
               label="观看量"
               value={kpi.total_views}
               change={comparison.changes?.total_views}
-              vsDate={comparison.start_date}
+              vsDate={vsPeriod}
               noComparison={comparison.no_comparison}
             />
             <KpiCardWithChange
@@ -199,7 +203,7 @@ export function NotesTab({
               value={kpi.avg_cover_ctr}
               isPercent
               change={comparison.changes?.avg_cover_ctr}
-              vsDate={comparison.start_date}
+              vsDate={vsPeriod}
               noComparison={comparison.no_comparison}
             />
             <KpiCardWithChange
@@ -207,7 +211,7 @@ export function NotesTab({
               value={kpi.avg_watch_time}
               valueUnit="seconds"
               change={comparison.changes?.avg_watch_time}
-              vsDate={comparison.start_date}
+              vsDate={vsPeriod}
               noComparison={comparison.no_comparison}
             />
           </div>
