@@ -31,82 +31,109 @@ const emptyNotesStats = {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  let snapshotDate = searchParams.get("snapshot_date");
   const from_date = searchParams.get("from_date");
   const to_date = searchParams.get("to_date");
   const contentTypes = searchParams.getAll("content_type").filter(Boolean);
   const genre = searchParams.get("genre") || "";
   const accountNames = searchParams.getAll("account").filter(Boolean);
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   console.log("[notes-stats] 收到请求，参数:", {
-    snapshot_date: snapshotDate ?? "(未传，将用最新)",
     from_date: from_date ?? "(未传)",
     to_date: to_date ?? "(未传)",
     content_type: contentTypes,
     genre: genre || "(全部)",
-  }, "SUPABASE_URL:", supabaseUrl ? `${supabaseUrl.slice(0, 30)}...` : "(未配置)");
+  });
 
-  if (!snapshotDate) {
-    const { data: dateRows, error: dateError } = await supabase
-      .from("xhs_notes")
-      .select("snapshot_date")
-      .order("snapshot_date", { ascending: false })
-      .limit(1);
-    if (dateError) console.log("[notes-stats] 获取最新快照日期失败:", dateError.message);
-    snapshotDate = dateRows?.[0]?.snapshot_date
-      ? String(dateRows[0].snapshot_date).slice(0, 10)
-      : null;
-    if (!snapshotDate) {
-      console.log("[notes-stats] 查询结果条数: 0 (无快照日期)，请确认应用连接的 Supabase 项目与有数据的项目一致");
-      return NextResponse.json(emptyNotesStats, {
-        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-      });
-    }
+  if (!from_date || !to_date) {
+    return NextResponse.json(emptyNotesStats, {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
   }
 
-  const fromDate = from_date ?? snapshotDate;
-  const toDate = to_date ?? snapshotDate;
-
-  let noteIdsFilter: string[] | null = null;
+  // 账号过滤
+  let accountNoteIds: string[] | null = null;
   if (accountNames.length > 0) {
     const { data: paidRows } = await supabase
       .from("xhs_paid_daily")
       .select("note_id")
       .in("creator", accountNames)
       .not("note_id", "is", null);
-    noteIdsFilter = Array.from(new Set((paidRows ?? []).map((r) => r.note_id as string).filter(Boolean)));
-    if (noteIdsFilter.length === 0) {
+    accountNoteIds = Array.from(
+      new Set((paidRows ?? []).map((r) => r.note_id as string).filter(Boolean))
+    );
+    if (accountNoteIds.length === 0) {
       return NextResponse.json(emptyNotesStats, {
         headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
       });
     }
   }
 
-  let query = supabase
+  // Step 1：找出 publish_date 在范围内的 note_id
+  let noteIdQuery = supabase
+    .from("xhs_notes_with_publish_date")
+    .select("note_id")
+    .gte("publish_date", from_date)
+    .lte("publish_date", to_date)
+    .not("note_id", "is", null);
+  if (accountNoteIds && accountNoteIds.length > 0) {
+    noteIdQuery = noteIdQuery.in("note_id", accountNoteIds);
+  }
+  const { data: noteIdRows } = await noteIdQuery;
+  const noteIds = Array.from(
+    new Set((noteIdRows ?? []).map((r: { note_id: string }) => r.note_id).filter(Boolean))
+  );
+  if (noteIds.length === 0) {
+    return NextResponse.json(emptyNotesStats, {
+      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    });
+  }
+
+  // Step 2：拉取这些笔记的所有快照，在 JS 侧保留每笔记最新快照
+  let snapshotQuery = supabase
     .from("xhs_notes_with_publish_date")
     .select("*")
-    .eq("snapshot_date", snapshotDate)
-    .gte("publish_date", fromDate)
-    .lte("publish_date", toDate);
-
-  if (noteIdsFilter && noteIdsFilter.length > 0) {
-    query = query.in("note_id", noteIdsFilter);
-  }
+    .in("note_id", noteIds);
   if (contentTypes.length > 0) {
-    query = query.in("content_type", contentTypes);
+    snapshotQuery = snapshotQuery.in("content_type", contentTypes);
   }
   if (genre && genre !== "全部") {
-    query = query.eq("genre", genre);
+    snapshotQuery = snapshotQuery.eq("genre", genre);
   }
-
-  const { data: rows, error } = await query;
+  const { data: allSnapshots, error } = await snapshotQuery;
   if (error) {
     console.log("[notes-stats] 查询错误:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  const list = rows ?? [];
-  console.log("[notes-stats] 查询结果条数:", list.length);
+
+  // 每个 note_id 只保留 snapshot_date 最大的行
+  type RawRow = {
+    note_id?: string;
+    snapshot_date?: string;
+    publish_date?: string;
+    title?: string;
+    genre?: string;
+    content_type?: string;
+    exposure?: unknown;
+    views?: unknown;
+    likes?: unknown;
+    comments?: unknown;
+    collects?: unknown;
+    shares?: unknown;
+    follows?: unknown;
+    cover_ctr?: unknown;
+    is_paid?: unknown;
+  };
+  const latestByNote = new Map<string, RawRow>();
+  for (const row of (allSnapshots ?? []) as RawRow[]) {
+    const nid = String(row.note_id ?? "");
+    if (!nid) continue;
+    const existing = latestByNote.get(nid);
+    if (!existing || String(row.snapshot_date) > String(existing.snapshot_date)) {
+      latestByNote.set(nid, row);
+    }
+  }
+  const list = Array.from(latestByNote.values());
+  console.log("[notes-stats] 查询结果条数 (去重最新快照):", list.length);
 
   const totalNotes = list.length;
   const totalExposure = list.reduce((s, r) => s + Number(r.exposure || 0), 0);
