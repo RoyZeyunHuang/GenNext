@@ -68,6 +68,7 @@ export async function loadNotesReportData(filters: {
     to_date: filters.to_date,
   });
   account_names.forEach((name) => comparisonParams.append("account", name));
+  comparisonParams.set("_cb", String(Date.now()));
 
   const comparisonRes = await fetch(
     `/api/kpi/notes-comparison?${comparisonParams}`,
@@ -99,6 +100,7 @@ export async function loadNotesReportData(filters: {
     to_date: filters.to_date,
   });
   account_names.forEach((name) => statsParams.append("account", name));
+  statsParams.set("_cb", String(Date.now()));
 
   const statsRes = await fetch(`/api/kpi/notes-stats?${statsParams}`, {
     cache: "no-store",

@@ -72,6 +72,7 @@ export function KpiClient() {
       if (tab !== "notes") {
         filters.account_names.forEach((name) => params.append("account", name));
       }
+      params.set("_cb", String(Date.now()));
       const res = await fetch(`/api/kpi/notes-comparison?${params}`, {
         cache: "no-store",
       });
