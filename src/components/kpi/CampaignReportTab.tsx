@@ -39,7 +39,12 @@ function parseReportNoteKeys(report: Report): string[] | undefined {
   }
 }
 
-export function CampaignReportTab() {
+export function CampaignReportTab({
+  notesDataVersion = 0,
+}: {
+  /** KPI 上传笔记成功后递增，用于刷新 Campaign 新建表单里的候选笔记列表 */
+  notesDataVersion?: number;
+}) {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Report | null>(null);
@@ -134,6 +139,7 @@ export function CampaignReportTab() {
       <div className="rounded-lg bg-white p-6 shadow-card">
         {creating ? (
           <NewReportForm
+            notesDataVersion={notesDataVersion}
             onClose={() => setCreating(false)}
             onCreated={(r) => {
               setReports((prev) => [r, ...prev]);
@@ -305,9 +311,11 @@ function ReportView({ report }: { report: Report }) {
 type NoteOption = { key: string; title: string; note_id: string | null };
 
 function NewReportForm({
+  notesDataVersion = 0,
   onClose,
   onCreated,
 }: {
+  notesDataVersion?: number;
   onClose: () => void;
   onCreated: (r: Report) => void;
 }) {
@@ -321,6 +329,8 @@ function NewReportForm({
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [pickSearch, setPickSearch] = useState("");
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  /** 手动刷新候选列表（与日期、上传无关时） */
+  const [listRefreshNonce, setListRefreshNonce] = useState(0);
 
   const inputCls =
     "h-9 rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20";
@@ -340,14 +350,21 @@ function NewReportForm({
     (async () => {
       setOptionsLoading(true);
       try {
+        const params = new URLSearchParams({
+          from_date: dateFrom,
+          to_date: dateTo,
+          _cb: String(Date.now()),
+        });
         const res = await fetch(
-          `/api/kpi/campaign-report-note-options?from_date=${encodeURIComponent(dateFrom)}&to_date=${encodeURIComponent(dateTo)}`,
+          `/api/kpi/campaign-report-note-options?${params}`,
           { cache: "no-store" }
         );
         const data = await res.json().catch(() => ({}));
         if (!cancelled) {
-          setOptions(Array.isArray(data.options) ? data.options : []);
-          setSelectedKeys([]);
+          const next = Array.isArray(data.options) ? data.options : [];
+          setOptions(next);
+          const allowed = new Set(next.map((o: NoteOption) => o.key));
+          setSelectedKeys((prev) => prev.filter((k) => allowed.has(k)));
         }
       } catch {
         if (!cancelled) setOptions([]);
@@ -358,7 +375,7 @@ function NewReportForm({
     return () => {
       cancelled = true;
     };
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, notesDataVersion, listRefreshNonce]);
 
   const filteredOptions = useMemo(() => {
     const q = pickSearch.trim().toLowerCase();
@@ -470,7 +487,15 @@ function NewReportForm({
                 （已选 {selectedKeys.length}/{options.length}）
               </span>
             </span>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                onClick={() => setListRefreshNonce((n) => n + 1)}
+                disabled={optionsLoading || !dateFrom || !dateTo}
+                className="rounded px-2 py-0.5 text-[10px] text-[#78716C] hover:bg-[#F5F5F4] disabled:opacity-40"
+              >
+                刷新列表
+              </button>
               <button
                 type="button"
                 onClick={selectAllKeys}

@@ -217,7 +217,9 @@ export function KpiClient() {
       )}
       {tab === "paid" && <PaidTab filters={filters} />}
       {tab === "natural" && <NaturalTab filters={filters} />}
-      {tab === "campaign" && <CampaignReportTab />}
+      {tab === "campaign" && (
+        <CampaignReportTab notesDataVersion={notesRefreshToken} />
+      )}
 
       {uploadOpen && (
         <UploadModal
