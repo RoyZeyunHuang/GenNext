@@ -9,7 +9,8 @@ export type Kpi = {
   avg_interaction_rate: number;
   avg_collect_rate: number;
   avg_cover_ctr: number;
-  follow_efficiency: number;
+  /** 按观看量加权的平均人均观看时长（秒） */
+  avg_watch_time: number;
   paid_ratio: number;
 };
 

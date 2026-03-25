@@ -10,7 +10,20 @@ function toNum(v: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
-function aggregate(list: { exposure?: unknown; views?: unknown; likes?: unknown; comments?: unknown; collects?: unknown; shares?: unknown; follows?: unknown; cover_ctr?: unknown; is_paid?: unknown }[]) {
+function aggregate(
+  list: {
+    exposure?: unknown;
+    views?: unknown;
+    likes?: unknown;
+    comments?: unknown;
+    collects?: unknown;
+    shares?: unknown;
+    follows?: unknown;
+    cover_ctr?: unknown;
+    avg_watch_time?: unknown;
+    is_paid?: unknown;
+  }[]
+) {
   const total_notes = list.length;
   const total_exposure = list.reduce((s, r) => s + Number(r.exposure || 0), 0);
   const total_views = list.reduce((s, r) => s + Number(r.views || 0), 0);
@@ -25,7 +38,11 @@ function aggregate(list: { exposure?: unknown; views?: unknown; likes?: unknown;
   const avg_interaction_rate = total_views > 0 ? total_interactions / total_views : 0;
   const avg_collect_rate = total_views > 0 ? total_collects / total_views : 0;
   const avg_cover_ctr = total_exposure > 0 ? exposure_weighted_ctr / total_exposure : 0;
-  const follow_efficiency = total_views > 0 ? total_follows / total_views : 0;
+  const weighted_watch = list.reduce(
+    (s, r) => s + toNum(r.avg_watch_time) * Number(r.views || 0),
+    0
+  );
+  const avg_watch_time = total_views > 0 ? weighted_watch / total_views : 0;
   const paid_ratio = total_notes > 0 ? paid_count / total_notes : 0;
   return {
     total_notes,
@@ -36,7 +53,7 @@ function aggregate(list: { exposure?: unknown; views?: unknown; likes?: unknown;
     avg_interaction_rate,
     avg_collect_rate,
     avg_cover_ctr,
-    follow_efficiency,
+    avg_watch_time,
     paid_ratio,
   };
 }
@@ -87,7 +104,7 @@ export async function GET(req: NextRequest) {
             avg_interaction_rate: emptyMetric(thisWeekAgg.avg_interaction_rate),
             avg_collect_rate: emptyMetric(thisWeekAgg.avg_collect_rate),
             avg_cover_ctr: emptyMetric(thisWeekAgg.avg_cover_ctr),
-            follow_efficiency: emptyMetric(thisWeekAgg.follow_efficiency),
+            avg_watch_time: emptyMetric(thisWeekAgg.avg_watch_time),
             paid_ratio: emptyMetric(thisWeekAgg.paid_ratio),
           }
         : null,
@@ -123,7 +140,7 @@ export async function GET(req: NextRequest) {
     avg_interaction_rate: toMetric(lastAgg.avg_interaction_rate, thisAgg.avg_interaction_rate),
     avg_collect_rate: toMetric(lastAgg.avg_collect_rate, thisAgg.avg_collect_rate),
     avg_cover_ctr: toMetric(lastAgg.avg_cover_ctr, thisAgg.avg_cover_ctr),
-    follow_efficiency: toMetric(lastAgg.follow_efficiency, thisAgg.follow_efficiency),
+    avg_watch_time: toMetric(lastAgg.avg_watch_time, thisAgg.avg_watch_time),
     paid_ratio: toMetric(lastAgg.paid_ratio, thisAgg.paid_ratio),
   };
 
