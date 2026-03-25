@@ -358,16 +358,7 @@ async function executeTool(name: string, input: ToolInput): Promise<unknown> {
   }
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const { message, conversation_history = [] } = await req.json();
-
-    const messages: Anthropic.MessageParam[] = [
-      ...conversation_history,
-      { role: "user" as const, content: message },
-    ];
-
-    const systemPrompt = `你是 GenNext 的中央 AI 助手，服务于一个纽约地产营销团队。
+const CHAT_SYSTEM_PROMPT = `你是 GenNext 的中央 AI 助手，服务于一个纽约地产营销团队。和用户说话要像关系不错的同事在微信里打字：自然、有人情味、好扫一眼能懂，不要像维基百科、说明书或报告标题。
 
 你可以：
 - 查询今日日程和待办事项
@@ -381,75 +372,191 @@ export async function POST(req: NextRequest) {
 - 用户问某家开发商/管理公司 → 用 search_company
 - 不确定是楼盘还是公司时 → 先用 search_property，没结果再用 search_company
 
+输出格式（务必遵守）：
+- 用户在窄聊天框里看回复。【禁止 Markdown】：不要用 # 标题、不要用 ** 或 __ 加粗、不要用标准 Markdown 列表（-, *, 1. 叠很多层）。如需分句，用空行分段；偶尔用「·」或「一是」这种口语列举即可。
+- 不要输出 \`\`\` 代码块；强调就用「」或引号包住词，直接把重点写进句子里。
+- 讲楼盘、外联时可以用两三段短话：先一句接话（比如「这条我刚对了一下库里——」），再信息点，最后有需要再补一句建议或下一步。
+
 工作原则：
 - 先用工具查询相关数据，再给出回答
 - 生成文案时，主动搜索相关档案库和模板
-- 回答简洁直接，中文为主
-- 如果需要生成文案，直接输出内容
+- 中文为主，该简短就简短
+- 如果需要生成文案，直接输出内容本身（同样不要包一层 Markdown）
 - 多步骤任务时，逐步完成，不要一次性要求用户提供所有信息`;
 
-    let currentMessages = messages;
-    let finalText = "";
-    let iterations = 0;
-    const maxIterations = 5;
+type ChatBody = {
+  message?: string;
+  conversation_history?: Anthropic.MessageParam[];
+  /** 默认 true：SSE 流式输出。传 false 时返回 JSON { reply }（兼容旧客户端） */
+  stream?: boolean;
+};
 
-    while (iterations < maxIterations) {
-      iterations++;
+function buildChatMessages(body: ChatBody): Anthropic.MessageParam[] {
+  const message = String(body.message ?? "").trim();
+  const history = Array.isArray(body.conversation_history) ? body.conversation_history : [];
+  return [...history, { role: "user" as const, content: message }];
+}
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        system: systemPrompt,
-        tools,
-        messages: currentMessages,
-      });
+async function runOneTurnNonStreaming(
+  currentMessages: Anthropic.MessageParam[]
+): Promise<
+  | { kind: "text"; text: string }
+  | { kind: "tool"; assistantContent: Anthropic.ContentBlock[]; toolResults: Anthropic.ToolResultBlockParam[] }
+> {
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 2000,
+    system: CHAT_SYSTEM_PROMPT,
+    tools,
+    messages: currentMessages,
+  });
 
-      if (response.stop_reason === "end_turn") {
-        finalText = response.content
+  if (response.stop_reason === "tool_use") {
+    const toolUseBlocks = response.content.filter(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+    );
+    const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+      toolUseBlocks.map(async (block) => {
+        console.log(`[AI Tool] 调用: ${block.name}`, block.input);
+        const result = await executeTool(block.name, block.input as ToolInput);
+        return {
+          type: "tool_result" as const,
+          tool_use_id: block.id,
+          content: JSON.stringify(result),
+        };
+      })
+    );
+    return { kind: "tool", assistantContent: response.content, toolResults };
+  }
+
+  const text =
+    response.stop_reason === "end_turn"
+      ? response.content
+          .filter((b): b is Anthropic.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("")
+      : response.content
           .filter((b): b is Anthropic.TextBlock => b.type === "text")
           .map((b) => b.text)
           .join("");
-        break;
-      }
 
-      if (response.stop_reason === "tool_use") {
-        const toolUseBlocks = response.content.filter(
-          (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
-        );
+  return { kind: "text", text };
+}
 
-        const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
-          toolUseBlocks.map(async (block) => {
-            console.log(`[AI Tool] 调用: ${block.name}`, block.input);
-            const result = await executeTool(block.name, block.input as ToolInput);
-            return {
-              type: "tool_result" as const,
-              tool_use_id: block.id,
-              content: JSON.stringify(result),
-            };
-          })
-        );
+export async function POST(req: NextRequest) {
+  const body = (await req.json()) as ChatBody;
+  const message = String(body.message ?? "").trim();
+  if (!message) {
+    return NextResponse.json({ error: "缺少 message", success: false }, { status: 400 });
+  }
 
+  const useSse = body.stream !== false;
+
+  if (!useSse) {
+    try {
+      let currentMessages = buildChatMessages(body);
+      let finalText = "";
+      const maxIterations = 5;
+      for (let iterations = 0; iterations < maxIterations; iterations++) {
+        const turn = await runOneTurnNonStreaming(currentMessages);
+        if (turn.kind === "text") {
+          finalText = turn.text;
+          break;
+        }
         currentMessages = [
           ...currentMessages,
-          { role: "assistant" as const, content: response.content },
-          { role: "user" as const, content: toolResults },
+          { role: "assistant" as const, content: turn.assistantContent },
+          { role: "user" as const, content: turn.toolResults },
         ];
-        continue;
       }
-
-      finalText = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("");
-      break;
+      return NextResponse.json({ reply: finalText, success: true });
+    } catch (error) {
+      console.error("AI Chat error:", error);
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : String(error), success: false },
+        { status: 500 }
+      );
     }
-
-    return NextResponse.json({ reply: finalText, success: true });
-  } catch (error) {
-    console.error("AI Chat error:", error);
-    return NextResponse.json(
-      { error: String(error), success: false },
-      { status: 500 }
-    );
   }
+
+  const encoder = new TextEncoder();
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      const send = (obj: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      };
+
+      try {
+        let currentMessages = buildChatMessages(body);
+        const maxIterations = 5;
+
+        for (let iterations = 0; iterations < maxIterations; iterations++) {
+          const msgStream = anthropic.messages.stream({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 2000,
+            system: CHAT_SYSTEM_PROMPT,
+            tools,
+            messages: currentMessages,
+          });
+
+          msgStream.on("text", (delta) => {
+            send({ type: "delta", text: delta });
+          });
+
+          const finalMsg = await msgStream.finalMessage();
+
+          if (finalMsg.stop_reason === "tool_use") {
+            const toolUseBlocks = finalMsg.content.filter(
+              (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+            );
+            const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+              toolUseBlocks.map(async (block) => {
+                console.log(`[AI Tool] 调用: ${block.name}`, block.input);
+                const result = await executeTool(block.name, block.input as ToolInput);
+                return {
+                  type: "tool_result" as const,
+                  tool_use_id: block.id,
+                  content: JSON.stringify(result),
+                };
+              })
+            );
+            currentMessages = [
+              ...currentMessages,
+              { role: "assistant" as const, content: finalMsg.content },
+              { role: "user" as const, content: toolResults },
+            ];
+            continue;
+          }
+
+          send({ type: "done", success: true });
+          controller.close();
+          return;
+        }
+
+        send({
+          type: "error",
+          message: "工具调用次数过多，请缩短问题或稍后重试",
+          success: false,
+        });
+        controller.close();
+      } catch (error) {
+        console.error("AI Chat stream error:", error);
+        send({
+          type: "error",
+          message: error instanceof Error ? error.message : String(error),
+          success: false,
+        });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(readable, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
 }

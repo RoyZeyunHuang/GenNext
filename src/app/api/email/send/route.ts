@@ -130,26 +130,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "未配置 SENDER_EMAIL" }, { status: 503 });
     }
 
-    const aiSummary = emailBody.trim()
-      ? await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 64,
-          system: "你是 BD 邮件分析助手。只输出最终总结，不要输出其它文字。",
-          messages: [
-            {
-              role: "user",
-              content: `用一句中文总结这封邮件的核心内容和需要的行动，不超过30字。邮件内容：${emailBody}`,
-            },
-          ],
-        }).then((r) => {
-          const text = r.content
-            .filter((b): b is Anthropic.TextBlock => b.type === "text")
-            .map((b) => b.text)
-            .join("");
-          return (text || "").trim().slice(0, 30);
-        })
-      : null;
-
     /** 合并 property_ids 与 property_id，避免只传其一或 JSON 省略 undefined 时漏掉 */
     const outreachPropertyIds: string[] = (() => {
       const fromArr = Array.isArray(bodyPropertyIds)
@@ -219,6 +199,32 @@ export async function POST(req: NextRequest) {
       }
     );
     const resendId = sendResult?.id ?? null;
+
+    /** Claude 总结放在发信之后：避免 529/过载导致信未发就整请求失败；失败时仅无 ai_summary */
+    let aiSummary: string | null = null;
+    if (emailBody.trim()) {
+      try {
+        const r = await anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 64,
+          system: "你是 BD 邮件分析助手。只输出最终总结，不要输出其它文字。",
+          messages: [
+            {
+              role: "user",
+              content: `用一句中文总结这封邮件的核心内容和需要的行动，不超过30字。邮件内容：${emailBody}`,
+            },
+          ],
+        });
+        const text = r.content
+          .filter((b): b is Anthropic.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("");
+        const t = (text || "").trim().slice(0, 30);
+        aiSummary = t || null;
+      } catch {
+        aiSummary = null;
+      }
+    }
 
     for (const pid of outreachPropertyIds) {
       await updateOutreachAfterEmailSent(supabase, pid);

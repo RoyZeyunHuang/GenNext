@@ -16,7 +16,21 @@ type HistoryItem = {
   tags: string[] | null;
   publish_date: string | null;
   created_at: string | null;
+  source_url: string | null;
 };
+
+function externalArticleUrl(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const s = raw.trim();
+  if (!/^https?:\/\//i.test(s)) return null;
+  try {
+    const u = new URL(s);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.href;
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 export default function NewsPage() {
   const { t } = useLocale();
@@ -39,7 +53,22 @@ export default function NewsPage() {
         setToday(data.today);
         setLastUpdated(new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }));
       }
-      setHistory(Array.isArray(data.history) ? data.history : []);
+      const hist = Array.isArray(data.history) ? data.history : [];
+      setHistory(
+        hist.map((it: Record<string, unknown>) => ({
+          id: String(it.id),
+          title: (it.title as string) ?? null,
+          content: (it.content as string) ?? null,
+          category: (it.category as string) ?? null,
+          tags: Array.isArray(it.tags) ? (it.tags as string[]) : [],
+          publish_date: (it.publish_date as string) ?? null,
+          created_at: (it.created_at as string) ?? null,
+          source_url:
+            (typeof it.source_url === "string" && it.source_url) ||
+            (typeof it.url === "string" && it.url) ||
+            null,
+        }))
+      );
     } catch { /* ignore */ }
     if (!silent) setLoading(false);
     setRefreshing(false);
@@ -119,8 +148,41 @@ export default function NewsPage() {
                     <div key={i} className="rounded-lg bg-white p-5 shadow-card">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-sm font-semibold text-[#1C1917]">{item.title}</h3>
-                          <p className="mt-0.5 text-xs text-[#A8A29E]">{item.source}</p>
+                          {(() => {
+                            const srcHref = externalArticleUrl(item.source);
+                            return (
+                              <>
+                                <h3 className="text-sm font-semibold text-[#1C1917]">
+                                  {srcHref ? (
+                                    <a
+                                      href={srcHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="hover:text-[#574DFF] hover:underline"
+                                    >
+                                      {item.title}
+                                    </a>
+                                  ) : (
+                                    item.title
+                                  )}
+                                </h3>
+                                <p className="mt-0.5 text-xs text-[#A8A29E]">
+                                  {srcHref ? (
+                                    <a
+                                      href={srcHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="hover:text-[#78716C] hover:underline"
+                                    >
+                                      {item.source}
+                                    </a>
+                                  ) : (
+                                    item.source
+                                  )}
+                                </p>
+                              </>
+                            );
+                          })()}
                         </div>
                         <button
                           type="button"
@@ -168,8 +230,41 @@ export default function NewsPage() {
                     <div key={i} className="rounded-lg bg-white p-5 shadow-card">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <h3 className="text-sm font-semibold text-[#1C1917]">{item.title}</h3>
-                          <p className="mt-0.5 text-xs text-[#A8A29E]">{item.source}</p>
+                          {(() => {
+                            const srcHref = externalArticleUrl(item.source);
+                            return (
+                              <>
+                                <h3 className="text-sm font-semibold text-[#1C1917]">
+                                  {srcHref ? (
+                                    <a
+                                      href={srcHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="hover:text-[#574DFF] hover:underline"
+                                    >
+                                      {item.title}
+                                    </a>
+                                  ) : (
+                                    item.title
+                                  )}
+                                </h3>
+                                <p className="mt-0.5 text-xs text-[#A8A29E]">
+                                  {srcHref ? (
+                                    <a
+                                      href={srcHref}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="hover:text-[#78716C] hover:underline"
+                                    >
+                                      {item.source}
+                                    </a>
+                                  ) : (
+                                    item.source
+                                  )}
+                                </p>
+                              </>
+                            );
+                          })()}
                         </div>
                         <button
                           type="button"
@@ -220,7 +315,24 @@ export default function NewsPage() {
                 <div key={it.id} className="rounded-lg bg-[#FAFAF9] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-[#1C1917]">{it.title ?? t("news.noTitle")}</p>
+                      {(() => {
+                        const href = externalArticleUrl(it.source_url);
+                        const label = it.title ?? t("news.noTitle");
+                        return href ? (
+                          <p className="text-sm font-semibold text-[#1C1917]">
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:text-[#574DFF] hover:underline"
+                            >
+                              {label}
+                            </a>
+                          </p>
+                        ) : (
+                          <p className="text-sm font-semibold text-[#1C1917]">{label}</p>
+                        );
+                      })()}
                       <p className="mt-1 text-xs text-[#A8A29E]">
                         {it.publish_date ?? it.created_at ?? ""}{it.category ? ` · ${it.category}` : ""}
                       </p>

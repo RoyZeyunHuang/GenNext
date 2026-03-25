@@ -14,7 +14,21 @@ type NewsItem = {
   summary_zh: string | null;
   category: string | null;
   tags: string[] | null;
+  source_url: string | null;
 };
+
+function externalArticleUrl(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const s = raw.trim();
+  if (!/^https?:\/\//i.test(s)) return null;
+  try {
+    const u = new URL(s);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.href;
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 const PILL_COLORS = [
   "bg-emerald-100 text-emerald-800",
@@ -62,6 +76,10 @@ export function DashboardNewsBlock() {
             summary_zh: (it.summary_zh as string) ?? null,
             category: (it.category as string) ?? null,
             tags: Array.isArray(it.tags) ? (it.tags as string[]) : [],
+            source_url:
+              (typeof it.source_url === "string" && it.source_url) ||
+              (typeof it.url === "string" && it.url) ||
+              null,
           }))
         );
       })
@@ -104,9 +122,22 @@ export function DashboardNewsBlock() {
                         key={it.id}
                         className="border-b border-[#E7E5E4] pb-3 last:border-0 last:pb-0"
                       >
-                        <p className="text-sm font-medium text-[#1C1917]">
-                          {it.title ?? it.summary_zh ?? "(无标题)"}
-                        </p>
+                        {(() => {
+                          const href = externalArticleUrl(it.source_url);
+                          const titleText = it.title ?? it.summary_zh ?? "(无标题)";
+                          return href ? (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium text-[#1C1917] hover:text-[#574DFF] hover:underline"
+                            >
+                              {titleText}
+                            </a>
+                          ) : (
+                            <p className="text-sm font-medium text-[#1C1917]">{titleText}</p>
+                          );
+                        })()}
                         {(it.content || it.summary_zh) && (
                           <p className="mt-0.5 line-clamp-2 text-xs text-[#78716C]">
                             {it.content || it.summary_zh}

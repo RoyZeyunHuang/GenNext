@@ -2,9 +2,18 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
-import { Copy, Star, Loader2, Sparkles, X, Plus } from "lucide-react";
+import { Copy, Star, Loader2, Sparkles, X, Plus, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { composeOutputWithTitle, parseTitleVariantsAndBody } from "@/lib/parse-title-variants";
+import {
+  riskLevelBadgeClass,
+  riskLevelLabel,
+  riskLevelMarkClass,
+  scanXhsForbidden,
+  segmentsForHighlight,
+  type RiskLevel,
+  type ScanResult,
+} from "@/lib/xhsForbiddenScan";
 
 const SINGLE_SELECT_CATEGORIES = ["人格模板", "任务模板"];
 const TITLE_PATTERN_CATEGORY = "标题套路";
@@ -14,17 +23,36 @@ type Category = { id: string; name: string; icon: string; is_auto_include?: bool
 type Doc = { id: string; title: string; category_id: string; tags?: string[] };
 type SelectedItem = { doc_id: string; doc_title: string; category_name: string; reason?: string };
 type Intent = { suggested_docs: SelectedItem[] };
-type HistoryItem = { id: string; user_input: string | null; platform: string | null; output: string | null; starred: boolean; created_at: string };
 type OpenPicker = { categoryName: string; replaceIndex?: number } | null;
 
-const PLATFORM_ICONS: Record<string, string> = {
-  xiaohongshu: "📕",
-  instagram: "📸",
-  linkedin: "💼",
-  video: "🎬",
-  wechat: "💬",
-  other: "📝",
-};
+function HighlightedForbiddenText({
+  text,
+  scan,
+}: {
+  text: string;
+  scan: ScanResult;
+}) {
+  const segs = segmentsForHighlight(text, scan.levelAt);
+  return (
+    <>
+      {segs.map((s, i) => {
+        const chunk = text.slice(s.start, s.end);
+        if (!s.level) {
+          return <span key={i}>{chunk}</span>;
+        }
+        return (
+          <mark
+            key={i}
+            className={cn("rounded px-0.5", riskLevelMarkClass(s.level))}
+            title={`风险：${riskLevelLabel(s.level)}`}
+          >
+            {chunk}
+          </mark>
+        );
+      })}
+    </>
+  );
+}
 
 function DocPickerDropdown({
   categoryName,
@@ -100,7 +128,8 @@ export function CopywriterClient() {
   const [titlePatternDocId, setTitlePatternDocId] = useState<string | null>(null);
   const [titlePatternUserCleared, setTitlePatternUserCleared] = useState(false);
   const [selectedTitleIdx, setSelectedTitleIdx] = useState(0);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [sensitiveScan, setSensitiveScan] = useState<ScanResult | null>(null);
+  const [editingOutput, setEditingOutput] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
   const pickerAnchorRef = useRef<HTMLDivElement>(null);
   const titlePatternPickerRef = useRef<HTMLDivElement>(null);
@@ -109,11 +138,9 @@ export function CopywriterClient() {
     Promise.all([
       fetch("/api/docs/categories").then((r) => r.json()),
       fetch("/api/docs").then((r) => r.json()),
-      fetch("/api/generated-copies").then((r) => r.json()),
-    ]).then(([cats, docs, hist]) => {
+    ]).then(([cats, docs]) => {
       setCategories(Array.isArray(cats) ? cats : []);
       setAllDocs(Array.isArray(docs) ? docs : []);
-      setHistory(Array.isArray(hist) ? hist.slice(0, 10) : []);
     });
   }, []);
 
@@ -291,9 +318,15 @@ export function CopywriterClient() {
     ? composeOutputWithTitle(effectiveTitleForCopy, parsedOutput.body)
     : output;
 
+  const textToScan = (copyPayload || output).trim() ? copyPayload || output : "";
+
   useEffect(() => {
     setSelectedTitleIdx(0);
   }, [output]);
+
+  useEffect(() => {
+    setSensitiveScan(null);
+  }, [output, selectedTitleIdx]);
 
   const copyToClipboard = async () => {
     if (!output) return;
@@ -319,9 +352,6 @@ export function CopywriterClient() {
       }),
     });
     setStarred(true);
-    const histRes = await fetch("/api/generated-copies");
-    const histData = await histRes.json();
-    setHistory(Array.isArray(histData) ? histData.slice(0, 10) : []);
   };
 
   const hasIntent = intent !== null && (selectedDocs.length > 0 || selectedDocIds.size > 0);
@@ -585,13 +615,36 @@ export function CopywriterClient() {
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-medium text-[#1C1917]">生成结果</h3>
             {output && (
-              <div className="flex gap-1">
+              <div className="flex flex-wrap items-center gap-1">
                 <button type="button" onClick={copyToClipboard} className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]">
                   <Copy className="h-3.5 w-3.5" /> {copied ? "已复制" : "复制"}
                 </button>
                 <button type="button" onClick={handleStar} className={cn("flex items-center gap-1 rounded px-2 py-1 text-xs hover:bg-[#F5F5F4]", starred ? "text-amber-600" : "text-[#78716C] hover:text-[#1C1917]")}>
                   <Star className={cn("h-3.5 w-3.5", starred && "fill-current")} /> {starred ? "已收藏" : "收藏"}
                 </button>
+                <button
+                  type="button"
+                  disabled={!textToScan.trim() || generating || editingOutput}
+                  onClick={() => setSensitiveScan(scanXhsForbidden(textToScan))}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917] disabled:opacity-50"
+                  title="基于小红书违禁词库（总表 + 房产专项）扫描，仅供参考"
+                >
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  敏感词检查
+                </button>
+                {!showTitleVariants && (
+                  <button
+                    type="button"
+                    disabled={!output || generating}
+                    onClick={() => {
+                      setEditingOutput((v) => !v);
+                      setSensitiveScan(null);
+                    }}
+                    className="rounded px-2 py-1 text-xs text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917] disabled:opacity-50"
+                  >
+                    {editingOutput ? "完成编辑" : "编辑文本"}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -601,7 +654,22 @@ export function CopywriterClient() {
           >
             {!output && !generating && "生成结果将显示在此处"}
             {generating && !output && "..."}
-            {output && !showTitleVariants && output}
+            {output && !showTitleVariants && editingOutput && (
+              <textarea
+                value={output}
+                onChange={(e) => {
+                  setOutput(e.target.value);
+                  setStarred(false);
+                }}
+                rows={14}
+                className="h-full min-h-[220px] w-full resize-y rounded border border-[#E7E5E4] bg-white p-3 font-mono text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+                placeholder="在此直接修改文案；改完后可再次敏感词检查"
+              />
+            )}
+            {output && !showTitleVariants && !editingOutput && sensitiveScan && (
+              <HighlightedForbiddenText text={textToScan} scan={sensitiveScan} />
+            )}
+            {output && !showTitleVariants && !editingOutput && !sensitiveScan && output}
             {output && showTitleVariants && (
               <div className="space-y-4">
                 <div>
@@ -629,27 +697,46 @@ export function CopywriterClient() {
                   <p className="mb-2 text-xs font-medium text-[#78716C]">正文</p>
                   <div className="whitespace-pre-wrap text-[#1C1917]">{parsedOutput.body || "（无正文）"}</div>
                 </div>
+                {sensitiveScan && (
+                  <div className="border-t border-[#E7E5E4] pt-4">
+                    <p className="mb-2 text-xs font-medium text-[#78716C]">敏感词标注（与「复制」所用合并稿一致）</p>
+                    <div className="whitespace-pre-wrap text-[#1C1917]">
+                      <HighlightedForbiddenText text={textToScan} scan={sensitiveScan} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        </div>
-
-        <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
-          <h3 className="mb-3 text-sm font-medium text-[#1C1917]">最近生成</h3>
-          {history.length === 0 ? (
-            <p className="text-xs text-[#A8A29E]">暂无记录</p>
-          ) : (
-            <div className="space-y-2">
-              {history.map((h) => (
-                <div key={h.id} className="flex items-center gap-2 rounded-lg border border-[#E7E5E4] px-3 py-2">
-                  <span className="shrink-0 text-base">{PLATFORM_ICONS[h.platform ?? "other"] ?? "📝"}</span>
-                  <span className="flex-1 truncate text-xs text-[#1C1917]">{h.user_input || "无输入"}</span>
-                  <span className="shrink-0 text-xs text-[#A8A29E]">
-                    {new Date(h.created_at).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                  {h.starred && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
-                </div>
-              ))}
+          {output && sensitiveScan && !editingOutput && (
+            <div className="mt-3 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2.5">
+              <p className="mb-2 text-xs font-medium text-[#57534E]">
+                命中 {sensitiveScan.hits.length} 处
+                <span className="ml-2 font-normal text-[#A8A29E]">图例：</span>
+                <span className={cn("ml-1 rounded border px-1.5 py-0.5 text-[10px]", riskLevelBadgeClass("high"))}>高</span>
+                <span className={cn("ml-1 rounded border px-1.5 py-0.5 text-[10px]", riskLevelBadgeClass("medium"))}>中</span>
+                <span className={cn("ml-1 rounded border px-1.5 py-0.5 text-[10px]", riskLevelBadgeClass("low"))}>低</span>
+              </p>
+              {sensitiveScan.hits.length === 0 ? (
+                <p className="text-xs text-emerald-700">未命中词库中的词条（仍须遵守平台实时规则）。</p>
+              ) : (
+                <ul className="max-h-36 space-y-1 overflow-y-auto text-xs">
+                  {sensitiveScan.hits.map((h, i) => (
+                    <li
+                      key={`${h.start}-${h.end}-${h.phrase}-${i}`}
+                      className="flex flex-wrap items-center gap-2 border-b border-[#F5F5F4] py-1 last:border-0"
+                    >
+                      <span className={cn("rounded border px-1.5 py-0.5 font-medium", riskLevelBadgeClass(h.level))}>
+                        {riskLevelLabel(h.level as RiskLevel)}
+                      </span>
+                      <span className="font-medium text-[#1C1917]">{h.phrase}</span>
+                      <span className="text-[#A8A29E]">
+                        位置 {h.start}–{h.end}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </div>

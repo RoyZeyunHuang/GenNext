@@ -23,9 +23,15 @@ export function AIAssistant() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  function buildConversationHistory() {
+  /** 传给 API 的若干轮对话（不含当前这条 user；空内容的 assistant 不入历史） */
+  function conversationHistoryForApi(): { role: "user" | "assistant"; content: string }[] {
     return messages
       .slice(-MAX_HISTORY)
+      .filter(
+        (m) =>
+          m.role === "user" ||
+          (m.role === "assistant" && m.content.trim().length > 0)
+      )
       .map((m) => ({ role: m.role, content: m.content }));
   }
 
@@ -33,6 +39,8 @@ export function AIAssistant() {
     e.preventDefault();
     const text = input.trim();
     if (!text || isLoading) return;
+
+    const conversationHistory = conversationHistoryForApi();
 
     const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text };
     setMessages((prev) => [...prev, userMsg]);
@@ -44,26 +52,77 @@ export function AIAssistant() {
     setMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
 
     try {
-      const conversationHistory = buildConversationHistory();
-
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: text,
           conversation_history: conversationHistory,
+          stream: true,
         }),
       });
 
-      const data = await res.json();
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(
+          (errJson as { error?: string }).error || `HTTP ${res.status}`
+        );
+      }
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.body) {
+        throw new Error("无响应体");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = "";
+      let assembled = "";
+
+      readLoop: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        sseBuffer += decoder.decode(value, { stream: true });
+
+        for (;;) {
+          const sep = sseBuffer.indexOf("\n\n");
+          if (sep === -1) break;
+          const raw = sseBuffer.slice(0, sep).trim();
+          sseBuffer = sseBuffer.slice(sep + 2);
+          if (!raw.startsWith("data: ")) continue;
+          let payload: { type?: string; text?: string; message?: string; success?: boolean };
+          try {
+            payload = JSON.parse(raw.slice(6)) as typeof payload;
+          } catch {
+            continue;
+          }
+
+          if (payload.type === "delta" && typeof payload.text === "string") {
+            assembled += payload.text;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId ? { ...m, content: assembled } : m
+              )
+            );
+          } else if (payload.type === "done") {
+            if (!payload.success) {
+              throw new Error("助手未正常结束回复");
+            }
+            break readLoop;
+          } else if (payload.type === "error") {
+            throw new Error(
+              typeof payload.message === "string"
+                ? payload.message
+                : "流式输出失败"
+            );
+          }
+        }
       }
 
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId ? { ...m, content: data.reply || "（无回复）" } : m
+          m.id === assistantId
+            ? { ...m, content: assembled.trim() || "（无回复）" }
+            : m
         )
       );
     } catch (err) {

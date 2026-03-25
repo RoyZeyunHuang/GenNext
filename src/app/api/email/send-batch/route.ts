@@ -30,25 +30,28 @@ const anthropic = new Anthropic({
 async function summarizeSentEmail(body: string): Promise<string | null> {
   if (!body.trim()) return null;
   if (!anthropic.apiKey) return null;
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 64,
+      system: "你是 BD 邮件分析助手。只输出最终总结，不要输出其它文字。",
+      messages: [
+        {
+          role: "user",
+          content: `用一句中文总结这封邮件的核心内容和需要的行动，不超过30字。邮件内容：${body}`,
+        },
+      ],
+    });
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 64,
-    system: "你是 BD 邮件分析助手。只输出最终总结，不要输出其它文字。",
-    messages: [
-      {
-        role: "user",
-        content: `用一句中文总结这封邮件的核心内容和需要的行动，不超过30字。邮件内容：${body}`,
-      },
-    ],
-  });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-  const t = (text || "").trim().slice(0, 30);
-  return t || null;
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+    const t = (text || "").trim().slice(0, 30);
+    return t || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: NextRequest) {

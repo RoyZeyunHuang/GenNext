@@ -117,6 +117,8 @@ export function BatchEmailModal({
 
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState<PropertyRow[]>([]);
+  const propertiesRef = useRef<PropertyRow[]>([]);
+  propertiesRef.current = properties;
   /** 公司 id → 联系人列表（用于第 2 步多选收件人） */
   const [companyContactsMap, setCompanyContactsMap] = useState<
     Map<string, CompanyContactRow[]>
@@ -182,6 +184,132 @@ export function BatchEmailModal({
   /** 点击「批量输入」时跳过单行搜索 blur 触发的逗号匹配 */
   const skipSearchBlurMatchRef = useRef(false);
 
+  /** 楼盘/outreach 原始数据缓存，切换过滤时无需重新请求 */
+  const bulkPropertyLoadCacheRef = useRef<{
+    propertiesRaw: any[];
+    outreachItems: any[];
+  } | null>(null);
+
+  /**
+   * true：不展示任意外联阶段 ≠「未开始」的楼盘（追踪中、Won、Lost 等均隐藏）
+   * false：全部楼盘均可选
+   */
+  const [hideOutreachPropertiesInStep1, setHideOutreachPropertiesInStep1] =
+    useState(true);
+  const hideOutreachPropertiesInStep1Ref = useRef(true);
+  hideOutreachPropertiesInStep1Ref.current = hideOutreachPropertiesInStep1;
+
+  const buildPropertyRowsFromCache = useCallback(
+    (
+      excludeOutreach: boolean,
+      contactsByCompanyId: Map<string, CompanyContactRow[]>
+    ) => {
+      const cache = bulkPropertyLoadCacheRef.current;
+      if (!cache) return;
+      const { propertiesRaw, outreachItems } = cache;
+
+      const excludedOutreachPropertyIds = new Set<string>();
+      if (excludeOutreach) {
+        for (const item of outreachItems) {
+          const pid = item?.property_id;
+          if (!pid) continue;
+          const st = String(item?.stage ?? item?.status ?? "Not Started").trim();
+          if (st !== "Not Started") excludedOutreachPropertyIds.add(String(pid));
+        }
+      }
+
+      const stageByPropertyId = new Map<string, string>();
+      for (const item of outreachItems) {
+        const pid = item?.property_id;
+        if (!pid) continue;
+        if (stageByPropertyId.has(pid)) continue;
+        stageByPropertyId.set(
+          pid,
+          String(item?.stage ?? item?.status ?? "Not Started").trim()
+        );
+      }
+
+      const rows: PropertyRow[] = [];
+      for (const prop of propertiesRaw) {
+        const property_id = String(prop?.id ?? "");
+        if (excludeOutreach && excludedOutreachPropertyIds.has(property_id))
+          continue;
+
+        const property_name = String(prop?.name ?? "");
+        const address = (prop?.address as string | null) ?? null;
+        const area = (prop?.area as string | null) ?? null;
+        const build_year = (prop?.build_year as number | null) ?? null;
+        const units = (prop?.units as number | null) ?? null;
+        const city = (prop?.city as string | null) ?? null;
+        const price_range = (prop?.price_range as string | null) ?? null;
+        const pcs = Array.isArray(prop?.property_companies)
+          ? prop.property_companies
+          : [];
+
+        for (const pc of pcs) {
+          const company_id = String(pc?.company_id ?? "");
+          const company_name = (pc?.companies?.name as string | null) ?? null;
+          const company_role = String(pc?.role ?? "");
+          if (!property_id || !company_id || !company_role) continue;
+
+          const contacts = contactsByCompanyId.get(company_id) ?? [];
+          const primaryWithEmail = contacts.find(
+            (ct) => ct.is_primary && ct.email
+          );
+          const anyWithEmail = contacts.find((ct) => !!ct.email);
+          const primaryOrFirst = contacts.find((ct) => ct.is_primary) ?? contacts[0];
+
+          const email: string | null = primaryWithEmail?.email
+            ? String(primaryWithEmail.email)
+            : anyWithEmail?.email
+              ? String(anyWithEmail.email)
+              : null;
+
+          const contact_name: string | null = primaryWithEmail?.name
+            ? String(primaryWithEmail.name)
+            : anyWithEmail?.name
+              ? String(anyWithEmail.name)
+              : primaryOrFirst?.name
+                ? String(primaryOrFirst.name)
+                : null;
+
+          const stage = stageByPropertyId.get(property_id) ?? "Not Started";
+
+          const row_key = `${property_id}__${company_id}__${company_role}`;
+
+          rows.push({
+            row_key,
+            property_id,
+            property_name,
+            address,
+            area,
+            build_year,
+            units,
+            city,
+            price_range,
+            company_id,
+            company_name,
+            company_role,
+            contact_name,
+            email,
+            stage,
+          });
+        }
+      }
+
+      setProperties(rows);
+      setSelectedIds((prev) => {
+        const keys = new Set(rows.map((r) => r.row_key));
+        const next = new Set<string>();
+        prev.forEach((k) => {
+          if (keys.has(k)) next.add(k);
+        });
+        return next;
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     cancelGuard.current = false;
     return () => {
@@ -190,10 +318,18 @@ export function BatchEmailModal({
   }, []);
 
   useEffect(() => {
+    if (!bulkPropertyLoadCacheRef.current) return;
+    buildPropertyRowsFromCache(hideOutreachPropertiesInStep1, companyContactsMap);
+  }, [
+    hideOutreachPropertiesInStep1,
+    companyContactsMap,
+    buildPropertyRowsFromCache,
+  ]);
+
+  useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        // 1) 拉取楼盘 + 外联（Stage）
         const pRes = await fetch("/api/crm/properties");
         const propertiesData = await pRes.json().catch(() => []);
         const propertiesRaw: any[] = Array.isArray(propertiesData) ? propertiesData : [];
@@ -202,24 +338,6 @@ export function BatchEmailModal({
         const outreachData = await oRes.json().catch(() => []);
         const outreachItems: any[] = Array.isArray(outreachData) ? outreachData : [];
 
-        /** 任意外联阶段不是「未开始」的楼盘：不在此列表展示（避免重复触达已在推进中的盘） */
-        const excludedOutreachPropertyIds = new Set<string>();
-        for (const item of outreachItems) {
-          const pid = item?.property_id;
-          if (!pid) continue;
-          const st = String(item?.stage ?? item?.status ?? "Not Started").trim();
-          if (st !== "Not Started") excludedOutreachPropertyIds.add(String(pid));
-        }
-
-        const stageByPropertyId = new Map<string, string>();
-        for (const item of outreachItems) {
-          const pid = item?.property_id;
-          if (!pid) continue;
-          if (stageByPropertyId.has(pid)) continue; // outreach 已按 updated_at desc
-          stageByPropertyId.set(pid, String(item?.stage ?? item?.status ?? "Not Started").trim());
-        }
-
-        // 2) 收集所有关联公司，批量拉联系人
         const companyIdsSet = new Set<string>();
         for (const prop of propertiesRaw) {
           const pcs = Array.isArray(prop?.property_companies) ? prop.property_companies : [];
@@ -242,79 +360,13 @@ export function BatchEmailModal({
         }
 
         const contactsByCompanyId = mapContactsByCompany(contactsData);
+        bulkPropertyLoadCacheRef.current = { propertiesRaw, outreachItems };
         setCompanyContactsMap(contactsByCompanyId);
+        buildPropertyRowsFromCache(
+          hideOutreachPropertiesInStep1Ref.current,
+          contactsByCompanyId
+        );
 
-        // 3) 每个 property_companies 生成一行：楼盘 + 关联公司（并为该公司选一个联系人邮箱）
-        const rows: PropertyRow[] = [];
-        for (const prop of propertiesRaw) {
-          const property_id = String(prop?.id ?? "");
-          if (excludedOutreachPropertyIds.has(property_id)) continue;
-
-          const property_name = String(prop?.name ?? "");
-          const address = (prop?.address as string | null) ?? null;
-          const area = (prop?.area as string | null) ?? null;
-          const build_year = (prop?.build_year as number | null) ?? null;
-          const units = (prop?.units as number | null) ?? null;
-          const city = (prop?.city as string | null) ?? null;
-          const price_range = (prop?.price_range as string | null) ?? null;
-          const pcs = Array.isArray(prop?.property_companies)
-            ? prop.property_companies
-            : [];
-
-          for (const pc of pcs) {
-            const company_id = String(pc?.company_id ?? "");
-            const company_name = (pc?.companies?.name as string | null) ?? null;
-            const company_role = String(pc?.role ?? "");
-            if (!property_id || !company_id || !company_role) continue;
-
-            const contacts = contactsByCompanyId.get(company_id) ?? [];
-            const primaryWithEmail = contacts.find(
-              (ct) => ct.is_primary && ct.email
-            );
-            const anyWithEmail = contacts.find((ct) => !!ct.email);
-            const primaryOrFirst = contacts.find((ct) => ct.is_primary) ?? contacts[0];
-
-            const email: string | null = primaryWithEmail?.email
-              ? String(primaryWithEmail.email)
-              : anyWithEmail?.email
-                ? String(anyWithEmail.email)
-                : null;
-
-            const contact_name: string | null = primaryWithEmail?.name
-              ? String(primaryWithEmail.name)
-              : anyWithEmail?.name
-                ? String(anyWithEmail.name)
-                : primaryOrFirst?.name
-                  ? String(primaryOrFirst.name)
-                  : null;
-
-            const stage = stageByPropertyId.get(property_id) ?? "Not Started";
-
-            const row_key = `${property_id}__${company_id}__${company_role}`;
-
-            rows.push({
-              row_key,
-              property_id,
-              property_name,
-              address,
-              area,
-              build_year,
-              units,
-              city,
-              price_range,
-              company_id,
-              company_name,
-              company_role,
-              contact_name,
-              email,
-              stage,
-            });
-          }
-        }
-
-        setProperties(rows);
-
-        // 4) 邮件模板
         const tRes = await fetch("/api/email/templates");
         const tData = await tRes.json().catch(() => []);
         setTemplates(Array.isArray(tData) ? tData : []);
@@ -325,17 +377,17 @@ export function BatchEmailModal({
       }
     }
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在弹窗挂载时拉取一次；切换隐藏外联由独立 effect + 缓存重建行
   }, []);
 
-  const reloadCompanyContacts = useCallback(async () => {
+  const fetchContactsForPropertyRows = useCallback(async (rows: PropertyRow[]) => {
     const companyIdsSet = new Set<string>();
-    for (const p of properties) {
+    for (const p of rows) {
       if (p.company_id) companyIdsSet.add(p.company_id);
     }
     const companyIds = Array.from(companyIdsSet);
     if (!companyIds.length) {
-      setCompanyContactsMap(new Map());
-      return;
+      return new Map<string, CompanyContactRow[]>();
     }
     const cRes = await fetch(
       `/api/crm/contacts-bulk?company_ids=${encodeURIComponent(
@@ -344,23 +396,32 @@ export function BatchEmailModal({
       { cache: "no-store" }
     );
     const contactsData = await cRes.json().catch(() => []);
-    setCompanyContactsMap(
-      mapContactsByCompany(Array.isArray(contactsData) ? contactsData : [])
-    );
-  }, [properties]);
+    return mapContactsByCompany(Array.isArray(contactsData) ? contactsData : []);
+  }, []);
 
+  const reloadCompanyContacts = useCallback(async () => {
+    const map = await fetchContactsForPropertyRows(properties);
+    setCompanyContactsMap(map);
+  }, [properties, fetchContactsForPropertyRows]);
+
+  /** 进入第 2 步时拉一次联系人；勿依赖 reloadCompanyContacts/properties（否则会 companyContactsMap→重建 properties→回调变身→无限循环） */
   useEffect(() => {
     if (step !== 2) return;
-    if (!properties.length) return;
+    const rows = propertiesRef.current;
+    if (!rows.length) return;
     let cancelled = false;
     setContactsRefreshing(true);
-    void reloadCompanyContacts().finally(() => {
-      if (!cancelled) setContactsRefreshing(false);
-    });
+    void fetchContactsForPropertyRows(rows)
+      .then((map) => {
+        if (!cancelled) setCompanyContactsMap(map);
+      })
+      .finally(() => {
+        if (!cancelled) setContactsRefreshing(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [step, reloadCompanyContacts]);
+  }, [step, fetchContactsForPropertyRows]);
 
   const selectedProperties = useMemo(() => {
     const set = selectedIds;
@@ -907,9 +968,30 @@ export function BatchEmailModal({
             <div className="flex items-center justify-center py-20 text-sm text-[#78716C]">加载中…</div>
           ) : step === 1 ? (
             <div className="p-4">
-              <p className="mb-3 text-[11px] text-[#78716C]">
-                已在外联中推进的楼盘（阶段不是「未开始」）不会出现在本列表，避免重复触达。
-              </p>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setHideOutreachPropertiesInStep1((v) => !v)
+                  }
+                  className={cn(
+                    "shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                    hideOutreachPropertiesInStep1
+                      ? "border-[#1C1917] bg-[#1C1917] text-white"
+                      : "border-[#E7E5E4] bg-white text-[#78716C] hover:bg-[#FAFAF9]"
+                  )}
+                  title="切换是否在列表中排除外联看板里阶段已非「未开始」的楼盘"
+                >
+                  {hideOutreachPropertiesInStep1
+                    ? "已开启：隐藏外联中/已失败楼盘"
+                    : "显示全部楼盘（含外联中）"}
+                </button>
+                <span className="text-[11px] leading-snug text-[#78716C]">
+                  {hideOutreachPropertiesInStep1
+                    ? "不展示外联阶段已推进或已终止的楼盘，减少重复触达。"
+                    : "当前包含外联中的楼盘；批量发信前请自行核对是否重复联系。"}
+                </span>
+              </div>
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="flex flex-wrap gap-2">
                   <div>
