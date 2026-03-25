@@ -124,6 +124,7 @@ function fmtDateTime(v: unknown): string {
   return String(v).trim();
 }
 
+/** 百分比/小数 → 小数率；与 POST /api/kpi/upload 中 coverCtrToStoredRate 一致 */
 function toPercent(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
   let s = String(v).trim();
