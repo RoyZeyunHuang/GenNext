@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Plus, Eye, Trash2, X, Loader2, Download } from "lucide-react";
+import { Plus, Trash2, X, Loader2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   downloadDomAsPdf,
@@ -94,11 +94,24 @@ export function CampaignReportTab({
               return (
               <div
                 key={r.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setSelected(r);
+                  setCreating(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelected(r);
+                    setCreating(false);
+                  }
+                }}
                 className={cn(
-                  "rounded-lg border p-3 transition-colors",
+                  "cursor-pointer rounded-lg border p-3 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#1C1917]/30",
                   selected?.id === r.id
                     ? "border-[#1C1917] bg-[#FAFAF9]"
-                    : "border-[#E7E5E4] bg-white"
+                    : "border-[#E7E5E4] bg-white hover:border-[#D6D3D1]"
                 )}
               >
                 <div className="text-sm font-medium text-[#1C1917]">{r.title}</div>
@@ -111,20 +124,13 @@ export function CampaignReportTab({
                 <div className="mt-0.5 text-[10px] text-[#A8A29E]">
                   {new Date(r.created_at).toLocaleDateString("zh-CN")}
                 </div>
-                <div className="mt-2 flex gap-1">
+                <div className="mt-2 flex justify-end">
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelected(r);
-                      setCreating(false);
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void deleteReport(r.id);
                     }}
-                    className="flex items-center gap-0.5 rounded px-2 py-0.5 text-[10px] text-[#78716C] hover:bg-[#F5F5F4]"
-                  >
-                    <Eye className="h-3 w-3" /> View
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteReport(r.id)}
                     className="flex items-center gap-0.5 rounded px-2 py-0.5 text-[10px] text-red-500 hover:bg-red-50"
                   >
                     <Trash2 className="h-3 w-3" /> Delete
