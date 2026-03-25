@@ -68,49 +68,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Step 1：找出 publish_date 在范围内的 note_id
-  let noteIdQuery = supabase
-    .from("xhs_notes_with_publish_date")
-    .select("note_id")
-    .gte("publish_date", from_date)
-    .lte("publish_date", to_date)
-    .not("note_id", "is", null);
-  if (accountNoteIds && accountNoteIds.length > 0) {
-    noteIdQuery = noteIdQuery.in("note_id", accountNoteIds);
-  }
-  const { data: noteIdRows } = await noteIdQuery;
-  const noteIds = Array.from(
-    new Set((noteIdRows ?? []).map((r: { note_id: string }) => r.note_id).filter(Boolean))
-  );
-  if (noteIds.length === 0) {
-    return NextResponse.json(emptyNotesStats, {
-      headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-    });
-  }
-
-  // Step 2：拉取这些笔记的所有快照，在 JS 侧保留每笔记最新快照
-  let snapshotQuery = supabase
-    .from("xhs_notes_with_publish_date")
-    .select("*")
-    .in("note_id", noteIds);
-  if (contentTypes.length > 0) {
-    snapshotQuery = snapshotQuery.in("content_type", contentTypes);
-  }
-  if (genre && genre !== "全部") {
-    snapshotQuery = snapshotQuery.eq("genre", genre);
-  }
-  const { data: allSnapshots, error } = await snapshotQuery;
-  if (error) {
-    console.log("[notes-stats] 查询错误:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  // 每个 note_id 只保留 snapshot_date 最大的行
   type RawRow = {
-    note_id?: string;
+    note_id?: string | null;
+    title?: string | null;
     snapshot_date?: string;
-    publish_date?: string;
-    title?: string;
+    publish_date?: string | null;
     genre?: string;
     content_type?: string;
     exposure?: unknown;
@@ -123,17 +85,54 @@ export async function GET(req: NextRequest) {
     cover_ctr?: unknown;
     is_paid?: unknown;
   };
+
+  // 主查询：publish_date 在范围内的所有快照行
+  let primaryQ = supabase
+    .from("xhs_notes_with_publish_date")
+    .select("*")
+    .gte("publish_date", from_date)
+    .lte("publish_date", to_date);
+  if (accountNoteIds && accountNoteIds.length > 0) {
+    primaryQ = primaryQ.in("note_id", accountNoteIds);
+  }
+  if (contentTypes.length > 0) primaryQ = primaryQ.in("content_type", contentTypes);
+  if (genre && genre !== "全部") primaryQ = primaryQ.eq("genre", genre);
+  const { data: primaryRows, error } = await primaryQ;
+  if (error) {
+    console.log("[notes-stats] 主查询错误:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // 兜底查询：publish_date 为 NULL 时用 snapshot_date 过滤
+  let fallbackQ = supabase
+    .from("xhs_notes_with_publish_date")
+    .select("*")
+    .is("publish_date", null)
+    .gte("snapshot_date", from_date)
+    .lte("snapshot_date", to_date);
+  if (accountNoteIds && accountNoteIds.length > 0) {
+    fallbackQ = fallbackQ.in("note_id", accountNoteIds);
+  }
+  if (contentTypes.length > 0) fallbackQ = fallbackQ.in("content_type", contentTypes);
+  if (genre && genre !== "全部") fallbackQ = fallbackQ.eq("genre", genre);
+  const { data: fallbackRows } = await fallbackQ;
+
+  const allRows = [...(primaryRows ?? []), ...(fallbackRows ?? [])] as RawRow[];
+
+  // 每笔记保留最新快照（key = note_id 优先，否则 title）
   const latestByNote = new Map<string, RawRow>();
-  for (const row of (allSnapshots ?? []) as RawRow[]) {
-    const nid = String(row.note_id ?? "");
-    if (!nid) continue;
-    const existing = latestByNote.get(nid);
+  for (const row of allRows) {
+    const key = String(row.note_id ?? row.title ?? "").trim();
+    if (!key) continue;
+    const existing = latestByNote.get(key);
     if (!existing || String(row.snapshot_date) > String(existing.snapshot_date)) {
-      latestByNote.set(nid, row);
+      latestByNote.set(key, row);
     }
   }
   const list = Array.from(latestByNote.values());
-  console.log("[notes-stats] 查询结果条数 (去重最新快照):", list.length);
+  console.log(
+    `[notes-stats] publish范围[${from_date}→${to_date}] 主${(primaryRows ?? []).length}行+兜底${(fallbackRows ?? []).length}行 → 去重后${list.length}条`
+  );
 
   const totalNotes = list.length;
   const totalExposure = list.reduce((s, r) => s + Number(r.exposure || 0), 0);
