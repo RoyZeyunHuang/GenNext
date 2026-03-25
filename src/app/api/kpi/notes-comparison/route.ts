@@ -3,6 +3,23 @@ import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** 避免 Vercel/代理缓存 GET，否则改库后前端仍看到旧的 avg_cover_ctr 等 */
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "private, no-store, no-cache, must-revalidate, max-age=0",
+  Pragma: "no-cache",
+} as const;
+
+function jsonRes(
+  data: unknown,
+  init?: { status?: number }
+): NextResponse {
+  return NextResponse.json(data, {
+    ...init,
+    headers: NO_STORE_HEADERS,
+  });
+}
 
 function toNum(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
@@ -136,10 +153,7 @@ export async function GET(req: NextRequest) {
   const accountNames = searchParams.getAll("account").filter(Boolean);
 
   if (!from_date || !to_date) {
-    return NextResponse.json(
-      { error: "from_date and to_date required" },
-      { status: 400 }
-    );
+    return jsonRes({ error: "from_date and to_date required" }, { status: 400 });
   }
 
   const noDataResponse = {
@@ -163,7 +177,7 @@ export async function GET(req: NextRequest) {
     accountNoteIds = Array.from(
       new Set((paidRows ?? []).map((r) => r.note_id as string).filter(Boolean))
     );
-    if (accountNoteIds.length === 0) return NextResponse.json(noDataResponse);
+    if (accountNoteIds.length === 0) return jsonRes(noDataResponse);
   }
 
   // ① 当前期
@@ -172,7 +186,7 @@ export async function GET(req: NextRequest) {
     to_date,
     accountNoteIds
   );
-  if (currentRows.length === 0) return NextResponse.json(noDataResponse);
+  if (currentRows.length === 0) return jsonRes(noDataResponse);
 
   const current = aggregate(currentRows);
 
@@ -239,7 +253,7 @@ export async function GET(req: NextRequest) {
     paid_ratio: metricChange(current.paid_ratio, previous.paid_ratio),
   };
 
-  return NextResponse.json({
+  return jsonRes({
     /** 对比期起止（前端用于显示"vs xxxx → xxxx"） */
     start_date: prevFromDate,
     end_date: prevToDate,
