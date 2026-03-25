@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import {
+  fetchLatestRowsForPublishRange,
+  noteRowKey,
+  type LatestNoteInRangeRow,
+} from "@/lib/kpi-latest-notes-in-range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,22 +32,7 @@ function toNum(v: unknown): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
-type NoteRow = {
-  note_id?: string | null;
-  title?: string | null;
-  publish_date?: string | null;
-  snapshot_date: string;
-  exposure?: unknown;
-  views?: unknown;
-  likes?: unknown;
-  comments?: unknown;
-  collects?: unknown;
-  shares?: unknown;
-  follows?: unknown;
-  cover_ctr?: unknown;
-  avg_watch_time?: unknown;
-  is_paid?: unknown;
-};
+type NoteRow = LatestNoteInRangeRow;
 
 function aggregate(rows: NoteRow[]) {
   const total_notes = rows.length;
@@ -103,65 +93,8 @@ function shiftCalendarDateByYears(ymd: string, deltaYears: number): string {
   return u.toISOString().slice(0, 10);
 }
 
-/**
- * 拉取 publish_date 在 [fromDate, toDate] 范围内的所有快照行，
- * 然后在 JS 侧按笔记（note_id 或 title）保留最新快照。
- *
- * 当 publish_date 为 NULL（日期格式无法解析）时，
- * 兜底用 snapshot_date 过滤（保证老数据不丢失）。
- */
-async function fetchLatestRowsForPublishRange(
-  fromDate: string,
-  toDate: string,
-  accountNoteIds?: string[]
-): Promise<NoteRow[]> {
-  // 主查询：publish_date 在范围内的所有快照行
-  let q = supabase
-    .from("xhs_notes_with_publish_date")
-    .select(
-      "note_id, title, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, avg_watch_time, is_paid"
-    )
-    .gte("publish_date", fromDate)
-    .lte("publish_date", toDate);
-  if (accountNoteIds?.length) {
-    q = q.in("note_id", accountNoteIds);
-  }
-  const { data: primary, error: primaryError } = await q;
-  if (primaryError) {
-    console.error("[notes-comparison] 主查询错误:", primaryError.message);
-  }
-
-  // 兜底查询：publish_date 为 NULL 时用 snapshot_date 过滤
-  // （应对 publish_time 格式无法解析的笔记，如"3天前"等）
-  let fallbackQ = supabase
-    .from("xhs_notes_with_publish_date")
-    .select(
-      "note_id, title, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, avg_watch_time, is_paid"
-    )
-    .is("publish_date", null)
-    .gte("snapshot_date", fromDate)
-    .lte("snapshot_date", toDate);
-  if (accountNoteIds?.length) {
-    fallbackQ = fallbackQ.in("note_id", accountNoteIds);
-  }
-  const { data: fallback } = await fallbackQ;
-
-  const allRows = [...(primary ?? []), ...(fallback ?? [])] as NoteRow[];
-  console.log(
-    `[notes-comparison] publish范围[${fromDate}→${toDate}] 主查${(primary ?? []).length}行 + 兜底${(fallback ?? []).length}行`
-  );
-
-  // 按笔记保留最新快照（key = note_id 优先，否则用 title）
-  const latestByNote = new Map<string, NoteRow>();
-  for (const row of allRows) {
-    const key = String(row.note_id ?? row.title ?? "").trim();
-    if (!key) continue;
-    const existing = latestByNote.get(key);
-    if (!existing || String(row.snapshot_date) > String(existing.snapshot_date)) {
-      latestByNote.set(key, row);
-    }
-  }
-  return Array.from(latestByNote.values());
+function filterRowsByKeys(rows: NoteRow[], allowed: Set<string>): NoteRow[] {
+  return rows.filter((r) => allowed.has(noteRowKey(r)));
 }
 
 export async function GET(req: NextRequest) {
@@ -169,6 +102,12 @@ export async function GET(req: NextRequest) {
   const from_date = searchParams.get("from_date");
   const to_date = searchParams.get("to_date");
   const accountNames = searchParams.getAll("account").filter(Boolean);
+  const noteKeyParams = searchParams
+    .getAll("note_key")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  const allowedKeys =
+    noteKeyParams.length > 0 ? new Set(noteKeyParams) : null;
 
   if (!from_date || !to_date) {
     return jsonRes({ error: "from_date and to_date required" }, { status: 400 });
@@ -184,7 +123,6 @@ export async function GET(req: NextRequest) {
     no_comparison: true,
   };
 
-  // 账号过滤：拿到该账号下的 note_id 集合
   let accountNoteIds: string[] | undefined;
   if (accountNames.length > 0) {
     const { data: paidRows } = await supabase
@@ -198,17 +136,18 @@ export async function GET(req: NextRequest) {
     if (accountNoteIds.length === 0) return jsonRes(noDataResponse);
   }
 
-  // ① 当前期
-  const currentRows = await fetchLatestRowsForPublishRange(
+  let currentRows = await fetchLatestRowsForPublishRange(
     from_date,
     to_date,
     accountNoteIds
   );
+  if (allowedKeys) {
+    currentRows = filterRowsByKeys(currentRows, allowedKeys);
+  }
   if (currentRows.length === 0) return jsonRes(noDataResponse);
 
   const current = aggregate(currentRows);
 
-  // 趋势：按 publish_date（或 snapshot_date 兜底）分组
   const byDate = new Map<string, NoteRow[]>();
   for (const row of currentRows) {
     const d = String(row.publish_date ?? row.snapshot_date ?? "").slice(0, 10);
@@ -229,15 +168,17 @@ export async function GET(req: NextRequest) {
       };
     });
 
-  // ② 对比期：去年同期（与当前所选起止日同月同日，仅年份 -1）
   const prevFromDate = shiftCalendarDateByYears(from_date, -1);
   const prevToDate = shiftCalendarDateByYears(to_date, -1);
 
-  const prevRows = await fetchLatestRowsForPublishRange(
+  let prevRows = await fetchLatestRowsForPublishRange(
     prevFromDate,
     prevToDate,
     accountNoteIds
   );
+  if (allowedKeys) {
+    prevRows = filterRowsByKeys(prevRows, allowedKeys);
+  }
   const previous = aggregate(prevRows);
   const no_comparison = prevRows.length === 0;
 
@@ -267,7 +208,6 @@ export async function GET(req: NextRequest) {
   };
 
   return jsonRes({
-    /** 去年同期起止（前端用于显示 vs 范围） */
     start_date: prevFromDate,
     end_date: prevToDate,
     current,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { noteRowKey } from "@/lib/kpi-latest-notes-in-range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -133,9 +134,17 @@ export async function GET(req: NextRequest) {
       latestByNote.set(key, row);
     }
   }
-  const list = Array.from(latestByNote.values());
+  let list = Array.from(latestByNote.values());
+  const noteKeyFilter = searchParams
+    .getAll("note_key")
+    .map((k) => k.trim())
+    .filter(Boolean);
+  if (noteKeyFilter.length > 0) {
+    const allowed = new Set(noteKeyFilter);
+    list = list.filter((r) => allowed.has(noteRowKey(r)));
+  }
   console.log(
-    `[notes-stats] publish范围[${from_date}→${to_date}] 主${(primaryRows ?? []).length}行+兜底${(fallbackRows ?? []).length}行 → 去重后${list.length}条`
+    `[notes-stats] publish范围[${from_date}→${to_date}] 主${(primaryRows ?? []).length}行+兜底${(fallbackRows ?? []).length}行 → 去重后${noteKeyFilter.length ? `${list.length}（过滤）` : `${list.length}`}`
   );
 
   const totalNotes = list.length;

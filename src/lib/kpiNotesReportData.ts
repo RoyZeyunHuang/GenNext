@@ -58,8 +58,10 @@ export async function loadNotesReportData(filters: {
   from_date: string;
   to_date: string;
   account_names?: string[];
+  note_keys?: string[];
 }): Promise<{ ok: true; data: NotesReportBundle } | { ok: false; error: string }> {
   const account_names = filters.account_names ?? [];
+  const note_keys = filters.note_keys ?? [];
   if (!filters.from_date || !filters.to_date) {
     return { ok: false, error: "缺少日期范围" };
   }
@@ -69,6 +71,7 @@ export async function loadNotesReportData(filters: {
     to_date: filters.to_date,
   });
   account_names.forEach((name) => comparisonParams.append("account", name));
+  note_keys.forEach((k) => comparisonParams.append("note_key", k));
   comparisonParams.set("_cb", String(Date.now()));
 
   const comparisonRes = await fetch(
@@ -101,6 +104,7 @@ export async function loadNotesReportData(filters: {
     to_date: filters.to_date,
   });
   account_names.forEach((name) => statsParams.append("account", name));
+  note_keys.forEach((k) => statsParams.append("note_key", k));
   statsParams.set("_cb", String(Date.now()));
 
   const statsRes = await fetch(`/api/kpi/notes-stats?${statsParams}`, {
