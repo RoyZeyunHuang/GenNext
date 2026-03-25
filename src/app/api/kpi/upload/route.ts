@@ -19,6 +19,21 @@ function pctToDecimal(v: unknown): number | null {
   return n / 100;
 }
 
+/**
+ * 封面点击率 → 库内小数率（如 14.2%、14.2、「14.2%」→ 0.142）。
+ * Excel 常导出已为 0.142 的数值，不可再 /100（否则会成 0.00142）。
+ * 规则：带 % 或 |n|>1 视为百分点，除以 100；否则视为已是 0–1 小数率。
+ */
+function coverCtrToStoredRate(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const s = String(v).trim();
+  const hasPct = /[%％]/.test(s);
+  const n = Number(s.replace(/[%％]/g, ""));
+  if (isNaN(n)) return null;
+  if (hasPct || Math.abs(n) > 1) return n / 100;
+  return n;
+}
+
 /** 将日期字符串规范为 YYYY-MM-DD（供投放表 event_date 等使用） */
 function normalizeDateString(v: string): string | null {
   const s = String(v).trim();
@@ -211,8 +226,8 @@ export async function POST(req: NextRequest) {
         for (const [dbCol, cnCol] of Object.entries(colMap)) {
           let v = row[cnCol];
           if (dbCol === "cover_ctr") {
-            const p = pctToDecimal(v);
-            out[dbCol] = p != null ? p : toNum(v);
+            const p = coverCtrToStoredRate(v);
+            out[dbCol] = p != null ? p : null;
           } else if (["exposure", "views", "likes", "comments", "collects", "follows", "shares", "danmaku"].includes(dbCol)) {
             out[dbCol] = toNum(v);
           } else if (dbCol === "avg_watch_time") {
