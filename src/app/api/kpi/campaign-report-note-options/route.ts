@@ -6,6 +6,7 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const NO_STORE = {
   "Cache-Control": "private, no-store, no-cache, must-revalidate, max-age=0",
