@@ -22,6 +22,9 @@ const emptyNotesStats = {
     total_follows: 0,
     avg_interaction_rate: 0,
     avg_collect_rate: 0,
+    avg_cover_ctr: 0,
+    avg_watch_time: 0,
+    paid_ratio: 0,
   },
   by_type: [] as { content_type: string; count: number; avg_interaction_rate: number }[],
   by_genre: { video: { count: 0, avg_interaction_rate: 0, avg_collect_rate: 0 }, image: { count: 0, avg_interaction_rate: 0, avg_collect_rate: 0 } },
@@ -83,6 +86,7 @@ export async function GET(req: NextRequest) {
     shares?: unknown;
     follows?: unknown;
     cover_ctr?: unknown;
+    avg_watch_time?: unknown;
     is_paid?: unknown;
   };
 
@@ -158,7 +162,11 @@ export async function GET(req: NextRequest) {
   const avgCollectRate = totalViews > 0 ? totalCollects / totalViews : 0;
   const avgCoverCtr =
     totalExposure > 0 ? exposureWeightedCtr / totalExposure : 0;
-  const followEfficiency = totalViews > 0 ? totalFollows / totalViews : 0;
+  const weightedWatch = list.reduce(
+    (s, r) => s + toNum(r.avg_watch_time) * Number(r.views || 0),
+    0
+  );
+  const avgWatchTime = totalViews > 0 ? weightedWatch / totalViews : 0;
   const paidRatio = totalNotes > 0 ? paidCount / totalNotes : 0;
 
   const totalLikes = list.reduce((s, r) => s + toNum(r.likes), 0);
@@ -177,7 +185,7 @@ export async function GET(req: NextRequest) {
     avg_interaction_rate: avgInteractionRate,
     avg_collect_rate: avgCollectRate,
     avg_cover_ctr: avgCoverCtr,
-    follow_efficiency: followEfficiency,
+    avg_watch_time: avgWatchTime,
     paid_ratio: paidRatio,
   };
 

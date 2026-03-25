@@ -40,6 +40,7 @@ type NoteRow = {
   shares?: unknown;
   follows?: unknown;
   cover_ctr?: unknown;
+  avg_watch_time?: unknown;
   is_paid?: unknown;
 };
 
@@ -62,7 +63,11 @@ function aggregate(rows: NoteRow[]) {
   const avg_interaction_rate = total_views > 0 ? total_interactions / total_views : 0;
   const avg_collect_rate = total_views > 0 ? total_collects / total_views : 0;
   const avg_cover_ctr = total_exposure > 0 ? weighted_cover_ctr / total_exposure : 0;
-  const follow_efficiency = total_views > 0 ? total_follows / total_views : 0;
+  const weighted_watch = rows.reduce(
+    (s, r) => s + toNum(r.avg_watch_time) * toNum(r.views),
+    0
+  );
+  const avg_watch_time = total_views > 0 ? weighted_watch / total_views : 0;
   const paid_ratio = total_notes > 0 ? paid_count / total_notes : 0;
 
   return {
@@ -74,7 +79,7 @@ function aggregate(rows: NoteRow[]) {
     avg_interaction_rate,
     avg_collect_rate,
     avg_cover_ctr,
-    follow_efficiency,
+    avg_watch_time,
     paid_ratio,
   };
 }
@@ -101,7 +106,7 @@ async function fetchLatestRowsForPublishRange(
   let q = supabase
     .from("xhs_notes_with_publish_date")
     .select(
-      "note_id, title, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, is_paid"
+      "note_id, title, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, avg_watch_time, is_paid"
     )
     .gte("publish_date", fromDate)
     .lte("publish_date", toDate);
@@ -118,7 +123,7 @@ async function fetchLatestRowsForPublishRange(
   let fallbackQ = supabase
     .from("xhs_notes_with_publish_date")
     .select(
-      "note_id, title, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, is_paid"
+      "note_id, title, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, avg_watch_time, is_paid"
     )
     .is("publish_date", null)
     .gte("snapshot_date", fromDate)
@@ -246,9 +251,9 @@ export async function GET(req: NextRequest) {
       previous.avg_collect_rate
     ),
     avg_cover_ctr: metricChange(current.avg_cover_ctr, previous.avg_cover_ctr),
-    follow_efficiency: metricChange(
-      current.follow_efficiency,
-      previous.follow_efficiency
+    avg_watch_time: metricChange(
+      current.avg_watch_time,
+      previous.avg_watch_time
     ),
     paid_ratio: metricChange(current.paid_ratio, previous.paid_ratio),
   };

@@ -26,7 +26,12 @@ export type CampaignReportPdfMeta = {
 const CHART_W = 722;
 const CHART_H = 280;
 
-function formatValue(value: number, isPercent = false): string {
+function formatValue(
+  value: number,
+  isPercent = false,
+  unit: "none" | "seconds" = "none"
+): string {
+  if (unit === "seconds") return `${value.toFixed(1)} 秒`;
   return isPercent ? `${(value * 100).toFixed(2)}%` : value.toLocaleString();
 }
 
@@ -35,6 +40,7 @@ function PdfKpiCard({
   value,
   change,
   isPercent = false,
+  valueUnit = "none",
   vsDate,
   noComparison,
 }: {
@@ -42,10 +48,11 @@ function PdfKpiCard({
   value: number;
   change?: ChangeMetric | null;
   isPercent?: boolean;
+  valueUnit?: "none" | "seconds";
   vsDate?: string | null;
   noComparison?: boolean;
 }) {
-  const display = formatValue(value, isPercent);
+  const display = formatValue(value, isPercent, valueUnit);
 
   let changeNode: ReactNode = null;
   if (noComparison) {
@@ -53,9 +60,12 @@ function PdfKpiCard({
       <span className="text-[11px] text-[#A8A29E]">暂无对比数据</span>
     );
   } else if (change != null) {
-    const changeValue = isPercent
-      ? `${change.change >= 0 ? "+" : ""}${(change.change * 100).toFixed(2)}%`
-      : `${change.change >= 0 ? "+" : ""}${change.change.toLocaleString()}`;
+    const changeValue =
+      valueUnit === "seconds"
+        ? `${change.change >= 0 ? "+" : ""}${change.change.toFixed(1)} 秒`
+        : isPercent
+          ? `${change.change >= 0 ? "+" : ""}${(change.change * 100).toFixed(2)}%`
+          : `${change.change >= 0 ? "+" : ""}${change.change.toLocaleString()}`;
     const rateValue = `${change.change_rate >= 0 ? "+" : ""}${(change.change_rate * 100).toFixed(1)}%`;
     if (change.change > 0) {
       changeNode = (
@@ -200,10 +210,10 @@ export function CampaignReportPdfDocument({
           noComparison={comparison.no_comparison}
         />
         <PdfKpiCard
-          label="涨粉效率"
-          value={kpi.follow_efficiency}
-          isPercent
-          change={comparison.changes?.follow_efficiency}
+          label="人均观看时长"
+          value={kpi.avg_watch_time}
+          valueUnit="seconds"
+          change={comparison.changes?.avg_watch_time}
           vsDate={comparison.start_date}
           noComparison={comparison.no_comparison}
         />
