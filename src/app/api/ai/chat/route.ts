@@ -21,8 +21,19 @@ const tools: Anthropic.Tool[] = [
     input_schema: { type: "object" as const, properties: {}, required: [] },
   },
   {
+    name: "search_property",
+    description: "按楼盘名称搜索，返回楼盘基本信息、关联开发商公司、联系人和外联（outreach）状态。用户问某楼盘信息时优先用此工具。",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "楼盘名称或关键词，如 The Journal、Sable、Park 23 等" },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "search_company",
-    description: "在CRM中搜索公司信息，包括联系人和最近沟通记录",
+    description: "按公司（开发商/管理公司）名称搜索，返回公司信息和联系人。用户问某开发商/管理公司时用此工具。",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -128,6 +139,54 @@ async function executeTool(name: string, input: ToolInput): Promise<unknown> {
         .eq("done", false)
         .order("created_at", { ascending: false });
       return data || [];
+    }
+
+    case "search_property": {
+      const q = String(input.query ?? "").trim();
+      // 搜楼盘名
+      const { data: props } = await supabase
+        .from("properties")
+        .select("id, name, address, city, area, units, build_year, price_range")
+        .ilike("name", `%${q}%`)
+        .limit(5);
+      if (!props?.length) return { found: false, properties: [] };
+
+      const propertyIds = props.map((p: { id: string }) => p.id);
+
+      // 关联公司 + 联系人
+      const { data: pcs } = await supabase
+        .from("property_companies")
+        .select("property_id, role, companies(id, name, email, phone, contacts(id, name, title, email, phone))")
+        .in("property_id", propertyIds);
+
+      // 外联状态
+      const { data: outreachRows } = await supabase
+        .from("outreach")
+        .select("property_id, stage, deal_status, contact_name, contact_info, notes, needs_attention, updated_at")
+        .in("property_id", propertyIds)
+        .order("updated_at", { ascending: false });
+
+      const outreachByPropertyId: Record<string, unknown[]> = {};
+      for (const row of (outreachRows ?? [])) {
+        const pid = (row as { property_id: string }).property_id;
+        if (!outreachByPropertyId[pid]) outreachByPropertyId[pid] = [];
+        outreachByPropertyId[pid].push(row);
+      }
+
+      const pcsByPropertyId: Record<string, unknown[]> = {};
+      for (const pc of (pcs ?? [])) {
+        const pid = (pc as { property_id: string }).property_id;
+        if (!pcsByPropertyId[pid]) pcsByPropertyId[pid] = [];
+        pcsByPropertyId[pid].push(pc);
+      }
+
+      const result = props.map((p: { id: string; name: string; address: string | null; city: string | null; area: string | null; units: number | null; build_year: number | null; price_range: string | null }) => ({
+        ...p,
+        companies: pcsByPropertyId[p.id] ?? [],
+        outreach: outreachByPropertyId[p.id] ?? [],
+      }));
+
+      return { found: true, properties: result };
     }
 
     case "search_company": {
@@ -312,9 +371,15 @@ export async function POST(req: NextRequest) {
 
 你可以：
 - 查询今日日程和待办事项
-- 在CRM中查找公司信息，帮写跟进消息
+- 查询楼盘（property）信息、关联开发商和外联状态
+- 查询开发商/管理公司信息和联系人
 - 搜索档案库，生成文案内容
 - 获取最新新闻和KPI数据
+
+工具选择原则（重要）：
+- 用户问「XXX 楼盘」「XXX 的信息」「XXX outreach 状态」→ 用 search_property
+- 用户问某家开发商/管理公司 → 用 search_company
+- 不确定是楼盘还是公司时 → 先用 search_property，没结果再用 search_company
 
 工作原则：
 - 先用工具查询相关数据，再给出回答
