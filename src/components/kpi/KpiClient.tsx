@@ -68,7 +68,10 @@ export function KpiClient() {
         from_date: filters.from_date,
         to_date: filters.to_date,
       });
-      filters.account_names.forEach((name) => params.append("account", name));
+      // 账号 filter 仅用于投放 tab
+      if (tab !== "notes") {
+        filters.account_names.forEach((name) => params.append("account", name));
+      }
       const res = await fetch(`/api/kpi/notes-comparison?${params}`, {
         cache: "no-store",
       });
@@ -138,7 +141,7 @@ export function KpiClient() {
               )}
             </>
           )}
-          {tab === "notes" && (
+          {tab === "paid" && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-[#78716C]">{t("kpi.account")}</span>
               <select
