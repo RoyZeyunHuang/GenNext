@@ -141,13 +141,23 @@ async function executeTool(name: string, input: ToolInput): Promise<unknown> {
     }
 
     case "get_company_logs": {
-      const { data } = await supabase
+      // outreach 按 property_id 关联，需先找该公司的楼盘
+      const { data: pcs } = await supabase
+        .from("property_companies")
+        .select("property_id, properties(id, name)")
+        .eq("company_id", input.company_id);
+      const propertyIds = (pcs ?? []).map((pc: { property_id: string }) => pc.property_id).filter(Boolean);
+      if (propertyIds.length === 0) return { outreach: [], properties: [] };
+      const { data: outreachRows } = await supabase
         .from("outreach")
-        .select("*")
-        .eq("company_id", input.company_id)
+        .select("*, properties(name)")
+        .in("property_id", propertyIds)
         .order("updated_at", { ascending: false })
-        .limit(10);
-      return data || [];
+        .limit(20);
+      return {
+        properties: (pcs ?? []).map((pc: { property_id: string; properties: unknown }) => pc.properties),
+        outreach: outreachRows ?? [],
+      };
     }
 
     case "search_knowledge": {
