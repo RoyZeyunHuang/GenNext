@@ -5,7 +5,25 @@ import Link from "next/link";
 import { Newspaper, Loader2 } from "lucide-react";
 
 type ViralItem = { title: string; hook: string; source: string };
-type HistoryItem = { id: string; title: string | null; content: string | null };
+type HistoryItem = {
+  id: string;
+  title: string | null;
+  content: string | null;
+  source_url?: string | null;
+};
+
+function externalArticleUrl(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null;
+  const s = raw.trim();
+  if (!/^https?:\/\//i.test(s)) return null;
+  try {
+    const u = new URL(s);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.href;
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 export function NewsCard() {
   const [items, setItems] = useState<ViralItem[]>([]);
@@ -48,26 +66,59 @@ export function NewsCard() {
           </p>
         ) : (
           <ul className="space-y-3">
-            {history.map((it) => (
+            {history.map((it) => {
+              const href = externalArticleUrl(it.source_url);
+              const titleText = it.title ?? "(无标题)";
+              return (
               <li key={it.id} className="border-b border-[#E7E5E4] pb-3 last:border-0 last:pb-0">
-                <p className="text-sm font-medium text-[#1C1917]">{it.title ?? "(无标题)"}</p>
+                <p className="text-sm font-medium text-[#1C1917]">
+                  {href ? (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-[#574DFF] hover:underline"
+                    >
+                      {titleText}
+                    </a>
+                  ) : (
+                    titleText
+                  )}
+                </p>
                 {it.content ? (
                   <p className="mt-0.5 line-clamp-2 text-xs text-[#78716C]">{it.content}</p>
                 ) : (
                   <p className="mt-0.5 text-xs text-[#78716C]">（无内容）</p>
                 )}
               </li>
-            ))}
+            );
+            })}
           </ul>
         )
       ) : (
         <ul className="space-y-3">
-          {items.map((item, i) => (
+          {items.map((item, i) => {
+            const href = externalArticleUrl(item.source);
+            return (
             <li key={i} className="border-b border-[#E7E5E4] pb-3 last:border-0 last:pb-0">
-              <p className="text-sm font-medium text-[#1C1917]">{item.title}</p>
+              <p className="text-sm font-medium text-[#1C1917]">
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-[#574DFF] hover:underline"
+                  >
+                    {item.title}
+                  </a>
+                ) : (
+                  item.title
+                )}
+              </p>
               <p className="mt-0.5 text-xs text-[#C2410C]">💡 {item.hook}</p>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>
