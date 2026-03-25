@@ -11,8 +11,9 @@ function toNum(v: unknown): number {
 }
 
 type NoteRow = {
-  note_id?: string;
-  publish_date?: string;
+  note_id?: string | null;
+  title?: string | null;
+  publish_date?: string | null;
   snapshot_date: string;
   exposure?: unknown;
   views?: unknown;
@@ -68,48 +69,61 @@ function metricChange(current: number, previous: number) {
 }
 
 /**
- * 找出 publish_date 在 [from, to] 范围内的去重 note_id 列表
+ * 拉取 publish_date 在 [fromDate, toDate] 范围内的所有快照行，
+ * 然后在 JS 侧按笔记（note_id 或 title）保留最新快照。
+ *
+ * 当 publish_date 为 NULL（日期格式无法解析）时，
+ * 兜底用 snapshot_date 过滤（保证老数据不丢失）。
  */
-async function fetchNoteIdsInPublishRange(
-  from: string,
-  to: string,
-  allowedIds?: string[]
-): Promise<string[]> {
+async function fetchLatestRowsForPublishRange(
+  fromDate: string,
+  toDate: string,
+  accountNoteIds?: string[]
+): Promise<NoteRow[]> {
+  // 主查询：publish_date 在范围内的所有快照行
   let q = supabase
     .from("xhs_notes_with_publish_date")
-    .select("note_id")
-    .gte("publish_date", from)
-    .lte("publish_date", to)
-    .not("note_id", "is", null);
-  if (allowedIds && allowedIds.length > 0) {
-    q = q.in("note_id", allowedIds);
+    .select(
+      "note_id, title, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, is_paid"
+    )
+    .gte("publish_date", fromDate)
+    .lte("publish_date", toDate);
+  if (accountNoteIds?.length) {
+    q = q.in("note_id", accountNoteIds);
   }
-  const { data } = await q;
-  return Array.from(
-    new Set((data ?? []).map((r: { note_id: string }) => r.note_id).filter(Boolean))
-  );
-}
+  const { data: primary, error: primaryError } = await q;
+  if (primaryError) {
+    console.error("[notes-comparison] 主查询错误:", primaryError.message);
+  }
 
-/**
- * 对 noteIds 中每个笔记取最新快照行，返回汇总用的行数组
- */
-async function fetchLatestSnapshotRows(noteIds: string[]): Promise<NoteRow[]> {
-  if (noteIds.length === 0) return [];
-  const { data, error } = await supabase
+  // 兜底查询：publish_date 为 NULL 时用 snapshot_date 过滤
+  // （应对 publish_time 格式无法解析的笔记，如"3天前"等）
+  let fallbackQ = supabase
     .from("xhs_notes_with_publish_date")
     .select(
-      "note_id, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, is_paid"
+      "note_id, title, publish_date, snapshot_date, exposure, views, likes, comments, collects, shares, follows, cover_ctr, is_paid"
     )
-    .in("note_id", noteIds);
-  if (error || !data) return [];
-  // 每个 note_id 保留 snapshot_date 最大的那行
+    .is("publish_date", null)
+    .gte("snapshot_date", fromDate)
+    .lte("snapshot_date", toDate);
+  if (accountNoteIds?.length) {
+    fallbackQ = fallbackQ.in("note_id", accountNoteIds);
+  }
+  const { data: fallback } = await fallbackQ;
+
+  const allRows = [...(primary ?? []), ...(fallback ?? [])] as NoteRow[];
+  console.log(
+    `[notes-comparison] publish范围[${fromDate}→${toDate}] 主查${(primary ?? []).length}行 + 兜底${(fallback ?? []).length}行`
+  );
+
+  // 按笔记保留最新快照（key = note_id 优先，否则用 title）
   const latestByNote = new Map<string, NoteRow>();
-  for (const row of data as NoteRow[]) {
-    const nid = row.note_id ?? "";
-    if (!nid) continue;
-    const existing = latestByNote.get(nid);
+  for (const row of allRows) {
+    const key = String(row.note_id ?? row.title ?? "").trim();
+    if (!key) continue;
+    const existing = latestByNote.get(key);
     if (!existing || String(row.snapshot_date) > String(existing.snapshot_date)) {
-      latestByNote.set(nid, row);
+      latestByNote.set(key, row);
     }
   }
   return Array.from(latestByNote.values());
@@ -152,30 +166,29 @@ export async function GET(req: NextRequest) {
     if (accountNoteIds.length === 0) return NextResponse.json(noDataResponse);
   }
 
-  // ① 当前期：publish_date 在 [from, to] 的笔记，取各笔记最新快照
-  const currentNoteIds = await fetchNoteIdsInPublishRange(
+  // ① 当前期
+  const currentRows = await fetchLatestRowsForPublishRange(
     from_date,
     to_date,
     accountNoteIds
   );
-  if (currentNoteIds.length === 0) return NextResponse.json(noDataResponse);
+  if (currentRows.length === 0) return NextResponse.json(noDataResponse);
 
-  const currentRows = await fetchLatestSnapshotRows(currentNoteIds);
   const current = aggregate(currentRows);
 
-  // 趋势：按 publish_date 分组（每天发布的笔记，以最新快照指标汇总）
-  const byPublishDate = new Map<string, NoteRow[]>();
+  // 趋势：按 publish_date（或 snapshot_date 兜底）分组
+  const byDate = new Map<string, NoteRow[]>();
   for (const row of currentRows) {
-    const pd = String(row.publish_date ?? "").slice(0, 10);
-    if (!pd) continue;
-    const list = byPublishDate.get(pd) ?? [];
+    const d = String(row.publish_date ?? row.snapshot_date ?? "").slice(0, 10);
+    if (!d) continue;
+    const list = byDate.get(d) ?? [];
     list.push(row);
-    byPublishDate.set(pd, list);
+    byDate.set(d, list);
   }
-  const trend = Array.from(byPublishDate.keys())
+  const trend = Array.from(byDate.keys())
     .sort()
     .map((d) => {
-      const a = aggregate(byPublishDate.get(d) ?? []);
+      const a = aggregate(byDate.get(d) ?? []);
       return {
         date: d,
         exposure: a.total_exposure,
@@ -193,14 +206,13 @@ export async function GET(req: NextRequest) {
     fromMs - 86400000 - durationDays * 86400000
   ).toISOString().slice(0, 10);
 
-  const prevNoteIds = await fetchNoteIdsInPublishRange(
+  const prevRows = await fetchLatestRowsForPublishRange(
     prevFromDate,
     prevToDate,
     accountNoteIds
   );
-  const prevRows = await fetchLatestSnapshotRows(prevNoteIds);
   const previous = aggregate(prevRows);
-  const no_comparison = prevNoteIds.length === 0;
+  const no_comparison = prevRows.length === 0;
 
   const changes = {
     total_notes: metricChange(current.total_notes, previous.total_notes),
