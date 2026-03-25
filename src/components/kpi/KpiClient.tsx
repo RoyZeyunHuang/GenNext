@@ -45,12 +45,11 @@ export function KpiClient() {
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
-    const firstDay = new Date();
-    firstDay.setDate(1);
-    const monthStart = firstDay.toISOString().slice(0, 10);
+    const y = new Date().getFullYear();
+    const yearStart = `${y}-01-01`;
     setFilters((prev) => ({
       ...prev,
-      from_date: prev.from_date || monthStart,
+      from_date: prev.from_date || yearStart,
       to_date: prev.to_date || today,
     }));
   }, []);
