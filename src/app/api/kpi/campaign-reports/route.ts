@@ -12,6 +12,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
+  const noteKeys = Array.isArray(body.note_keys)
+    ? body.note_keys.map((k: unknown) => String(k).trim()).filter(Boolean)
+    : [];
   const { data, error } = await supabase.from("campaign_reports").insert({
     id: body.id ?? crypto.randomUUID(),
     title: body.title,
@@ -20,6 +23,7 @@ export async function POST(req: NextRequest) {
     date_to: body.date_to,
     aggregate_json: body.aggregate_json ? JSON.stringify(body.aggregate_json) : null,
     top_posts_json: body.top_posts_json ? JSON.stringify(body.top_posts_json) : null,
+    note_keys_json: noteKeys.length > 0 ? JSON.stringify(noteKeys) : null,
     created_at: new Date().toISOString(),
   }).select().single();
   if (error) return Response.json({ error: error.message }, { status: 500 });

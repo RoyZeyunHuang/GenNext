@@ -108,6 +108,7 @@ export function NotesTab({
       from_date: filters.from_date,
       to_date: filters.to_date,
       account_names: filters.account_names ?? [],
+      note_keys: filters.note_keys?.length ? filters.note_keys : undefined,
     });
     if (!result.ok) {
       setComparison(null);
@@ -121,7 +122,13 @@ export function NotesTab({
     setByGenre(byGenre);
     setTop10(top10);
     setLoading(false);
-  }, [filters.from_date, filters.to_date, filters.account_names, refreshToken]);
+  }, [
+    filters.from_date,
+    filters.to_date,
+    filters.account_names,
+    filters.note_keys?.join("\0"),
+    refreshToken,
+  ]);
 
   useEffect(() => {
     fetchData();

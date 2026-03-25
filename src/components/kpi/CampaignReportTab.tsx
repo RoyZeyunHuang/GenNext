@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Plus, Eye, Trash2, X, Loader2, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -22,8 +22,22 @@ type Report = {
   date_to: string;
   aggregate_json: string | null;
   top_posts_json: string | null;
+  note_keys_json?: string | null;
   created_at: string;
 };
+
+function parseReportNoteKeys(report: Report): string[] | undefined {
+  const raw = report.note_keys_json;
+  if (raw == null || raw === "") return undefined;
+  try {
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr)) return undefined;
+    const keys = arr.map((k) => String(k).trim()).filter(Boolean);
+    return keys.length > 0 ? keys : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function CampaignReportTab() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -70,7 +84,9 @@ export function CampaignReportTab() {
           ) : reports.length === 0 ? (
             <p className="py-8 text-center text-sm text-[#78716C]">暂无报告</p>
           ) : (
-            reports.map((r) => (
+            reports.map((r) => {
+              const nk = parseReportNoteKeys(r);
+              return (
               <div
                 key={r.id}
                 className={cn(
@@ -83,6 +99,9 @@ export function CampaignReportTab() {
                 <div className="text-sm font-medium text-[#1C1917]">{r.title}</div>
                 <div className="mt-0.5 text-xs text-[#78716C]">
                   {r.date_from} → {r.date_to}
+                  {nk?.length ? (
+                    <span className="ml-1 text-[#A8A29E]">· 已选 {nk.length} 篇</span>
+                  ) : null}
                 </div>
                 <div className="mt-0.5 text-[10px] text-[#A8A29E]">
                   {new Date(r.created_at).toLocaleDateString("zh-CN")}
@@ -107,7 +126,8 @@ export function CampaignReportTab() {
                   </button>
                 </div>
               </div>
-            ))
+            );
+            })
           )}
         </div>
       </div>
@@ -140,10 +160,12 @@ function ReportView({ report }: { report: Report }) {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [pdfBundle, setPdfBundle] = useState<NotesReportBundle | null>(null);
   const hasRange = Boolean(report.date_from && report.date_to);
+  const noteKeys = parseReportNoteKeys(report);
   const filters = {
     from_date: report.date_from,
     to_date: report.date_to,
     account_names: [] as string[],
+    note_keys: noteKeys,
   };
 
   const handleDownloadPdf = async () => {
@@ -154,6 +176,7 @@ function ReportView({ report }: { report: Report }) {
       from_date: report.date_from,
       to_date: report.date_to,
       account_names: [],
+      note_keys: noteKeys,
     });
     if (!result.ok) {
       setPdfError(result.error);
@@ -240,7 +263,8 @@ function ReportView({ report }: { report: Report }) {
               )}
               <p className="mt-1 text-xs text-[#A8A29E]">
                 以下数据与 KPI「全量笔记」一致（日期范围：{report.date_from}{" "}
-                → {report.date_to}）
+                → {report.date_to}
+                {noteKeys?.length ? ` · 仅统计已选 ${noteKeys.length} 篇笔记` : ""}）
               </p>
             </div>
             <NotesTab filters={filters} refreshToken={0} />
@@ -278,6 +302,8 @@ function ReportView({ report }: { report: Report }) {
   );
 }
 
+type NoteOption = { key: string; title: string; note_id: string | null };
+
 function NewReportForm({
   onClose,
   onCreated,
@@ -291,6 +317,10 @@ function NewReportForm({
   const [dateTo, setDateTo] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [options, setOptions] = useState<NoteOption[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+  const [pickSearch, setPickSearch] = useState("");
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
   const inputCls =
     "h-9 rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20";
@@ -303,6 +333,52 @@ function NewReportForm({
     setDateFrom((prev) => prev || monthStart);
     setDateTo((prev) => prev || today);
   }, []);
+
+  useEffect(() => {
+    if (!dateFrom || !dateTo) return;
+    let cancelled = false;
+    (async () => {
+      setOptionsLoading(true);
+      try {
+        const res = await fetch(
+          `/api/kpi/campaign-report-note-options?from_date=${encodeURIComponent(dateFrom)}&to_date=${encodeURIComponent(dateTo)}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) {
+          setOptions(Array.isArray(data.options) ? data.options : []);
+          setSelectedKeys([]);
+        }
+      } catch {
+        if (!cancelled) setOptions([]);
+      } finally {
+        if (!cancelled) setOptionsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dateFrom, dateTo]);
+
+  const filteredOptions = useMemo(() => {
+    const q = pickSearch.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.title.toLowerCase().includes(q) ||
+        (o.note_id && o.note_id.toLowerCase().includes(q)) ||
+        o.key.toLowerCase().includes(q)
+    );
+  }, [options, pickSearch]);
+
+  const toggleKey = (key: string) => {
+    setSelectedKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  const selectAllKeys = () => setSelectedKeys(options.map((o) => o.key));
+  const clearKeys = () => setSelectedKeys([]);
 
   const save = async () => {
     if (!title.trim() || !dateFrom || !dateTo) return;
@@ -319,6 +395,7 @@ function NewReportForm({
           date_to: dateTo,
           aggregate_json: {},
           top_posts_json: [],
+          note_keys: selectedKeys.length > 0 ? selectedKeys : [],
         }),
       });
       const report = await res.json().catch(() => ({}));
@@ -353,8 +430,7 @@ function NewReportForm({
         </button>
       </div>
       <p className="mb-3 text-xs text-[#78716C]">
-        保存后，报告详情页将展示与 KPI「全量笔记」相同的指标、趋势图与 Top
-        10 列表；日期范围请与全量笔记页顶栏一致以便口径对齐。
+        保存后展示与 KPI「全量笔记」相同口径；可在下方勾选仅包含的笔记（不勾选则包含该日期范围内全部笔记）。
       </p>
       <div className="grid gap-3">
         <input
@@ -385,6 +461,71 @@ function NewReportForm({
             onChange={(e) => setDateTo(e.target.value)}
             className={inputCls}
           />
+        </div>
+        <div className="rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-medium text-[#1C1917]">
+              包含笔记{" "}
+              <span className="font-normal text-[#78716C]">
+                （已选 {selectedKeys.length}/{options.length}）
+              </span>
+            </span>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={selectAllKeys}
+                disabled={options.length === 0}
+                className="rounded px-2 py-0.5 text-[10px] text-[#78716C] hover:bg-[#F5F5F4] disabled:opacity-40"
+              >
+                全选
+              </button>
+              <button
+                type="button"
+                onClick={clearKeys}
+                className="rounded px-2 py-0.5 text-[10px] text-[#78716C] hover:bg-[#F5F5F4]"
+              >
+                清空
+              </button>
+            </div>
+          </div>
+          <input
+            value={pickSearch}
+            onChange={(e) => setPickSearch(e.target.value)}
+            placeholder="搜索标题或笔记 ID…"
+            className={cn(inputCls, "mb-2 w-full")}
+          />
+          {optionsLoading ? (
+            <p className="py-4 text-center text-xs text-[#78716C]">加载候选笔记…</p>
+          ) : options.length === 0 ? (
+            <p className="py-2 text-xs text-[#A8A29E]">该日期范围内暂无笔记</p>
+          ) : (
+            <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
+              {filteredOptions.map((o) => (
+                <label
+                  key={o.key}
+                  className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 text-xs hover:bg-white"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedKeys.includes(o.key)}
+                    onChange={() => toggleKey(o.key)}
+                    className="mt-0.5 shrink-0"
+                  />
+                  <span className="min-w-0 text-[#1C1917]">
+                    <span className="line-clamp-2 font-medium">{o.title}</span>
+                    {o.note_id ? (
+                      <span className="mt-0.5 block text-[10px] text-[#A8A29E]">
+                        ID {o.note_id}
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              ))}
+              {filteredOptions.length === 0 && options.length > 0 ? (
+                <p className="py-2 text-center text-xs text-[#A8A29E]">无匹配项</p>
+              ) : null}
+            </div>
+          )}
         </div>
       </div>
       <button

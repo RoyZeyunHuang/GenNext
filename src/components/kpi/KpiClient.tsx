@@ -22,6 +22,8 @@ export type KpiFilters = {
   from_date: string;
   to_date: string;
   account_names: string[];
+  /** Campaign：仅这些笔记 key；未传或空则整个日期区间全量 */
+  note_keys?: string[];
 };
 
 export function KpiClient() {
