@@ -93,15 +93,8 @@ export async function loadNotesReportData(filters: {
     no_comparison: !!comparisonData.no_comparison,
   };
 
-  if (!comparisonData.end_date) {
-    return {
-      ok: true,
-      data: { comparison, byGenre: null, top10: [] },
-    };
-  }
-
+  // notes-stats 现在通过 publish_date 范围 + 每笔记最新快照聚合，无需传 snapshot_date
   const statsParams = new URLSearchParams({
-    snapshot_date: comparisonData.end_date,
     from_date: filters.from_date,
     to_date: filters.to_date,
   });

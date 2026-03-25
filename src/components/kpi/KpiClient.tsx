@@ -113,7 +113,9 @@ export function KpiClient() {
         <div className="flex flex-wrap items-center gap-3">
           {tab !== "campaign" && (
             <>
-              <span className="text-sm text-[#78716C]">{t("kpi.dateRange")}</span>
+              <span className="text-sm text-[#78716C]">
+                {tab === "notes" ? "笔记发布日期" : t("kpi.dateRange")}
+              </span>
               <input
                 type="date"
                 value={filters.from_date}
@@ -131,6 +133,9 @@ export function KpiClient() {
                 }
                 className={inputCls}
               />
+              {tab === "notes" && (
+                <span className="text-xs text-[#A8A29E]">（按发布日期筛选，统计各笔记最新快照）</span>
+              )}
             </>
           )}
           {tab === "notes" && (
@@ -175,7 +180,7 @@ export function KpiClient() {
       {tab !== "campaign" && (
         <div className="mb-3 text-xs text-[#78716C]">
           {compareInfo?.start_date && compareInfo?.end_date
-            ? `${t("kpi.compareLabel")}${compareInfo.start_date} → ${compareInfo.end_date}${compareInfo.no_comparison ? t("kpi.compareNoData") : ""}`
+            ? `${t("kpi.compareLabel")}${compareInfo.start_date} → ${compareInfo.end_date}${tab === "notes" ? " 发布的笔记" : ""}${compareInfo.no_comparison ? t("kpi.compareNoData") : ""}`
             : t("kpi.compareLabel") + t("kpi.compareNone")}
         </div>
       )}
