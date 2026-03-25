@@ -90,6 +90,19 @@ function metricChange(current: number, previous: number) {
   return { change, change_rate };
 }
 
+/** YYYY-MM-DD 按日历加减整年（UTC，自动处理 2/29 等） */
+function shiftCalendarDateByYears(ymd: string, deltaYears: number): string {
+  const y = Number(ymd.slice(0, 4));
+  const m = Number(ymd.slice(5, 7));
+  const d = Number(ymd.slice(8, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+    return ymd;
+  }
+  const u = new Date(Date.UTC(y, m - 1, d));
+  u.setUTCFullYear(u.getUTCFullYear() + deltaYears);
+  return u.toISOString().slice(0, 10);
+}
+
 /**
  * 拉取 publish_date 在 [fromDate, toDate] 范围内的所有快照行，
  * 然后在 JS 侧按笔记（note_id 或 title）保留最新快照。
@@ -216,14 +229,9 @@ export async function GET(req: NextRequest) {
       };
     });
 
-  // ② 对比期：往前推同等天数
-  const fromMs = new Date(from_date).getTime();
-  const toMs = new Date(to_date).getTime();
-  const durationDays = Math.max(1, Math.round((toMs - fromMs) / 86400000));
-  const prevToDate = new Date(fromMs - 86400000).toISOString().slice(0, 10);
-  const prevFromDate = new Date(
-    fromMs - 86400000 - durationDays * 86400000
-  ).toISOString().slice(0, 10);
+  // ② 对比期：去年同期（与当前所选起止日同月同日，仅年份 -1）
+  const prevFromDate = shiftCalendarDateByYears(from_date, -1);
+  const prevToDate = shiftCalendarDateByYears(to_date, -1);
 
   const prevRows = await fetchLatestRowsForPublishRange(
     prevFromDate,
@@ -259,7 +267,7 @@ export async function GET(req: NextRequest) {
   };
 
   return jsonRes({
-    /** 对比期起止（前端用于显示"vs xxxx → xxxx"） */
+    /** 去年同期起止（前端用于显示 vs 范围） */
     start_date: prevFromDate,
     end_date: prevToDate,
     current,

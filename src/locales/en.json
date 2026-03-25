@@ -102,7 +102,7 @@
     "selectedCount": "Selected",
     "addAccount": "+ Add account",
     "uploadData": "Upload data",
-    "compareLabel": "Compare: ",
+    "compareLabel": "Compare (YoY): ",
     "compareNone": "No snapshots",
     "compareNoData": "(no comparison data)",
     "refreshToast": "Notes refresh triggered"

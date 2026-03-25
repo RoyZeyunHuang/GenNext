@@ -102,7 +102,7 @@
     "selectedCount": "已选",
     "addAccount": "+ 新增账号",
     "uploadData": "上传数据",
-    "compareLabel": "对比：",
+    "compareLabel": "对比（去年同期）：",
     "compareNone": "暂无可用快照",
     "compareNoData": "（暂无对比数据）",
     "refreshToast": "已触发全量笔记刷新"
