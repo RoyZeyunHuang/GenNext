@@ -71,11 +71,10 @@ export function MonthlyOverviewCard() {
 
   return (
     <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
-      <h3 className="mb-1 flex items-center gap-2 text-sm font-medium text-[#1C1917]">
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-[#1C1917]">
         <BarChart3 className="h-4 w-4 text-[#78716C]" />
         {t("dashboard.notesYearKpiTitle")}
       </h3>
-      <p className="mb-3 text-xs text-[#A8A29E]">{t("dashboard.notesYearKpiRangeHint")}</p>
       {loading ? (
         <p className="text-xs text-[#78716C]">{t("common.loading")}</p>
       ) : !hasData ? (
