@@ -194,10 +194,9 @@ export function CampaignReportPdfDocument({
           noComparison={comparison.no_comparison}
         />
         <PdfKpiCard
-          label="平均收藏率"
-          value={kpi.avg_collect_rate}
-          isPercent
-          change={comparison.changes?.avg_collect_rate}
+          label="观看量"
+          value={kpi.total_views}
+          change={comparison.changes?.total_views}
           vsDate={comparison.start_date}
           noComparison={comparison.no_comparison}
         />
