@@ -106,6 +106,31 @@ function mapContactsByCompany(contacts: any[]): Map<string, CompanyContactRow[]>
   return m;
 }
 
+/**
+ * 与初次 load() 一致：除当前扁平行上的 company_id 外，还要包含缓存里全部 property_companies 关联的公司。
+ * 否则在「隐藏已有外联楼盘」等过滤下，部分公司不会出现在 properties 行里，刷新联系人会漏请求 company_id，
+ * 公司页新加的联系人就不会出现在第 2 步多选列表中。
+ */
+function collectCompanyIdsForContactFetch(
+  rows: PropertyRow[],
+  cache: { propertiesRaw: any[] } | null | undefined
+): string[] {
+  const companyIdsSet = new Set<string>();
+  for (const p of rows) {
+    if (p.company_id) companyIdsSet.add(String(p.company_id));
+  }
+  if (cache?.propertiesRaw?.length) {
+    for (const prop of cache.propertiesRaw) {
+      const pcs = Array.isArray(prop?.property_companies) ? prop.property_companies : [];
+      for (const pc of pcs) {
+        const cid = pc?.company_id ?? pc?.companies?.id ?? pc?.companies?.company_id;
+        if (cid) companyIdsSet.add(String(cid));
+      }
+    }
+  }
+  return Array.from(companyIdsSet);
+}
+
 export function BatchEmailModal({
   onClose,
   onDone,
@@ -381,11 +406,10 @@ export function BatchEmailModal({
   }, []);
 
   const fetchContactsForPropertyRows = useCallback(async (rows: PropertyRow[]) => {
-    const companyIdsSet = new Set<string>();
-    for (const p of rows) {
-      if (p.company_id) companyIdsSet.add(p.company_id);
-    }
-    const companyIds = Array.from(companyIdsSet);
+    const companyIds = collectCompanyIdsForContactFetch(
+      rows,
+      bulkPropertyLoadCacheRef.current
+    );
     if (!companyIds.length) {
       return new Map<string, CompanyContactRow[]>();
     }
@@ -400,9 +424,9 @@ export function BatchEmailModal({
   }, []);
 
   const reloadCompanyContacts = useCallback(async () => {
-    const map = await fetchContactsForPropertyRows(properties);
+    const map = await fetchContactsForPropertyRows(propertiesRef.current);
     setCompanyContactsMap(map);
-  }, [properties, fetchContactsForPropertyRows]);
+  }, [fetchContactsForPropertyRows]);
 
   /** 进入第 2 步时拉一次联系人；勿依赖 reloadCompanyContacts/properties（否则会 companyContactsMap→重建 properties→回调变身→无限循环） */
   useEffect(() => {

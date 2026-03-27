@@ -1,6 +1,23 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
+import {
+  maxTokensForBodyStream,
+  normalizeArticleLength,
+  normalizePersonaIntensity,
+} from "@/lib/copy-generate-options";
+import {
+  buildSystemPrompt,
+  FULL_OUTPUT_TOOL,
+  TITLE_OUTPUT_TOOL,
+  type PromptDoc,
+} from "@/lib/prompt-templates";
 import { supabase } from "@/lib/supabase";
+import { GNN_TITLES_MARKER } from "@/lib/copy-stream-titles";
+import {
+  logAnthropicInputUsage,
+  usageMetaHeaders,
+} from "@/lib/anthropic-usage-log";
+import { isTitlePatternCategoryRow, resolvePromptDocRole } from "@/lib/doc-category-constants";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
@@ -9,7 +26,67 @@ const anthropic = new Anthropic({
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TITLE_PATTERN_CATEGORY_NAME = "标题套路";
+export type GenerationPhase = "titles" | "body" | "full";
+
+async function loadPromptDocs(allDocIds: string[]): Promise<{
+  promptDocs: PromptDoc[];
+  enableWebSearch: boolean;
+}> {
+  if (allDocIds.length === 0) {
+    return { promptDocs: [], enableWebSearch: false };
+  }
+
+  const { data: docs } = await supabase
+    .from("docs")
+    .select("id, title, content, category_id, role, priority")
+    .in("id", allDocIds);
+
+  const { data: categories } = await supabase.from("doc_categories").select("id, name");
+  const catMap = new Map((categories ?? []).map((c) => [c.id, c.name]));
+
+  const promptDocs: PromptDoc[] = (docs ?? []).map((d) => {
+    const categoryName = catMap.get(d.category_id) ?? "";
+    return {
+      id: d.id,
+      title: d.title,
+      content: d.content,
+      category_name: categoryName,
+      role: resolvePromptDocRole(categoryName, d.role as string | null | undefined),
+      priority: typeof d.priority === "number" ? d.priority : 3,
+    };
+  });
+
+  const enableWebSearch = (docs ?? []).some(
+    (d) =>
+      (d.content ?? "").includes("联网搜索") ||
+      (d.title ?? "").includes("联网搜索")
+  );
+
+  return { promptDocs, enableWebSearch };
+}
+
+async function loadTitlePatternContent(titlePatternDocId: string | null): Promise<string | null> {
+  if (!titlePatternDocId) return null;
+
+  const { data: tpDoc } = await supabase
+    .from("docs")
+    .select("id, content, category_id")
+    .eq("id", titlePatternDocId)
+    .maybeSingle();
+
+  if (!tpDoc?.category_id) return null;
+
+  const { data: cat } = await supabase
+    .from("doc_categories")
+    .select("id, name, sort_order")
+    .eq("id", tpDoc.category_id)
+    .maybeSingle();
+
+  if (cat && isTitlePatternCategoryRow(cat) && (tpDoc.content ?? "").trim()) {
+    return (tpDoc.content ?? "").trim();
+  }
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,17 +95,38 @@ export async function POST(req: NextRequest) {
       selected_doc_ids = [],
       user_input = "",
       title_pattern_doc_id: titlePatternDocIdRaw = null,
+      article_length: articleLengthRaw,
+      persona_intensity: personaIntensityRaw,
+      phase: phaseRaw = "full",
+      selected_title: selectedTitleRaw = "",
+      body_text: bodyTextRaw = "",
     } = body as {
       selected_doc_ids?: string[];
       user_input?: string;
       title_pattern_doc_id?: string | null;
+      article_length?: string;
+      persona_intensity?: number | string;
+      phase?: string;
+      selected_title?: string;
+      /** 先正文后标题：生成标题时传入已写正文 */
+      body_text?: string;
     };
+
+    const phase: GenerationPhase =
+      phaseRaw === "titles" || phaseRaw === "body" || phaseRaw === "full" ? phaseRaw : "full";
 
     const allDocIds = (Array.isArray(selected_doc_ids) ? selected_doc_ids : []).filter(Boolean);
     const titlePatternDocId =
       typeof titlePatternDocIdRaw === "string" && titlePatternDocIdRaw.trim()
         ? titlePatternDocIdRaw.trim()
         : null;
+    const articleLength = normalizeArticleLength(articleLengthRaw);
+    const personaIntensity = normalizePersonaIntensity(personaIntensityRaw);
+    const selectedTitle =
+      typeof selectedTitleRaw === "string" ? selectedTitleRaw.trim() : "";
+    const bodyTextForTitles =
+      typeof bodyTextRaw === "string" ? bodyTextRaw.trim() : "";
+    const userInputTrimmed = typeof user_input === "string" ? user_input.trim() : "";
 
     if (!anthropic.apiKey) {
       return new Response(
@@ -37,111 +135,345 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let enableWebSearch = false;
-    const systemParts: string[] = [
-      "你是一个专业的营销文案师，熟悉地产行业。根据用户选中的文档（品牌资料、知识库、模板等）和需求，生成高质量的文案内容。",
-    ];
+    const { promptDocs, enableWebSearch } = await loadPromptDocs(allDocIds);
+    const titlePatternContent = await loadTitlePatternContent(titlePatternDocId);
+    const useFullStructuredTool = !!titlePatternContent;
 
-    if (allDocIds.length > 0) {
-      const { data: docs } = await supabase
-        .from("docs")
-        .select("id, title, content, category_id")
-        .in("id", allDocIds);
+    const userBase = `=== 用户需求 ===\n${user_input || "无具体需求"}`;
+    const userMessageForBody =
+      phase === "body" && selectedTitle
+        ? `${userBase}\n\n=== 用户选定标题（请围绕其撰写正文，不要重复该标题行） ===\n${selectedTitle}`
+        : userBase;
 
-      const byCategory = await (async () => {
-        const { data: categories } = await supabase.from("doc_categories").select("id, name");
-        return new Map((categories ?? []).map((c) => [c.id, c.name]));
-      })();
+    const userMessageForTitles =
+      `${userBase}\n\n=== 已写正文（请据此生成标题候选） ===\n${bodyTextForTitles || "（空）"}`;
 
-      systemParts.push("\n\n=== 用户选中的参考资料 ===");
-      for (const doc of docs ?? []) {
-        const catName = byCategory.get(doc.category_id) ?? "";
-        systemParts.push(`【${catName} · ${doc.title}】\n${(doc.content ?? "").trim()}`);
+    // ---------- 阶段：据正文生成标题（tool） ----------
+    if (phase === "titles") {
+      if (!bodyTextForTitles) {
+        return new Response(JSON.stringify({ error: "生成标题需要先有正文，请传 body_text" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
       }
-      const docsList = (docs ?? []) as { id: string; title: string; content: string | null; category_id: string }[];
-      enableWebSearch = docsList.some(
-        (d) => (d.content ?? "").includes("联网搜索") || (d.title ?? "").includes("联网搜索")
+
+      // 标题阶段不附带联网工具：正文已写好，无需再搜；且 tool_choice 固定为 output_titles 时与 web_search 组合会拖慢/重试
+      const systemPrompt = buildSystemPrompt({
+        docs: promptDocs,
+        articleLength,
+        personaIntensity,
+        titlePatternContent,
+        mode: "titles_from_body",
+      });
+
+      const tools: Anthropic.Tool[] = [
+        {
+          name: TITLE_OUTPUT_TOOL.name,
+          description: TITLE_OUTPUT_TOOL.description,
+          input_schema: TITLE_OUTPUT_TOOL.input_schema,
+        } as unknown as Anthropic.Tool,
+      ];
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2048,
+        system: systemPrompt,
+        tools,
+        tool_choice: { type: "tool", name: TITLE_OUTPUT_TOOL.name },
+        messages: [{ role: "user", content: userMessageForTitles }],
+      });
+
+      logAnthropicInputUsage({
+        phase: "titles",
+        inputTokens: response.usage?.input_tokens,
+        userInputForExclusionEstimate: userInputTrimmed,
+      });
+
+      const titleBlock = response.content.find(
+        (b): b is Anthropic.ToolUseBlock =>
+          b.type === "tool_use" && b.name === TITLE_OUTPUT_TOOL.name
       );
-    }
 
-    let titlePatternContent: string | null = null;
-    if (titlePatternDocId) {
-      const { data: cat } = await supabase
-        .from("doc_categories")
-        .select("id")
-        .eq("name", TITLE_PATTERN_CATEGORY_NAME)
-        .maybeSingle();
-      if (cat?.id) {
-        const { data: tpDoc } = await supabase
-          .from("docs")
-          .select("id, content, category_id")
-          .eq("id", titlePatternDocId)
-          .maybeSingle();
-        if (tpDoc && tpDoc.category_id === cat.id && (tpDoc.content ?? "").trim()) {
-          titlePatternContent = (tpDoc.content ?? "").trim();
-        }
+      if (titleBlock) {
+        const result = titleBlock.input as {
+          titles: { type_name: string; text: string }[];
+        };
+        return new Response(
+          JSON.stringify({
+            structured: true,
+            phase: "titles",
+            titles: result.titles,
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache",
+              ...usageMetaHeaders(response.usage?.input_tokens, userInputTrimmed),
+            },
+          }
+        );
       }
+
+      const text = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+
+      return new Response(text, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache",
+          ...usageMetaHeaders(response.usage?.input_tokens, userInputTrimmed),
+        },
+      });
     }
 
-    if (titlePatternContent) {
-      systemParts.push(`
-重要：只输出最终文案本身，不要输出以下内容：
-- 不要说你搜索了什么
-- 不要说你按照什么模板写的
-- 不要说你用了什么人格
-- 不要做任何前置说明或分析过程
-- 不要在文案前后加任何解释
+    // ---------- 阶段：仅正文（流式；无 selected_title 时为「正文 + 同次 output_titles」） ----------
+    if (phase === "body") {
+      const systemPrompt = buildSystemPrompt({
+        docs: promptDocs,
+        articleLength,
+        personaIntensity,
+        titlePatternContent,
+        mode: selectedTitle ? "body_only" : "body_first",
+        selectedTitle: selectedTitle || undefined,
+      });
 
-同时为这篇内容生成多个标题变体。
+      const encoder = new TextEncoder();
 
-${titlePatternContent}
+      // 已选标题：只流式正文，不附带标题工具
+      if (selectedTitle) {
+        const tools: Anthropic.Tool[] = [];
+        if (enableWebSearch) {
+          tools.push({
+            type: "web_search_20250305",
+            name: "web_search",
+          } as unknown as Anthropic.Tool);
+        }
 
-输出格式：
-先输出所有标题变体，每个标题前标注类型名：
-【悬念型】xxx
-【数据型】xxx
-【情绪型】xxx
-【反转型】xxx
-【对话型】xxx
+        const stream = new ReadableStream({
+          async start(controller) {
+            try {
+              const response = await anthropic.messages.stream({
+                model: "claude-sonnet-4-20250514",
+                max_tokens: maxTokensForBodyStream(articleLength, "body_only"),
+                system: systemPrompt,
+                messages: [{ role: "user", content: userMessageForBody }],
+                ...(tools.length > 0 ? { tools } : {}),
+              });
+              for await (const event of response) {
+                if (event.type === "message_start") {
+                  logAnthropicInputUsage({
+                    phase: "body(body_only)",
+                    inputTokens: event.message.usage?.input_tokens,
+                    userInputForExclusionEstimate: userInputTrimmed,
+                  });
+                }
+                if (
+                  event.type === "content_block_delta" &&
+                  event.delta?.type === "text_delta" &&
+                  event.delta.text
+                ) {
+                  controller.enqueue(encoder.encode(event.delta.text));
+                }
+              }
+            } catch (err) {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              controller.enqueue(encoder.encode("ERROR: " + errMsg));
+            } finally {
+              controller.close();
+            }
+          },
+        });
 
-然后空一行，输出正文。
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-cache",
+          },
+        });
+      }
 
-（具体类型名称以「标题套路」文档中的定义为准；若文档中增减了类型，按文档输出对应行数。）
+      // 先正文：流式输出正文，同一次响应中再调用 output_titles，末尾追加标记 + JSON
+      const tools: Anthropic.Tool[] = [
+        {
+          name: TITLE_OUTPUT_TOOL.name,
+          description: TITLE_OUTPUT_TOOL.description,
+          input_schema: TITLE_OUTPUT_TOOL.input_schema,
+        } as unknown as Anthropic.Tool,
+      ];
+      if (enableWebSearch) {
+        tools.unshift({
+          type: "web_search_20250305",
+          name: "web_search",
+        } as unknown as Anthropic.Tool);
+      }
 
-正文部分格式要求（非常重要，必须严格遵守）：
-- 不要使用 **加粗** 或 markdown 格式
-- 不要使用标题格式（不要 ## 或 **标题**）
-- 段落之间用空行分隔，不要用标题分段
-- 要点用 emoji 开头代替数字编号，如 ✅ 📍 💡 🔑 ⚠️
-- 语气像小红书博主发帖，不像写文章或报告
-- 整体节奏：短句为主，偶尔长句，读起来像在刷手机不是在看文档
-- 每隔2-3段自然加1个 emoji，不要堆砌
-- 不要有任何看起来像 Word 文档或公众号文章的排版痕迹`);
-    } else {
-      systemParts.push(`
-重要：只输出最终文案本身，不要输出以下内容：
-- 不要说你搜索了什么
-- 不要说你按照什么模板写的
-- 不要说你用了什么人格
-- 不要做任何前置说明或分析过程
-- 不要在文案前后加任何解释
-- 直接输出标题和正文，第一行就是标题，第二行开始就是正文
+      const stream = new ReadableStream({
+        async start(controller) {
+          let collectingTitles = false;
+          let toolInputJson = "";
+          try {
+            const response = await anthropic.messages.stream({
+              model: "claude-sonnet-4-20250514",
+              max_tokens: maxTokensForBodyStream(articleLength, "body_first"),
+              system: systemPrompt,
+              tools,
+              tool_choice: { type: "auto" },
+              messages: [{ role: "user", content: userMessageForBody }],
+            });
+            for await (const event of response) {
+              if (event.type === "message_start") {
+                logAnthropicInputUsage({
+                  phase: "body(body_first+titles_tool)",
+                  inputTokens: event.message.usage?.input_tokens,
+                  userInputForExclusionEstimate: userInputTrimmed,
+                });
+              }
+              if (event.type === "content_block_start") {
+                const block = event.content_block;
+                if (block.type === "tool_use") {
+                  if (block.name === TITLE_OUTPUT_TOOL.name) {
+                    collectingTitles = true;
+                    toolInputJson = "";
+                  } else {
+                    collectingTitles = false;
+                    toolInputJson = "";
+                  }
+                }
+              }
+              if (event.type === "content_block_delta") {
+                if (event.delta.type === "text_delta" && event.delta.text) {
+                  controller.enqueue(encoder.encode(event.delta.text));
+                }
+                if (
+                  event.delta.type === "input_json_delta" &&
+                  collectingTitles &&
+                  "partial_json" in event.delta
+                ) {
+                  toolInputJson += event.delta.partial_json;
+                }
+              }
+            }
+            if (toolInputJson.trim()) {
+              try {
+                const parsed = JSON.parse(toolInputJson) as {
+                  titles?: { type_name: string; text: string }[];
+                };
+                if (parsed.titles && parsed.titles.length > 0) {
+                  controller.enqueue(
+                    encoder.encode(
+                      GNN_TITLES_MARKER + JSON.stringify({ titles: parsed.titles })
+                    )
+                  );
+                }
+              } catch {
+                /* 模型未产出合法 JSON 时由前端回退单独请求 */
+              }
+            }
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            controller.enqueue(encoder.encode("ERROR: " + errMsg));
+          } finally {
+            controller.close();
+          }
+        },
+      });
 
-格式要求（非常重要，必须严格遵守）：
-- 不要使用 **加粗** 或 markdown 格式
-- 不要使用标题格式（不要 ## 或 **标题**）
-- 段落之间用空行分隔，不要用标题分段
-- 要点用 emoji 开头代替数字编号，如 ✅ 📍 💡 🔑 ⚠️
-- 语气像小红书博主发帖，不像写文章或报告
-- 整体节奏：短句为主，偶尔长句，读起来像在刷手机不是在看文档
-- 每隔2-3段自然加1个 emoji，不要堆砌
-- 不要有任何看起来像 Word 文档或公众号文章的排版痕迹`);
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "X-Content-Type-Options": "nosniff",
+          "Cache-Control": "no-cache",
+        },
+      });
     }
 
-    const systemPrompt = systemParts.join("\n");
-    const userMessage = `=== 用户需求 ===\n${user_input || "无具体需求"}`;
+    // ---------- 阶段：full（一步生成，兼容旧行为） ----------
+    const systemPrompt = buildSystemPrompt({
+      docs: promptDocs,
+      articleLength,
+      personaIntensity,
+      titlePatternContent,
+      mode: "full",
+    });
+
+    const userMessage = userBase;
+    const tools: Anthropic.Tool[] = [];
+
+    if (enableWebSearch) {
+      tools.push({
+        type: "web_search_20250305",
+        name: "web_search",
+      } as unknown as Anthropic.Tool);
+    }
+
+    if (useFullStructuredTool) {
+      tools.push({
+        name: FULL_OUTPUT_TOOL.name,
+        description: FULL_OUTPUT_TOOL.description,
+        input_schema: FULL_OUTPUT_TOOL.input_schema,
+      } as unknown as Anthropic.Tool);
+    }
+
+    if (useFullStructuredTool && !enableWebSearch) {
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
+        tools,
+        tool_choice: { type: "tool", name: FULL_OUTPUT_TOOL.name },
+        messages: [{ role: "user", content: userMessage }],
+      });
+
+      logAnthropicInputUsage({
+        phase: "full(structured_tool)",
+        inputTokens: response.usage?.input_tokens,
+        userInputForExclusionEstimate: userInputTrimmed,
+      });
+
+      const toolBlock = response.content.find(
+        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+      );
+
+      if (toolBlock) {
+        const result = toolBlock.input as {
+          titles: { type_name: string; text: string }[];
+          body: string;
+        };
+
+        return new Response(
+          JSON.stringify({
+            structured: true,
+            titles: result.titles,
+            body: result.body,
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache",
+              ...usageMetaHeaders(response.usage?.input_tokens, userInputTrimmed),
+            },
+          }
+        );
+      }
+
+      const text = response.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+
+      return new Response(text, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache",
+          ...usageMetaHeaders(response.usage?.input_tokens, userInputTrimmed),
+        },
+      });
+    }
+
     const encoder = new TextEncoder();
-
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -150,16 +482,22 @@ ${titlePatternContent}
             max_tokens: 4096,
             system: systemPrompt,
             messages: [{ role: "user", content: userMessage }],
-            ...(enableWebSearch
-              ? {
-                  tools: [
-                    { type: "web_search_20250305", name: "web_search" },
-                  ] as unknown as Anthropic.Tool[],
-                }
-              : {}),
+            ...(tools.length > 0 ? { tools } : {}),
           });
+
           for await (const event of response) {
-            if (event.type === "content_block_delta" && event.delta?.type === "text_delta" && event.delta.text) {
+            if (event.type === "message_start") {
+              logAnthropicInputUsage({
+                phase: "full(stream)",
+                inputTokens: event.message.usage?.input_tokens,
+                userInputForExclusionEstimate: userInputTrimmed,
+              });
+            }
+            if (
+              event.type === "content_block_delta" &&
+              event.delta?.type === "text_delta" &&
+              event.delta.text
+            ) {
               controller.enqueue(encoder.encode(event.delta.text));
             }
           }

@@ -16,6 +16,7 @@ import {
   type CompanyWithContacts,
 } from "@/lib/email-helpers";
 import { sendEmail } from "@/lib/resend";
+import { getEmailSignatureSettings } from "@/lib/email-signature-settings";
 import { wrapEmailHtml } from "@/lib/email-template";
 import { updateOutreachAfterEmailSent } from "@/lib/outreach-after-send";
 import { mergeRecipientList } from "@/lib/email-recipients";
@@ -113,6 +114,9 @@ export async function POST(req: NextRequest) {
     if (!from) {
       return NextResponse.json({ error: "未配置 SENDER_EMAIL" }, { status: 503 });
     }
+
+    const sig = await getEmailSignatureSettings(supabase);
+
     let success = 0;
     let skipped = 0;
     let failed = 0;
@@ -139,9 +143,7 @@ export async function POST(req: NextRequest) {
           const primaryPropertyId = (outreachIds[0] ?? p.property_id) || null;
 
           const senderName =
-            p.sender_name?.trim() ||
-            process.env.SENDER_NAME?.trim() ||
-            "Royce Huang";
+            p.sender_name?.trim() || sig.senderName;
           const outgoing = useHtml
             ? wrapEmailHtml(
                 p.body,
@@ -149,7 +151,8 @@ export async function POST(req: NextRequest) {
                 undefined,
                 p.property_name ?? undefined,
                 senderName,
-                from
+                from,
+                sig.signatureTitleLine
               )
             : p.body;
           const sendResult = await sendEmail(to, p.subject, outgoing, from, useHtml, {
@@ -333,7 +336,7 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const senderName = process.env.SENDER_NAME?.trim() || "Royce Huang";
+        const senderName = sig.senderName;
         const outgoing = useHtml
           ? wrapEmailHtml(
               emailBody,
@@ -341,7 +344,8 @@ export async function POST(req: NextRequest) {
               undefined,
               propertyNameForHeader,
               senderName,
-              from
+              from,
+              sig.signatureTitleLine
             )
           : emailBody;
         const sendResult = await sendEmail(to, subject, outgoing, from, useHtml, {

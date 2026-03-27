@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Search, Plus, Pencil, Trash2, X, Loader2, Mail } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatThrownError, formatUserFacingError } from "@/lib/utils";
 import { EmailTemplatesClient } from "@/components/settings/EmailTemplatesClient";
 
 const COLORS = ["#4a90d9", "#21c354", "#e67e22", "#9b59b6", "#e74c3c", "#1abc9c", "#f39c12", "#3498db"];
@@ -30,6 +30,17 @@ export function SettingsClient() {
   const [testBcc, setTestBcc] = useState("");
   const [testSending, setTestSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  const [sigForm, setSigForm] = useState({
+    sender_name: "",
+    signature_title_line: "",
+  });
+  const [sigResolved, setSigResolved] = useState<{
+    sender_name: string;
+    signature_title_line: string;
+  } | null>(null);
+  const [sigLoading, setSigLoading] = useState(true);
+  const [sigSaving, setSigSaving] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -74,6 +85,58 @@ export function SettingsClient() {
   useEffect(() => {
     fetchMailSettings();
   }, [fetchMailSettings]);
+
+  const fetchSignatureSettings = useCallback(async () => {
+    setSigLoading(true);
+    try {
+      const res = await fetch("/api/settings/email-signature");
+      const d = await res.json();
+      if (res.ok && d) {
+        setSigForm({
+          sender_name: typeof d.sender_name_stored === "string" ? d.sender_name_stored : "",
+          signature_title_line:
+            typeof d.signature_title_line_stored === "string"
+              ? d.signature_title_line_stored
+              : "",
+        });
+        setSigResolved({
+          sender_name: d.sender_name_resolved ?? "",
+          signature_title_line: d.signature_title_line_resolved ?? "",
+        });
+      }
+    } finally {
+      setSigLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSignatureSettings();
+  }, [fetchSignatureSettings]);
+
+  const saveSignatureSettings = async () => {
+    setSigSaving(true);
+    try {
+      const res = await fetch("/api/settings/email-signature", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender_name: sigForm.sender_name,
+          signature_title_line: sigForm.signature_title_line,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(formatUserFacingError(data, "保存失败"));
+      setSigResolved({
+        sender_name: data.sender_name_resolved ?? "",
+        signature_title_line: data.signature_title_line_resolved ?? "",
+      });
+      setToast("邮件署名已保存");
+    } catch (e) {
+      alert(formatThrownError(e, "保存失败"));
+    } finally {
+      setSigSaving(false);
+    }
+  };
 
   const syncInbox = async () => {
     setSyncLoading(true);
@@ -285,6 +348,65 @@ export function SettingsClient() {
         {toast && (
           <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg bg-[#1C1917] px-4 py-2 text-sm text-white shadow-lg">
             {toast}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-[#E7E5E4] bg-white p-6">
+        <h2 className="mb-1 text-base font-semibold text-[#1C1917]">邮件署名</h2>
+        <p className="mb-4 text-xs text-[#A8A29E]">
+          用于 HTML 信纸底部三行中的前两行；第三行始终为发件邮箱（与{" "}
+          <code className="rounded bg-[#F5F5F4] px-1">SENDER_EMAIL</code> 一致）。
+          姓名留空时使用环境变量 <code className="rounded bg-[#F5F5F4] px-1">SENDER_NAME</code>{" "}
+          或默认占位。
+        </p>
+        {sigLoading ? (
+          <p className="text-sm text-[#78716C]">加载中…</p>
+        ) : (
+          <div className="space-y-3 max-w-lg">
+            <div>
+              <div className="mb-1 text-xs font-medium text-[#78716C]">署名姓名</div>
+              <input
+                value={sigForm.sender_name}
+                onChange={(e) =>
+                  setSigForm((p) => ({ ...p, sender_name: e.target.value }))
+                }
+                placeholder="留空则使用 SENDER_NAME 或默认"
+                className="h-9 w-full rounded-lg border border-[#E7E5E4] bg-white px-2 text-sm"
+              />
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-[#78716C]">
+                职务 / 团队行
+              </div>
+              <input
+                value={sigForm.signature_title_line}
+                onChange={(e) =>
+                  setSigForm((p) => ({ ...p, signature_title_line: e.target.value }))
+                }
+                placeholder="例如 BD Team · INVO by USWOO"
+                className="h-9 w-full rounded-lg border border-[#E7E5E4] bg-white px-2 text-sm"
+              />
+            </div>
+            {sigResolved && (
+              <p className="text-xs text-[#57534E]">
+                当前发信解析为：
+                <span className="ml-1 font-medium text-[#1C1917]">
+                  {sigResolved.sender_name}
+                </span>
+                {" · "}
+                <span className="text-[#57534E]">{sigResolved.signature_title_line}</span>
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={saveSignatureSettings}
+              disabled={sigSaving}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#1C1917] px-4 py-2 text-xs font-medium text-white hover:bg-[#1C1917]/90 disabled:opacity-50"
+            >
+              {sigSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              保存署名
+            </button>
           </div>
         )}
       </div>
