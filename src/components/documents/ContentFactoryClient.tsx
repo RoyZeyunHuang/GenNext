@@ -43,6 +43,7 @@ export function ContentFactoryClient() {
     is_auto_include: false,
   });
   const [docForm, setDocForm] = useState({ title: "", content: "", tags: "" });
+  const [savingAutoInclude, setSavingAutoInclude] = useState(false);
 
   const fetchCategories = useCallback(async () => {
     setLoadingCategories(true);
@@ -174,6 +175,28 @@ export function ContentFactoryClient() {
     fetchCategories();
   };
 
+  const toggleCategoryAutoInclude = async (next: boolean) => {
+    if (!selectedCategoryId || savingAutoInclude) return;
+    setSavingAutoInclude(true);
+    const snapshot = categories;
+    setCategories((cs) =>
+      cs.map((c) => (c.id === selectedCategoryId ? { ...c, is_auto_include: next } : c))
+    );
+    try {
+      const res = await fetch(`/api/docs/categories/${selectedCategoryId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_auto_include: next }),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch {
+      setCategories(snapshot);
+      alert("保存失败，请重试");
+    } finally {
+      setSavingAutoInclude(false);
+    }
+  };
+
   return (
     <div className="flex gap-6">
       {/* 左侧：类别列表 */}
@@ -252,8 +275,8 @@ export function ContentFactoryClient() {
           </div>
         ) : (
           <>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-sm">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="relative w-full max-w-sm flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#A8A29E]" />
                 <input
                   type="text"
@@ -263,13 +286,25 @@ export function ContentFactoryClient() {
                   className="h-9 w-full rounded-lg border border-[#E7E5E4] bg-white pl-9 pr-3 text-sm text-[#1C1917] placeholder:text-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
                 />
               </div>
-              <button
-                type="button"
-                onClick={openAddDoc}
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-[#1C1917] px-4 text-sm font-medium text-white hover:bg-[#1C1917]/90"
-              >
-                <Plus className="h-4 w-4" /> 新增文档
-              </button>
+              <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-[#1C1917]">
+                  <input
+                    type="checkbox"
+                    checked={isAutoInclude}
+                    disabled={savingAutoInclude}
+                    onChange={(e) => void toggleCategoryAutoInclude(e.target.checked)}
+                    className="rounded border-[#E7E5E4] text-[#1C1917] focus:ring-[#1C1917]/20 disabled:opacity-50"
+                  />
+                  <span className="whitespace-nowrap">AI 生成时自动读取此类别</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={openAddDoc}
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-[#1C1917] px-4 text-sm font-medium text-white hover:bg-[#1C1917]/90"
+                >
+                  <Plus className="h-4 w-4" /> 新增文档
+                </button>
+              </div>
             </div>
 
             {loadingDocs ? (

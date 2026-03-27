@@ -2,7 +2,21 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatThrownError, formatUserFacingError } from "@/lib/utils";
+import { applyTemplate } from "@/lib/email-helpers";
+import {
+  DEFAULT_SIGNATURE_SENDER_NAME,
+  DEFAULT_SIGNATURE_TITLE_LINE,
+} from "@/lib/email-signature-settings";
+import { wrapEmailHtml } from "@/lib/email-template";
+
+/** 与真实发信时相同的变量占位，便于预览效果 */
+const PREVIEW_VARS: Record<string, string> = {
+  company_name: "Sample Developer LLC",
+  contact_name: "Alex",
+  property_name: "The Journal",
+  company_role: "Developer",
+};
 
 type EmailTemplate = {
   id: string;
@@ -22,6 +36,13 @@ export function EmailTemplatesClient() {
   const [form, setForm] = useState({ name: "", subject: "", body: "" });
   const [saving, setSaving] = useState(false);
 
+  /** 与设置页「邮件署名」一致，用于预览 */
+  const [sigPreview, setSigPreview] = useState<{
+    senderName: string;
+    signatureTitleLine: string;
+    senderEmail: string;
+  } | null>(null);
+
   const fetchTemplates = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/email/templates");
@@ -33,6 +54,32 @@ export function EmailTemplatesClient() {
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  const refreshSignaturePreview = useCallback(() => {
+    fetch("/api/settings/email-signature")
+      .then((r) => r.json())
+      .then((d: {
+        sender_name_resolved?: string;
+        signature_title_line_resolved?: string;
+        sender_email_hint?: string | null;
+      }) => {
+        if (!d?.sender_name_resolved) return;
+        setSigPreview({
+          senderName: d.sender_name_resolved,
+          signatureTitleLine: d.signature_title_line_resolved ?? DEFAULT_SIGNATURE_TITLE_LINE,
+          senderEmail: (d.sender_email_hint ?? "").trim() || "sender@example.com",
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshSignaturePreview();
+  }, [refreshSignaturePreview]);
+
+  useEffect(() => {
+    if (modalOpen) refreshSignaturePreview();
+  }, [modalOpen, refreshSignaturePreview]);
 
   const openNew = () => {
     setEditingId(null);
@@ -57,7 +104,7 @@ export function EmailTemplatesClient() {
           body: JSON.stringify(form),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error ?? "保存失败");
+        if (!res.ok) throw new Error(formatUserFacingError(data, "保存失败"));
       } else {
         const res = await fetch("/api/email/templates", {
           method: "POST",
@@ -65,12 +112,12 @@ export function EmailTemplatesClient() {
           body: JSON.stringify(form),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error ?? "保存失败");
+        if (!res.ok) throw new Error(formatUserFacingError(data, "保存失败"));
       }
       setModalOpen(false);
       await fetchTemplates();
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      alert(formatThrownError(e, "保存失败"));
     } finally {
       setSaving(false);
     }
@@ -80,7 +127,7 @@ export function EmailTemplatesClient() {
     if (!confirm("确定删除该邮件模板？")) return;
     const res = await fetch(`/api/email/templates/${id}`, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) alert(data?.error ?? "删除失败");
+    if (!res.ok) alert(formatUserFacingError(data, "删除失败"));
     else fetchTemplates();
   };
 
@@ -89,6 +136,27 @@ export function EmailTemplatesClient() {
       "变量：{{company_name}} {{contact_name}} {{property_name}} {{company_role}} — 批量发信可选 INVO — Established / New Buildings 两套模版",
     []
   );
+
+  const previewSubject = useMemo(
+    () => applyTemplate(form.subject, PREVIEW_VARS),
+    [form.subject]
+  );
+
+  const previewHtmlFull = useMemo(() => {
+    const raw = form.body.trim();
+    if (!raw) return "";
+    const applied = applyTemplate(raw, PREVIEW_VARS);
+    const s = sigPreview;
+    return wrapEmailHtml(
+      applied,
+      undefined,
+      undefined,
+      PREVIEW_VARS.property_name,
+      s?.senderName ?? DEFAULT_SIGNATURE_SENDER_NAME,
+      s?.senderEmail ?? "sender@example.com",
+      s?.signatureTitleLine ?? DEFAULT_SIGNATURE_TITLE_LINE
+    );
+  }, [form.body, sigPreview]);
 
   return (
     <div className="rounded-xl border border-[#E7E5E4] bg-white p-6">
@@ -149,51 +217,50 @@ export function EmailTemplatesClient() {
           onClick={() => setModalOpen(false)}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-lg bg-white p-5 shadow-xl"
+            className="flex max-h-[min(92vh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-xl lg:max-h-[85vh] lg:flex-row"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-medium text-[#1C1917]">
-                {editingId ? "编辑邮件模板" : "新增邮件模板"}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="rounded p-1 text-[#78716C] hover:bg-[#F5F5F4]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <div className="mb-1 text-xs font-medium text-[#78716C]">名称</div>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                  className="h-9 w-full rounded-lg border border-[#E7E5E4] bg-white px-2 text-sm"
-                />
+            <div className="flex min-h-0 flex-1 flex-col border-[#E7E5E4] lg:border-r">
+              <div className="flex shrink-0 items-center justify-between border-b border-[#E7E5E4] px-4 py-3">
+                <h3 className="text-sm font-medium text-[#1C1917]">
+                  {editingId ? "编辑邮件模板" : "新增邮件模板"}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="rounded p-1 text-[#78716C] hover:bg-[#F5F5F4]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-[#78716C]">主题</div>
-                <input
-                  value={form.subject}
-                  onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
-                  className="h-9 w-full rounded-lg border border-[#E7E5E4] bg-white px-2 text-sm"
-                />
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+                <div>
+                  <div className="mb-1 text-xs font-medium text-[#78716C]">名称</div>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                    className="h-9 w-full rounded-lg border border-[#E7E5E4] bg-white px-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-medium text-[#78716C]">主题</div>
+                  <input
+                    value={form.subject}
+                    onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
+                    className="h-9 w-full rounded-lg border border-[#E7E5E4] bg-white px-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <div className="mb-1 text-xs font-medium text-[#78716C]">正文（支持变量）</div>
+                  <textarea
+                    value={form.body}
+                    onChange={(e) => setForm((p) => ({ ...p, body: e.target.value }))}
+                    rows={12}
+                    className="w-full rounded-lg border border-[#E7E5E4] bg-white px-2 py-2 font-mono text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <div className="mb-1 text-xs font-medium text-[#78716C]">正文（支持变量）</div>
-                <textarea
-                  value={form.body}
-                  onChange={(e) => setForm((p) => ({ ...p, body: e.target.value }))}
-                  rows={10}
-                  className="w-full rounded-lg border border-[#E7E5E4] bg-white px-2 py-2 text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 flex justify-end gap-2 border-t border-[#E7E5E4] pt-4">
+              <div className="flex shrink-0 justify-end gap-2 border-t border-[#E7E5E4] px-4 py-3">
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
@@ -218,6 +285,33 @@ export function EmailTemplatesClient() {
                   "保存"
                 )}
               </button>
+              </div>
+            </div>
+
+            <div className="flex w-full min-w-0 flex-col border-t border-[#E7E5E4] bg-[#FAFAF9] lg:w-[min(48%,400px)] lg:border-l lg:border-t-0">
+              <div className="shrink-0 border-b border-[#E7E5E4] px-4 py-3">
+                <p className="text-xs font-medium text-[#1C1917]">发送预览（HTML）</p>
+                <p className="mt-0.5 text-[10px] leading-snug text-[#A8A29E]">
+                  与 Resend 实际发信相同的 INVO 信纸；变量已用示例值替换。发件邮箱以部署环境为准。
+                </p>
+                <p className="mt-2 truncate text-xs text-[#57534E]" title={previewSubject}>
+                  <span className="text-[#A8A29E]">主题</span> {previewSubject || "—"}
+                </p>
+              </div>
+              <div className="min-h-0 flex-1 p-3">
+                {previewHtmlFull ? (
+                  <iframe
+                    title="邮件 HTML 预览"
+                    srcDoc={previewHtmlFull}
+                    sandbox="allow-same-origin"
+                    className="h-[min(58vh,420px)] w-full rounded-lg border border-[#E7E5E4] bg-white shadow-sm lg:h-[min(62vh,480px)]"
+                  />
+                ) : (
+                  <div className="flex h-[min(58vh,420px)] items-center justify-center rounded-lg border border-dashed border-[#E7E5E4] bg-white text-sm text-[#A8A29E] lg:h-[min(62vh,480px)]">
+                    输入正文后显示预览
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

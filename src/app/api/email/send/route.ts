@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { sendEmail } from "@/lib/resend";
+import { getEmailSignatureSettings } from "@/lib/email-signature-settings";
 import { wrapEmailHtml } from "@/lib/email-template";
 import { updateOutreachAfterEmailSent } from "@/lib/outreach-after-send";
 import { mergeRecipientList } from "@/lib/email-recipients";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const sig = await getEmailSignatureSettings(supabase);
     const body = await req.json();
     const {
       to,
@@ -74,11 +76,18 @@ export async function POST(req: NextRequest) {
       const testSubject = (subject ?? "INVO Email Test").trim();
       const testBody =
         (emailBody ?? "This is a test email from INVO Ops Hub.").trim();
-      const senderName =
-        sender_name?.trim() || process.env.SENDER_NAME?.trim() || "Royce Huang";
+      const senderName = sender_name?.trim() || sig.senderName;
       const useHtml = Boolean(is_html);
       const outgoingBody = useHtml
-        ? wrapEmailHtml(testBody, undefined, undefined, undefined, senderName, from)
+        ? wrapEmailHtml(
+            testBody,
+            undefined,
+            undefined,
+            undefined,
+            senderName,
+            from,
+            sig.signatureTitleLine
+          )
         : testBody;
       const attach =
         typeof attachment_path === "string" && attachment_path.trim()
@@ -165,8 +174,7 @@ export async function POST(req: NextRequest) {
       propertyName = (prop as { name?: string } | null)?.name;
     }
 
-    const senderName =
-      sender_name?.trim() || process.env.SENDER_NAME?.trim() || "Royce Huang";
+    const senderName = sender_name?.trim() || sig.senderName;
 
     const useHtml = Boolean(is_html);
     const outgoingBody = useHtml
@@ -176,7 +184,8 @@ export async function POST(req: NextRequest) {
           undefined,
           propertyName,
           senderName,
-          from
+          from,
+          sig.signatureTitleLine
         )
       : emailBody.trim();
 

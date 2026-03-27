@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, X, Trash2, User } from "lucide-react";
+import { Plus, Search, X, Trash2, User, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompanyEmailSection } from "@/components/crm/CompanyEmailSection";
 
@@ -91,6 +91,25 @@ export function CompaniesTab() {
     }
   };
 
+  const handleUpdateContact = async (
+    companyId: string,
+    contactId: string,
+    patch: Record<string, string | boolean | null>
+  ): Promise<boolean> => {
+    const res = await fetch(`/api/crm/contacts/${contactId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (res.ok) {
+      fetchDetail(companyId);
+      return true;
+    }
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || "保存失败");
+    return false;
+  };
+
   const handleDeleteContact = async (companyId: string, contactId: string) => {
     if (!window.confirm("确定要删除该联系人吗？此操作不可恢复。")) return;
     const res = await fetch(`/api/crm/contacts/${contactId}`, { method: "DELETE" });
@@ -178,6 +197,9 @@ export function CompaniesTab() {
             company={detail}
             onUpdate={(form) => handleUpdate(detail.id, form)}
             onAddContact={(c) => handleAddContact(detail.id, c)}
+            onUpdateContact={(contactId, patch) =>
+              handleUpdateContact(detail.id, contactId, patch)
+            }
             onDeleteCompany={() => handleDeleteCompany(detail.id)}
             onDeleteContact={(contactId) => handleDeleteContact(detail.id, contactId)}
           />
@@ -193,12 +215,17 @@ function CompanyDetail({
   company,
   onUpdate,
   onAddContact,
+  onUpdateContact,
   onDeleteCompany,
   onDeleteContact,
 }: {
   company: Company;
   onUpdate: (form: Record<string, string | null>) => void;
   onAddContact: (c: Record<string, string | boolean>) => void;
+  onUpdateContact: (
+    contactId: string,
+    patch: Record<string, string | boolean | null>
+  ) => Promise<boolean>;
   onDeleteCompany: () => void;
   onDeleteContact: (contactId: string) => void;
 }) {
@@ -206,10 +233,20 @@ function CompanyDetail({
   const [form, setForm] = useState({ name: company.name, type: company.type ?? "", phone: company.phone ?? "", email: company.email ?? "", website: company.website ?? "" });
   const [newContact, setNewContact] = useState(false);
   const [cf, setCf] = useState({ name: "", title: "", phone: "", email: "", linkedin_url: "" });
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [ecf, setEcf] = useState({
+    name: "",
+    title: "",
+    phone: "",
+    email: "",
+    linkedin_url: "",
+    is_primary: false,
+  });
 
   useEffect(() => {
     setForm({ name: company.name, type: company.type ?? "", phone: company.phone ?? "", email: company.email ?? "", website: company.website ?? "" });
     setEditing(false);
+    setEditingContactId(null);
   }, [company]);
 
   const inputCls = "rounded-lg border border-[#E7E5E4] px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20";
@@ -260,7 +297,14 @@ function CompanyDetail({
 
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-sm font-medium text-[#1C1917]">联系人</h4>
-        <button type="button" onClick={() => setNewContact(true)} className="flex items-center gap-1 text-xs text-[#78716C] hover:text-[#1C1917]">
+        <button
+          type="button"
+          onClick={() => {
+            setNewContact(true);
+            setEditingContactId(null);
+          }}
+          className="flex items-center gap-1 text-xs text-[#78716C] hover:text-[#1C1917]"
+        >
           <Plus className="h-3 w-3" /> 添加
         </button>
       </div>
@@ -271,6 +315,12 @@ function CompanyDetail({
             <input value={cf.title} onChange={(e) => setCf((p) => ({ ...p, title: e.target.value }))} placeholder="职位" className={inputCls} />
             <input value={cf.phone} onChange={(e) => setCf((p) => ({ ...p, phone: e.target.value }))} placeholder="电话" className={inputCls} />
             <input value={cf.email} onChange={(e) => setCf((p) => ({ ...p, email: e.target.value }))} placeholder="邮箱" className={inputCls} />
+            <input
+              value={cf.linkedin_url}
+              onChange={(e) => setCf((p) => ({ ...p, linkedin_url: e.target.value }))}
+              placeholder="LinkedIn（可选）"
+              className={inputCls}
+            />
             <div className="flex gap-2">
               <button type="button" disabled={!cf.name.trim()} onClick={() => { onAddContact({ name: cf.name, title: cf.title || "", phone: cf.phone || "", email: cf.email || "", linkedin_url: cf.linkedin_url || "", is_primary: false }); setCf({ name: "", title: "", phone: "", email: "", linkedin_url: "" }); setNewContact(false); }} className="rounded-lg bg-[#1C1917] px-4 py-1.5 text-xs text-white hover:bg-[#1C1917]/90 disabled:opacity-50">保存</button>
               <button type="button" onClick={() => setNewContact(false)} className="rounded-lg border border-[#E7E5E4] px-4 py-1.5 text-xs text-[#78716C] hover:bg-[#F5F5F4]">取消</button>
@@ -282,25 +332,118 @@ function CompanyDetail({
         {(company.contacts ?? []).length === 0 ? (
           <p className="text-xs text-[#78716C]">暂无联系人</p>
         ) : (
-          (company.contacts ?? []).map((c) => (
-            <div key={c.id} className="flex items-center gap-2 rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-2">
-              <User className="h-4 w-4 shrink-0 text-[#78716C]" />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-[#1C1917]">
-                  {c.name} {c.is_primary && <span className="ml-1 rounded bg-[#1C1917] px-1.5 py-0.5 text-[10px] text-white">主要</span>}
+          (company.contacts ?? []).map((c) =>
+            editingContactId === c.id ? (
+              <div key={c.id} className="rounded-lg border border-[#1C1917]/30 bg-[#FAFAF9] p-3">
+                <div className="mb-2 text-[10px] font-medium text-[#78716C]">编辑联系人</div>
+                <div className="grid gap-2">
+                  <input
+                    value={ecf.name}
+                    onChange={(e) => setEcf((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="姓名 *"
+                    className={inputCls}
+                  />
+                  <input
+                    value={ecf.title}
+                    onChange={(e) => setEcf((p) => ({ ...p, title: e.target.value }))}
+                    placeholder="职位"
+                    className={inputCls}
+                  />
+                  <input
+                    value={ecf.phone}
+                    onChange={(e) => setEcf((p) => ({ ...p, phone: e.target.value }))}
+                    placeholder="电话"
+                    className={inputCls}
+                  />
+                  <input
+                    value={ecf.email}
+                    onChange={(e) => setEcf((p) => ({ ...p, email: e.target.value }))}
+                    placeholder="邮箱"
+                    className={inputCls}
+                  />
+                  <input
+                    value={ecf.linkedin_url}
+                    onChange={(e) => setEcf((p) => ({ ...p, linkedin_url: e.target.value }))}
+                    placeholder="LinkedIn（可选）"
+                    className={inputCls}
+                  />
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-[#57534E]">
+                    <input
+                      type="checkbox"
+                      checked={ecf.is_primary}
+                      onChange={(e) => setEcf((p) => ({ ...p, is_primary: e.target.checked }))}
+                      className="rounded border-[#E7E5E4]"
+                    />
+                    设为主要联系人
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={!ecf.name.trim()}
+                      onClick={async () => {
+                        const ok = await onUpdateContact(c.id, {
+                          name: ecf.name.trim(),
+                          title: ecf.title.trim() || null,
+                          phone: ecf.phone.trim() || null,
+                          email: ecf.email.trim() || null,
+                          linkedin_url: ecf.linkedin_url.trim() || null,
+                          is_primary: ecf.is_primary,
+                        });
+                        if (ok) setEditingContactId(null);
+                      }}
+                      className="rounded-lg bg-[#1C1917] px-4 py-1.5 text-xs text-white hover:bg-[#1C1917]/90 disabled:opacity-50"
+                    >
+                      保存
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingContactId(null)}
+                      className="rounded-lg border border-[#E7E5E4] px-4 py-1.5 text-xs text-[#78716C] hover:bg-[#F5F5F4]"
+                    >
+                      取消
+                    </button>
+                  </div>
                 </div>
-                <div className="text-xs text-[#78716C]">{[c.title, c.phone, c.email].filter(Boolean).join(" · ")}</div>
               </div>
-              <button
-                type="button"
-                onClick={() => onDeleteContact(c.id)}
-                className="shrink-0 rounded p-1 text-[#78716C] hover:bg-[#FEE2E2] hover:text-[#DC2626]"
-                title="删除联系人"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))
+            ) : (
+              <div key={c.id} className="flex items-center gap-2 rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-2">
+                <User className="h-4 w-4 shrink-0 text-[#78716C]" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-[#1C1917]">
+                    {c.name} {c.is_primary && <span className="ml-1 rounded bg-[#1C1917] px-1.5 py-0.5 text-[10px] text-white">主要</span>}
+                  </div>
+                  <div className="text-xs text-[#78716C]">{[c.title, c.phone, c.email].filter(Boolean).join(" · ")}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingContactId(c.id);
+                    setNewContact(false);
+                    setEcf({
+                      name: c.name ?? "",
+                      title: c.title ?? "",
+                      phone: c.phone ?? "",
+                      email: c.email ?? "",
+                      linkedin_url: c.linkedin_url ?? "",
+                      is_primary: Boolean(c.is_primary),
+                    });
+                  }}
+                  className="shrink-0 rounded p-1 text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]"
+                  title="编辑联系人"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteContact(c.id)}
+                  className="shrink-0 rounded p-1 text-[#78716C] hover:bg-[#FEE2E2] hover:text-[#DC2626]"
+                  title="删除联系人"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            )
+          )
         )}
       </div>
 

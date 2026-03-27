@@ -1,11 +1,32 @@
+import {
+  DEFAULT_SIGNATURE_SENDER_NAME,
+  DEFAULT_SIGNATURE_TITLE_LINE,
+} from "@/lib/email-signature-settings";
+
+function escapeHtmlAttr(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function wrapEmailHtml(
   bodyContent: string,
   ctaText?: string,
   ctaUrl?: string,
   propertyName?: string,
   senderName?: string,
-  senderEmail?: string
+  senderEmail?: string,
+  /** 署名第二行，如「BD Team · INVO by USWOO」 */
+  signatureTitleLine?: string
 ): string {
+  const safeName = escapeHtmlAttr(senderName || DEFAULT_SIGNATURE_SENDER_NAME);
+  const safeTitle = escapeHtmlAttr(
+    signatureTitleLine?.trim() || DEFAULT_SIGNATURE_TITLE_LINE
+  );
+  const safeEmail = escapeHtmlAttr(senderEmail || "");
+
   return `
 <!DOCTYPE html>
 <html>
@@ -52,9 +73,9 @@ export function wrapEmailHtml(
                     
                     <!-- Signature -->
                     <table cellpadding="0" cellspacing="0" style="margin-top:24px;border-top:1px solid #e7e5e4;padding-top:16px;width:100%;">
-                      <tr><td style="font-size:13px;font-weight:bold;color:#1C1917;">${senderName || "Royce Huang"}</td></tr>
-                      <tr><td style="font-size:12px;color:#78716C;padding-top:2px;">BD Team · INVO by USWOO</td></tr>
-                      <tr><td style="font-size:12px;color:#a8a29e;padding-top:2px;">${senderEmail || ""}</td></tr>
+                      <tr><td style="font-size:13px;font-weight:bold;color:#1C1917;">${safeName}</td></tr>
+                      <tr><td style="font-size:12px;color:#78716C;padding-top:2px;">${safeTitle}</td></tr>
+                      <tr><td style="font-size:12px;color:#a8a29e;padding-top:2px;">${safeEmail}</td></tr>
                     </table>
                     
                   </td>
