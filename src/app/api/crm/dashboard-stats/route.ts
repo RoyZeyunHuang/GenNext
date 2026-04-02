@@ -12,6 +12,7 @@ export async function GET() {
 
     const totalProperties = propsRes.count ?? 0;
     const outreach = outreachRes.data ?? [];
+
     const totalOutreach = outreach.length;
     const won = outreach.filter((o) => (o as { stage?: string }).stage === "Won");
     const lost = outreach.filter((o) => (o as { stage?: string }).stage === "Lost");

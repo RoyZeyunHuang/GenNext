@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { classifyResendLastEvent, fetchAllResendSentList } from "@/lib/resend-list-sent";
+import { aggregatePitchMetricsFromResendEntries, type ResendPitchMetrics } from "@/lib/resend-email-metrics";
 
 function normEmail(s: string | null | undefined): string | null {
   const t = (s ?? "").trim().toLowerCase();
@@ -66,6 +67,7 @@ export type ResendPropertyReport = {
   db_rows_missing_property_id: number;
   db_rows_resend_id_not_found_in_api: number;
   properties: ResendPropertyRow[];
+  pitchMetrics: ResendPitchMetrics;
 };
 
 function formatRecipientLine(e: ResendPropertyEmailDetail): string {
@@ -235,7 +237,7 @@ async function enrichEmailsWithContacts(
  * - 仅当该盘**每一封**都是 bounce → has_bounce。
  */
 export async function getResendPropertyReport(): Promise<ResendPropertyReport> {
-  const resendById = await fetchAllResendSentList();
+  const { map: resendById } = await fetchAllResendSentList();
 
   const dbRows: DbEmailRow[] = [];
   const pageSize = 1000;
@@ -361,6 +363,8 @@ export async function getResendPropertyReport(): Promise<ResendPropertyReport> {
 
   properties.sort((a, b) => (a.property_name || "").localeCompare(b.property_name || "", "en"));
 
+  const pitchMetrics = aggregatePitchMetricsFromResendEntries(Array.from(resendById.values()));
+
   return {
     ok: true,
     resend_total_in_api: resendById.size,
@@ -368,6 +372,7 @@ export async function getResendPropertyReport(): Promise<ResendPropertyReport> {
     db_rows_missing_property_id: dbRowsNoProperty,
     db_rows_resend_id_not_found_in_api: dbRowsWithResendNotInApi,
     properties,
+    pitchMetrics,
   };
 }
 
