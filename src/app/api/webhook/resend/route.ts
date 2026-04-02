@@ -1,19 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
 import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Resend Webhooks：送达 / 打开 / 点击 / 弹回 → 更新 `emails` 与必要时的 `outreach`。
- * 在 Resend Dashboard 配置 URL：`https://你的域名/api/webhook/resend`
- */
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 export async function POST(req: NextRequest) {
   try {
-    const event = (await req.json()) as {
-      type?: string;
-      data?: { email_id?: string };
-    };
+    const body = await req.text();
+
+    let event: { type?: string; data?: { email_id?: string } };
+
+    const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
+    if (secret) {
+      try {
+        event = resend.webhooks.verify(({
+          payload: body,
+          headers: {
+            id: req.headers.get("svix-id") ?? "",
+            timestamp: req.headers.get("svix-timestamp") ?? "",
+            signature: req.headers.get("svix-signature") ?? "",
+          },
+          webhookSecret: secret,
+        }) as never) as typeof event;
+      } catch {
+        return NextResponse.json({ error: "invalid signature" }, { status: 401 });
+      }
+    } else {
+      event = JSON.parse(body);
+    }
 
     const resendId = event.data?.email_id;
     if (!resendId || typeof resendId !== "string") {

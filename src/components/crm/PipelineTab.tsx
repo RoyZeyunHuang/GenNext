@@ -152,13 +152,6 @@ export function PipelineTab() {
             );
           })}
         </div>
-        <p className="mt-3 text-xs text-[#A8A29E]">
-          {emailPitchLoading
-            ? (locale === "en" ? "Loading Resend metrics…" : "正在加载 Resend 指标…")
-            : emailPitch
-              ? t("crm.emailPitchPerformanceHintResend")
-              : (locale === "en" ? "Failed to load Resend metrics" : "Resend 指标加载失败")}
-        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
