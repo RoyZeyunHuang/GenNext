@@ -19,14 +19,14 @@ export type ResendPitchMetrics = {
  * 所有指标均按**收件人数**（to + cc）统计：
  * - Email Sent = Σ(to.length + cc.length)
  * - 每封邮件的 last_event 视为对该邮件全部收件人统一生效，按收件人数加权
- * - Delivery Rate = deliveredRecipients / (deliveredRecipients + bouncedRecipients)
- * - Open Rate = openedRecipients / deliveredRecipients
+ * - Delivery Rate = (sent - bounced) / sent  （与 Resend 控制台一致）
+ * - Open Rate = opened / delivered
  */
 export function aggregatePitchMetricsFromResendEntries(entries: ResendListEntry[]): ResendPitchMetrics {
   const norm = (e: string) => (e || "").trim().toLowerCase();
   let bouncedRecipients = 0;
-  let inboxRecipients = 0;
   let openedRecipients = 0;
+  let deliveredRecipients = 0;
   let totalRecipients = 0;
 
   for (const row of entries) {
@@ -35,18 +35,20 @@ export function aggregatePitchMetricsFromResendEntries(entries: ResendListEntry[
     const ev = norm(row.last_event);
     if (BOUNCE.has(ev)) {
       bouncedRecipients += rcpt;
-      continue;
-    }
-    if (IN_MAILBOX.has(ev)) {
-      inboxRecipients += rcpt;
+    } else if (IN_MAILBOX.has(ev)) {
+      deliveredRecipients += rcpt;
       if (OPEN_ENGAGEMENT.has(ev)) openedRecipients += rcpt;
     }
   }
 
   const emailSent = totalRecipients;
-  const resolved = inboxRecipients + bouncedRecipients;
-  const deliveryRate = resolved > 0 ? Math.round((100 * inboxRecipients) / resolved) : 0;
-  const openRate = inboxRecipients > 0 ? Math.round((100 * openedRecipients) / inboxRecipients) : 0;
+  const deliveryRate = totalRecipients > 0
+    ? Math.round((100 * (totalRecipients - bouncedRecipients)) / totalRecipients)
+    : 0;
+  const delivered = totalRecipients - bouncedRecipients;
+  const openRate = delivered > 0
+    ? Math.round((100 * openedRecipients) / delivered)
+    : 0;
 
   return { emailSent, deliveryRate, openRate };
 }
