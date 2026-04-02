@@ -83,7 +83,14 @@
     "tabProperties": "Properties",
     "tabCompanies": "Companies",
     "tabOutreach": "Tracking",
-    "tabPipeline": "Pipeline"
+    "tabPipeline": "Metrics",
+    "emailPitchPerformance": "Email Pitching Performance",
+    "emailPitchPerformanceHintResend": "From Resend “List Sent Emails” API (full pagination; does not trust has_more alone). Dashboard Metrics often filters by last N days / domain; here we aggregate every send the API returns. Delivery/open rates use last_event. Cached ~60s.",
+    "emailPitchPerformanceHintDatabase": "Resend unavailable or RESEND_API_KEY missing; using DB rows with direction=sent and resend_id set (same scope as the Resend sync modal).",
+    "emailPitchResendFallback": "Resend fetch failed; fell back to database",
+    "metricEmailSent": "Email Sent",
+    "metricDeliveryRate": "Delivery Rate",
+    "metricOpenRate": "Open Rate"
   },
   "pages": {
     "dashboard": "Dashboard",

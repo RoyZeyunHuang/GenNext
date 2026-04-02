@@ -83,7 +83,14 @@
     "tabProperties": "楼盘",
     "tabCompanies": "公司",
     "tabOutreach": "追踪",
-    "tabPipeline": "Pipeline"
+    "tabPipeline": "指标",
+    "emailPitchPerformance": "Email Pitching Performance",
+    "emailPitchPerformanceHintResend": "数据来自 Resend「List Sent Emails」API（分页拉全量，不再依赖 has_more，避免只统计一页）。控制台 Metrics 常按「最近 N 天 / 某域名」筛选，此处为当前 API 能枚举到的全部发信；口径不一致时以控制台为准。送达率 / 打开率按 last_event 聚合。约 60 秒缓存。",
+    "emailPitchPerformanceHintDatabase": "Resend 不可用或未配置 RESEND_API_KEY，当前为本地库统计（与「Resend 发信与送达」一致：direction=sent 且 resend_id 非空）。",
+    "emailPitchResendFallback": "Resend 拉取失败，已回退本地库",
+    "metricEmailSent": "Email Sent",
+    "metricDeliveryRate": "Delivery Rate",
+    "metricOpenRate": "Open Rate"
   },
   "pages": {
     "dashboard": "概览",
