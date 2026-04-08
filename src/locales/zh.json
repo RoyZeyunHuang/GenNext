@@ -9,7 +9,8 @@
     "crm": "BRM",
     "kpi": "KPI",
     "news": "新闻摘要",
-    "settings": "设置"
+    "settings": "设置",
+    "signOut": "退出登录"
   },
   "rednote": {
     "nav": {

@@ -9,7 +9,8 @@
     "crm": "BRM",
     "kpi": "KPI",
     "news": "News",
-    "settings": "Settings"
+    "settings": "Settings",
+    "signOut": "Sign out"
   },
   "rednote": {
     "nav": {
