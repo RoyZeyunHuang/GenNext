@@ -15,10 +15,12 @@ import {
   Newspaper,
   Languages,
   Settings,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/contexts/LocaleContext";
+import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 const navItemsMain = [
   { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
@@ -132,6 +134,19 @@ export function Sidebar() {
               </Link>
             );
           })}
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#78716C] transition-colors hover:bg-[#F5F5F4] hover:text-[#1C1917]"
+            onClick={async () => {
+              const sb = createSupabaseBrowserClient();
+              await sb.auth.signOut();
+              router.push("/rednote-factory/login");
+              router.refresh();
+            }}
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
+            {t("nav.signOut")}
+          </button>
         </div>
       </nav>
 
