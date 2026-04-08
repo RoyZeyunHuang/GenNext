@@ -25,18 +25,12 @@ export function PersonaAvatar({ name, size = 40, className }: PersonaAvatarProps
       )}
       style={{ width: size, height: size }}
     >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- 本地静态资源，竖图 top-crop
-        <img
-          src={src}
-          alt=""
-          className="h-full w-full object-cover object-top"
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center font-semibold text-[#A8A29E]">
-          <span style={{ fontSize: Math.max(10, Math.round(size * 0.38)) }}>{initial}</span>
-        </div>
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element -- 本地静态资源，竖图 top-crop */}
+      <img
+        src={src ?? "/profileimages/Profile_placeholder.png"}
+        alt=""
+        className="h-full w-full object-cover object-top"
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/contexts/LocaleContext";
+import { isNystudentsNetEmail } from "@/lib/nystudents-email";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 function safeNextPath(next: string | null): string | null {
@@ -82,6 +83,10 @@ function RednoteLoginForm() {
           router.refresh();
         } else {
           const trimmedEmail = email.trim();
+          if (!isNystudentsNetEmail(trimmedEmail)) {
+            setError(t("rednote.emailMustBeNystudents"));
+            return;
+          }
           try {
             const checkRes = await fetch("/api/auth/email-registered", {
               method: "POST",
@@ -169,6 +174,9 @@ function RednoteLoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
           />
+          {mode === "signUp" && (
+            <p className="-mt-2 mb-3.5 text-[11px] text-[#A8A29E]">{t("rednote.signUpEmailHint")}</p>
+          )}
           {mode !== "forgotPassword" && (
             <>
               <div className="mb-1.5 flex items-center justify-between gap-2">

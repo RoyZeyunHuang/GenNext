@@ -32,6 +32,8 @@
     "needAccount": "没有账号？注册",
     "authError": "登录失败，请检查邮箱与密码",
     "signUpError": "注册失败，请稍后再试",
+    "emailMustBeNystudents": "请使用 @nystudents.net 邮箱注册",
+    "signUpEmailHint": "注册仅限 @nystudents.net 邮箱",
     "emailAlreadyRegistered": "该邮箱已注册，请直接登录",
     "signUpCheckEmail": "注册成功，请查收邮件确认（若已关闭邮箱确认则可直接登录）",
     "adminContact": "没有账户？联系管理员开通",
