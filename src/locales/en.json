@@ -35,9 +35,21 @@
     "emailAlreadyRegistered": "This email is already registered. Please sign in.",
     "signUpCheckEmail": "Check your email to confirm your account (if email confirmation is enabled).",
     "adminContact": "No account? Ask your admin for access.",
+    "forgotPassword": "Forgot password?",
+    "sendResetEmail": "Send reset email",
+    "resetEmailSent": "If that email is registered, you will receive a message with a link to reset your password.",
+    "resetPasswordTitle": "Set a new password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "passwordsMismatch": "Passwords do not match",
+    "resetPasswordSubmit": "Update password and continue",
+    "resetPasswordSuccess": "Password updated",
+    "resetLinkInvalid": "This link is invalid or has expired. Go back to sign in and request a new reset.",
+    "backToLogin": "Back to sign in",
     "pages": {
       "home": "RednoteFactory",
-      "login": "Sign in"
+      "login": "Sign in",
+      "resetPassword": "Reset password"
     }
   },
   "common": {

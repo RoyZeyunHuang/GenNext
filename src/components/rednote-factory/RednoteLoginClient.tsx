@@ -15,7 +15,7 @@ function RednoteLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLocale();
-  const [mode, setMode] = useState<"signIn" | "signUp">("signIn");
+  const [mode, setMode] = useState<"signIn" | "signUp" | "forgotPassword">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,6 +52,17 @@ function RednoteLoginForm() {
       setLoading(true);
       try {
         const supabase = createSupabaseBrowserClient();
+        if (mode === "forgotPassword") {
+          const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+            redirectTo: `${window.location.origin}/rednote-factory/reset-password`,
+          });
+          if (err) {
+            setError(t("rednote.authError"));
+            return;
+          }
+          setMessage(t("rednote.resetEmailSent"));
+          return;
+        }
         if (mode === "signIn") {
           const { data, error: err } = await supabase.auth.signInWithPassword({
             email: email.trim(),
@@ -131,6 +142,12 @@ function RednoteLoginForm() {
     [email, password, mode, router, searchParams, t]
   );
 
+  const switchMode = (next: "signIn" | "signUp" | "forgotPassword") => {
+    setMode(next);
+    setError(null);
+    setMessage(null);
+  };
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAFAF9] px-7 pb-16">
       <div className="w-full max-w-[400px]">
@@ -152,19 +169,34 @@ function RednoteLoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
           />
-          <label htmlFor="rf-password" className="mb-1.5 block text-xs font-semibold text-[#78716C]">
-            {t("rednote.password")}
-          </label>
-          <input
-            id="rf-password"
-            type="password"
-            autoComplete={mode === "signIn" ? "current-password" : "new-password"}
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
-          />
+          {mode !== "forgotPassword" && (
+            <>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <label htmlFor="rf-password" className="block text-xs font-semibold text-[#78716C]">
+                  {t("rednote.password")}
+                </label>
+                {mode === "signIn" && (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-[#1C1917] underline-offset-2 hover:underline"
+                    onClick={() => switchMode("forgotPassword")}
+                  >
+                    {t("rednote.forgotPassword")}
+                  </button>
+                )}
+              </div>
+              <input
+                id="rf-password"
+                type="password"
+                autoComplete={mode === "signIn" ? "current-password" : "new-password"}
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+              />
+            </>
+          )}
 
           {error && (
             <p className="mb-2 text-sm text-red-600" role="alert">
@@ -184,24 +216,30 @@ function RednoteLoginForm() {
           >
             {loading
               ? t("common.loading")
-              : mode === "signIn"
-                ? t("rednote.signIn")
-                : t("rednote.signUp")}
+              : mode === "forgotPassword"
+                ? t("rednote.sendResetEmail")
+                : mode === "signIn"
+                  ? t("rednote.signIn")
+                  : t("rednote.signUp")}
           </button>
         </form>
 
         <p className="mt-7 text-center text-xs text-[#A8A29E]">{t("rednote.adminContact")}</p>
 
         <p className="mt-4 text-center text-sm text-[#78716C]">
-          {mode === "signIn" ? (
+          {mode === "forgotPassword" ? (
             <button
               type="button"
               className="font-medium text-[#1C1917] underline-offset-2 hover:underline"
-              onClick={() => {
-                setMode("signUp");
-                setError(null);
-                setMessage(null);
-              }}
+              onClick={() => switchMode("signIn")}
+            >
+              {t("rednote.backToLogin")}
+            </button>
+          ) : mode === "signIn" ? (
+            <button
+              type="button"
+              className="font-medium text-[#1C1917] underline-offset-2 hover:underline"
+              onClick={() => switchMode("signUp")}
             >
               {t("rednote.needAccount")}
             </button>
@@ -209,11 +247,7 @@ function RednoteLoginForm() {
             <button
               type="button"
               className="font-medium text-[#1C1917] underline-offset-2 hover:underline"
-              onClick={() => {
-                setMode("signIn");
-                setError(null);
-                setMessage(null);
-              }}
+              onClick={() => switchMode("signIn")}
             >
               {t("rednote.alreadyHaveAccount")}
             </button>
