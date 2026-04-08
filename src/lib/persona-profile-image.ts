@@ -4,8 +4,10 @@ const KNOWN_FILES = [
   "Caesy",
   "Cammy",
   "Freya",
+  "Kelvin",
   "Luke",
   "Mia",
+  "Ray",
   "Sabrina",
 ] as const;
 

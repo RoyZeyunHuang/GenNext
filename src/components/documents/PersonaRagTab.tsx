@@ -472,12 +472,12 @@ export function PersonaRagTab({
     >
       <div
         className={cn(
-          "shrink-0 rounded-lg border border-[#E7E5E4] bg-white",
+          "flex shrink-0 flex-col rounded-lg border border-[#E7E5E4] bg-white",
           asideW,
-          isRf ? "max-h-[40vh] overflow-hidden lg:max-h-none" : ""
+          isRf ? "max-h-[50vh] lg:max-h-none" : ""
         )}
       >
-        <div className="space-y-2 border-b border-[#E7E5E4] p-2">
+        <div className="shrink-0 space-y-2 border-b border-[#E7E5E4] p-2">
           <button
             type="button"
             onClick={() => void createPersona()}
@@ -499,7 +499,7 @@ export function PersonaRagTab({
             全部 AI 一句话简介
           </button>
         </div>
-        <div className={cn("max-h-[360px] overflow-y-auto p-2", isRf && "max-h-[min(40vh,320px)] lg:max-h-[calc(100dvh-12rem)]")}>
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {loadingList ? (
             <div className="py-8 text-center text-xs text-[#78716C]">加载中…</div>
           ) : personas.length === 0 ? (
