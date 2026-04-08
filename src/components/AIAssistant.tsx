@@ -144,7 +144,7 @@ export function AIAssistant() {
         <button
           type="button"
           onClick={() => setIsExpanded(true)}
-          className="fixed bottom-5 right-5 z-50 flex h-12 items-center gap-2 rounded-full bg-[#1C1917] px-4 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+          className="fixed bottom-5 right-5 z-[100] flex h-12 items-center gap-2 rounded-full bg-[#1C1917] px-4 text-sm font-medium text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
         >
           <MessageSquare className="h-4.5 w-4.5" />
           AI 助手
@@ -153,7 +153,7 @@ export function AIAssistant() {
 
       <div
         className={cn(
-          "fixed bottom-5 right-5 z-50 flex w-full max-w-md flex-col overflow-hidden rounded-lg border border-[#E7E5E4] bg-white shadow-lg transition-all duration-300 ease-in-out",
+          "fixed bottom-5 right-5 z-[100] flex w-full max-w-md flex-col overflow-hidden rounded-lg border border-[#E7E5E4] bg-white shadow-lg transition-all duration-300 ease-in-out",
           isExpanded ? "h-[420px] opacity-100 translate-y-0" : "h-0 opacity-0 translate-y-4 pointer-events-none"
         )}
       >

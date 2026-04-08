@@ -2,13 +2,41 @@
   "nav": {
     "dashboard": "Dashboard",
     "documents": "Content Factory",
-    "copywriter": "Copywriter",
+    "contentCreationSection": "Content creation",
+    "copywriter": "Black Magic Notes",
     "planning": "Planning",
     "calendar": "AI Calendar",
     "crm": "BRM",
     "kpi": "KPI",
     "news": "News",
     "settings": "Settings"
+  },
+  "rednote": {
+    "nav": {
+      "home": "Home"
+    },
+    "signOut": "Sign out",
+    "welcomeTitle": "Welcome to RednoteFactory",
+    "welcomeSubtitle": "Manage your material library and generate Xiaohongshu copy.",
+    "goDocuments": "Content factory",
+    "goCopywriter": "Start writing",
+    "loginTitle": "Sign in to RednoteFactory",
+    "loginSubtitle": "Use your registered email and password",
+    "registerTitle": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "alreadyHaveAccount": "Already have an account? Sign in",
+    "needAccount": "Need an account? Sign up",
+    "authError": "Sign-in failed. Check your email and password.",
+    "signUpError": "Sign-up failed. Try again later.",
+    "signUpCheckEmail": "Check your email to confirm your account (if email confirmation is enabled).",
+    "adminContact": "No account? Ask your admin for access.",
+    "pages": {
+      "home": "RednoteFactory",
+      "login": "Sign in"
+    }
   },
   "common": {
     "loading": "Loading…",

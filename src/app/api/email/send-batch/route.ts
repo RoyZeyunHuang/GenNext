@@ -9,12 +9,12 @@ import {
   isInvoManagedEmailTemplateName,
   invoBaseTemplateNameFromBuildYears,
   resolveContactName,
-  resolveInvoMultiDeveloperTemplateName,
   resolveRecipientEmail,
   sleep,
   type BatchPropertyForTemplate,
   type CompanyWithContacts,
 } from "@/lib/email-helpers";
+import { parseCityFromAddress } from "@/lib/resolve-area";
 import { sendEmail } from "@/lib/resend";
 import { getEmailSignatureSettings } from "@/lib/email-signature-settings";
 import { wrapEmailHtml } from "@/lib/email-template";
@@ -274,6 +274,8 @@ export async function POST(req: NextRequest) {
           company_name: c.name ?? "",
           company_role: lone.company_role ?? "",
           property_name: lone.property_name,
+          neighborhood:
+            parseCityFromAddress(lone.address) || lone.city || "the area",
           contact_name: contactName,
         };
         propertyNameForHeader = lone.property_name;
@@ -289,6 +291,7 @@ export async function POST(req: NextRequest) {
           company_name: c.name ?? "",
           company_role: "",
           property_name: "your portfolio",
+          neighborhood: "the area",
           contact_name: contactName,
         };
         propertyNameForHeader = "your portfolio";
@@ -315,24 +318,8 @@ export async function POST(req: NextRequest) {
         subject = applyTemplate(customSubject!, vars);
         emailBody = applyTemplate(customBody!, vars);
       } else {
-        let subjectTpl = effectiveBaseTemplateRow!.subject;
-        let bodyTpl = effectiveBaseTemplateRow!.body;
-        if (list.length >= 2 && effectiveBaseTemplateRow!.name) {
-          const multiName = resolveInvoMultiDeveloperTemplateName(effectiveBaseTemplateRow!.name);
-          if (multiName) {
-            const { data: multiRow } = await supabase
-              .from("email_templates")
-              .select("subject, body")
-              .eq("name", multiName)
-              .maybeSingle();
-            if (multiRow) {
-              subjectTpl = multiRow.subject;
-              bodyTpl = multiRow.body;
-            }
-          }
-        }
-        subject = applyTemplate(subjectTpl, vars);
-        emailBody = applyTemplate(bodyTpl, vars);
+        subject = applyTemplate(effectiveBaseTemplateRow!.subject, vars);
+        emailBody = applyTemplate(effectiveBaseTemplateRow!.body, vars);
       }
 
       try {

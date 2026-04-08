@@ -174,11 +174,15 @@ export const ZIP_TO_AREA: Record<string, { borough: string; area: string }> = {
   "07030": { borough: "Hoboken", area: "Hoboken" },
 
   // Other NJ
+  "07002": { borough: "Other NJ", area: "Bayonne" },
+  "07020": { borough: "Other NJ", area: "Edgewater" },
+  "07024": { borough: "Other NJ", area: "Fort Lee" },
+  "07032": { borough: "Other NJ", area: "Kearny" },
+  "07047": { borough: "Other NJ", area: "North Bergen" },
   "07086": { borough: "Other NJ", area: "Weehawken" },
   "07087": { borough: "Other NJ", area: "Union City" },
   "07093": { borough: "Other NJ", area: "West New York" },
-  "07020": { borough: "Other NJ", area: "Edgewater" },
-  "07024": { borough: "Other NJ", area: "Fort Lee" },
+  "07094": { borough: "Other NJ", area: "Secaucus" },
   "07102": { borough: "Other NJ", area: "Newark" },
   "07103": { borough: "Other NJ", area: "Newark" },
 };

@@ -107,5 +107,5 @@ export const AREA_MAP: Record<string, string[]> = {
     "Bergen-Lafayette",
   ],
   Hoboken: ["Hoboken"],
-  "Other NJ": ["Weehawken", "Union City", "West New York", "Edgewater", "Fort Lee", "Newark"],
+  "Other NJ": ["Bayonne", "Edgewater", "Fort Lee", "Kearny", "Newark", "North Bergen", "Secaucus", "Union City", "Weehawken", "West New York"],
 };

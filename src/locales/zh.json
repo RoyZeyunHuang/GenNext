@@ -2,13 +2,41 @@
   "nav": {
     "dashboard": "概览",
     "documents": "内容工厂",
-    "copywriter": "内容创作",
+    "contentCreationSection": "内容创作",
+    "copywriter": "黑魔法笔记生成",
     "planning": "内容排期",
     "calendar": "AI日历",
     "crm": "BRM",
     "kpi": "KPI",
     "news": "新闻摘要",
     "settings": "设置"
+  },
+  "rednote": {
+    "nav": {
+      "home": "首页"
+    },
+    "signOut": "退出登录",
+    "welcomeTitle": "欢迎使用 RednoteFactory",
+    "welcomeSubtitle": "管理材料库并生成小红书文案。",
+    "goDocuments": "进入内容工厂",
+    "goCopywriter": "开始创作",
+    "loginTitle": "登录 RednoteFactory",
+    "loginSubtitle": "使用注册邮箱与密码登录",
+    "registerTitle": "注册账号",
+    "email": "邮箱",
+    "password": "密码",
+    "signIn": "登录",
+    "signUp": "注册",
+    "alreadyHaveAccount": "已有账号？登录",
+    "needAccount": "没有账号？注册",
+    "authError": "登录失败，请检查邮箱与密码",
+    "signUpError": "注册失败，请稍后再试",
+    "signUpCheckEmail": "注册成功，请查收邮件确认（若已关闭邮箱确认则可直接登录）",
+    "adminContact": "没有账户？联系管理员开通",
+    "pages": {
+      "home": "RednoteFactory",
+      "login": "登录"
+    }
   },
   "common": {
     "loading": "加载中…",

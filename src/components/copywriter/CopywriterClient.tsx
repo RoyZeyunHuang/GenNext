@@ -88,6 +88,7 @@ function DocPickerDropdown({
   onSelect,
   onClose,
   onClear,
+  mobileSheet,
 }: {
   docs: Doc[];
   currentId: string | undefined;
@@ -96,13 +97,14 @@ function DocPickerDropdown({
   onClose: () => void;
   /** 已有选中时展示「清空」，恢复为不选 */
   onClear?: () => void;
+  mobileSheet?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const filtered = docs.filter(
     (d) => !search.trim() || d.title.toLowerCase().includes(search.trim().toLowerCase())
   );
-  return (
-    <div className="absolute left-0 right-0 top-full z-[60] mt-1 max-h-56 overflow-hidden rounded-lg border border-[#E7E5E4] bg-white shadow-lg">
+  const list = (
+    <>
       <div className="border-b border-[#E7E5E4] p-2">
         <input
           type="text"
@@ -147,11 +149,38 @@ function DocPickerDropdown({
           ))
         )}
       </div>
+    </>
+  );
+
+  if (mobileSheet) {
+    return (
+      <>
+        <div className="fixed inset-0 z-[65] bg-black/40 lg:hidden" onClick={onClose} aria-hidden />
+        <div className="fixed inset-x-0 bottom-0 z-[70] max-h-[min(70vh,480px)] overflow-hidden rounded-t-2xl border border-[#E7E5E4] bg-white shadow-2xl lg:hidden">
+          <div className="flex items-center justify-between border-b border-[#E7E5E4] px-3 py-2">
+            <span className="text-sm font-medium text-[#1C1917]">选择文档</span>
+            <button type="button" onClick={onClose} className="text-xs text-[#78716C]">
+              关闭
+            </button>
+          </div>
+          {list}
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="absolute left-0 right-0 top-full z-[60] mt-1 max-h-56 overflow-hidden rounded-lg border border-[#E7E5E4] bg-white shadow-lg">
+      {list}
     </div>
   );
 }
 
-export function CopywriterClient() {
+export function CopywriterClient({
+  layoutVariant = "default",
+}: {
+  layoutVariant?: "default" | "rednote";
+}) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [allDocs, setAllDocs] = useState<Doc[]>([]);
   const [userInput, setUserInput] = useState("");
@@ -174,6 +203,9 @@ export function CopywriterClient() {
   const [articleLength, setArticleLength] = useState<ArticleLength>(DEFAULT_ARTICLE_LENGTH);
   /** 人格浓度：四档代表值（见 PERSONA_SOUL_TIERS） */
   const [personaIntensity, setPersonaIntensity] = useState(DEFAULT_PERSONA_INTENSITY);
+  const isRf = layoutVariant === "rednote";
+  const [configCollapsed, setConfigCollapsed] = useState(false);
+  const [isLg, setIsLg] = useState(true);
   const [selectedTitleIdx, setSelectedTitleIdx] = useState(0);
   const [sensitiveScan, setSensitiveScan] = useState<ScanResult | null>(null);
   const [editingBody, setEditingBody] = useState(false);
@@ -192,6 +224,14 @@ export function CopywriterClient() {
       setCategories(Array.isArray(cats) ? cats : []);
       setAllDocs(Array.isArray(docs) ? docs : []);
     });
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const fn = () => setIsLg(mq.matches);
+    fn();
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
   }, []);
 
   /** 原标题模版类：名称「标题套路」/「标题」或 sort_order=6（与 generate 校验一致） */
@@ -519,6 +559,22 @@ export function CopywriterClient() {
 
   const generating = generatingTitles || generatingBody;
 
+  const prevGeneratingBody = useRef(false);
+  useEffect(() => {
+    if (!isRf) return;
+    if (prevGeneratingBody.current && !generatingBody && bodyText.trim()) {
+      setConfigCollapsed(true);
+    }
+    prevGeneratingBody.current = generatingBody;
+  }, [isRf, generatingBody, bodyText]);
+
+  const regenerateTitlesOnly = useCallback(() => {
+    void generateTitlesFromBody(bodyText);
+  }, [generateTitlesFromBody, bodyText]);
+
+  const showOutputBlockMobile =
+    !isRf || bodyText.trim().length > 0 || generatingBody || generatingTitles || configCollapsed;
+
   const copyToClipboard = async () => {
     if (!copyPayload.trim()) return;
     await navigator.clipboard.writeText(copyPayload);
@@ -545,22 +601,82 @@ export function CopywriterClient() {
     setStarred(true);
   };
 
+  const lengthLabel =
+    ARTICLE_LENGTH_SEGMENTED.find((o) => o.value === articleLength)?.label ?? "";
+  const soulLabel =
+    PERSONA_SOUL_TIERS.find((t) => t.intensity === personaIntensity)?.label ?? "";
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-stretch">
-      <div className="space-y-4">
-        <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
+    <div
+      className={cn(
+        isRf
+          ? "relative grid min-h-0 grid-cols-1 gap-0 pb-[calc(88px+env(safe-area-inset-bottom,0px))] lg:min-h-[calc(100dvh-48px)] lg:grid-cols-2 lg:items-stretch lg:gap-0 lg:pb-0"
+          : "grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-stretch"
+      )}
+    >
+      {isRf && (
+        <div className="col-span-full hidden h-12 shrink-0 items-center border-b border-[#E7E5E4] bg-white px-6 lg:flex">
+          <span className="text-[15px] font-bold text-[#1C1917]">内容创作</span>
+        </div>
+      )}
+      {isRf && configCollapsed && (
+        <button
+          type="button"
+          onClick={() => setConfigCollapsed(false)}
+          className="relative col-span-full shrink-0 border-b border-[#E7E5E4] bg-[#FAFAF9] px-4 py-3 pr-16 text-left lg:hidden"
+        >
+          <div className="text-[13px] font-medium text-[#1C1917] line-clamp-1">
+            {userInput.trim() || "（点击展开编辑任务）"}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-1 text-[11px] text-[#78716C]">
+            {dedupeOnePerCategory(selectedDocs).map((d, i) => (
+              <span key={d.doc_id}>
+                {i > 0 ? <span className="mx-1 text-[#A8A29E]">·</span> : null}
+                {d.doc_title.slice(0, 18)}
+                {d.doc_title.length > 18 ? "…" : ""}
+              </span>
+            ))}
+            <span className="mx-1 text-[#A8A29E]">·</span>
+            <span>{lengthLabel}</span>
+            <span className="mx-1 text-[#A8A29E]">·</span>
+            <span>{soulLabel}</span>
+          </div>
+          <span className="absolute right-3 top-3 text-[10px] text-[#A8A29E]">展开 ▾</span>
+        </button>
+      )}
+      <div
+        className={cn(
+          "min-w-0 space-y-4",
+          isRf && configCollapsed && "hidden lg:block",
+          isRf && "lg:border-r lg:border-[#E7E5E4] lg:bg-white lg:px-5 lg:py-4"
+        )}
+      >
+        <div
+          className={cn(
+            "rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm",
+            isRf && "rounded-none border-0 border-b border-[#E7E5E4] bg-transparent p-4 pb-4 shadow-none lg:rounded-lg lg:border lg:p-5 lg:shadow-sm"
+          )}
+        >
           <textarea
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             placeholder="告诉我你想创作什么，例如：帮我写 Sven 的小红书，突出大窗户和地铁近"
             rows={4}
-            className="w-full resize-none rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] px-4 py-3 text-sm text-[#1C1917] placeholder:text-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+            className={cn(
+              "w-full resize-none rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] px-4 py-3 text-sm text-[#1C1917] placeholder:text-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20",
+              isRf && "rounded-[10px] text-[15px] leading-relaxed lg:text-sm"
+            )}
           />
           <button
             type="button"
             onClick={detectIntent}
             disabled={detecting || !userInput.trim()}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-2.5 text-sm font-medium text-white hover:bg-[#1C1917]/90 disabled:opacity-50"
+            className={cn(
+              "mt-3 flex w-full items-center justify-center gap-2 py-2.5 text-sm font-medium disabled:opacity-50",
+              isRf
+                ? "rounded-[10px] border border-[#E7E5E4] bg-white text-[#1C1917] hover:bg-[#FAFAF9] lg:rounded-lg lg:border-0 lg:bg-[#1C1917] lg:text-white lg:hover:bg-[#1C1917]/90"
+                : "rounded-lg bg-[#1C1917] text-white hover:bg-[#1C1917]/90"
+            )}
           >
             {detecting ? (
               <>
@@ -579,12 +695,17 @@ export function CopywriterClient() {
         <div
           className={cn(
             "rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm",
-            (openPicker || openTitlePatternPicker) && "relative z-[50]"
+            (openPicker || openTitlePatternPicker) && "relative z-[50]",
+            isRf &&
+              "rounded-none border-0 border-b-0 bg-transparent p-4 pt-0 shadow-none lg:rounded-lg lg:border lg:p-5 lg:shadow-sm"
           )}
         >
-            {(openPicker || openTitlePatternPicker) && (
+            {(openPicker || openTitlePatternPicker) && (isLg || !isRf) && (
               <div
-                className="fixed inset-0 z-[40]"
+                className={cn(
+                  "fixed z-[40]",
+                  isRf ? "inset-0" : "bottom-0 left-56 right-0 top-0"
+                )}
                 onClick={() => {
                   setOpenPicker(null);
                   setOpenTitlePatternPicker(false);
@@ -592,7 +713,22 @@ export function CopywriterClient() {
                 aria-hidden
               />
             )}
-            <h3 className="mb-3 text-sm font-medium text-[#1C1917]">AI 将使用</h3>
+            {isRf && (
+              <div className="mb-2 flex items-center justify-between border-b border-[#E7E5E4] pb-2 lg:hidden">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[#A8A29E]">
+                  AI 将使用
+                </span>
+                <span className="text-[10px] text-[#A8A29E]">▾</span>
+              </div>
+            )}
+            <h3
+              className={cn(
+                "mb-3 text-sm font-medium text-[#1C1917]",
+                isRf && "hidden lg:block"
+              )}
+            >
+              AI 将使用
+            </h3>
 
             <div className="space-y-3">
               {slotCategories.map((cat) => {
@@ -605,20 +741,33 @@ export function CopywriterClient() {
 
                 return (
                   <div key={cat.id}>
-                    <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "flex items-center gap-2",
+                        isRf && "h-11 gap-2 active:bg-[#FAFAF9] lg:h-auto lg:active:bg-transparent"
+                      )}
+                    >
                       <span className="shrink-0 text-base">{cat.icon}</span>
-                      <span className="w-20 shrink-0 text-sm text-[#78716C]">{cat.name}：</span>
+                      <span
+                        className={cn(
+                          "w-20 shrink-0 text-sm text-[#78716C]",
+                          isRf && "w-9 text-xs lg:w-20 lg:text-sm"
+                        )}
+                      >
+                        {cat.name}
+                      </span>
                       <div className="relative min-w-0 flex-1" ref={openForRow ? pickerAnchorRef : null}>
                         <button
                           type="button"
                           onClick={() => setOpenPicker(openPicker?.categoryName === catName ? null : { categoryName: catName })}
                           className={cn(
                             "flex h-9 w-full items-center justify-between rounded-lg border border-[#E7E5E4] px-3 text-left text-sm hover:bg-[#FAFAF9]",
-                            boxLabel ? "text-[#1C1917]" : "text-[#A8A29E]"
+                            boxLabel ? "text-[#1C1917]" : "text-[#A8A29E]",
+                            isRf && "h-9 rounded-md border-[#E7E5E4] bg-[#FAFAF9] text-[13px] lg:bg-white"
                           )}
                         >
                           <span className="truncate">{boxLabel ?? "点击选择"}</span>
-                          <span className="shrink-0 text-[#A8A29E]">▾</span>
+                          <span className="shrink-0 text-[#A8A29E]">{isRf ? "›" : "▾"}</span>
                         </button>
                         {openForRow && (
                           <DocPickerDropdown
@@ -628,6 +777,7 @@ export function CopywriterClient() {
                             onSelect={(doc) => replaceSingleInCategory(catName, doc)}
                             onClose={() => setOpenPicker(null)}
                             onClear={() => clearCategorySelection(catName)}
+                            mobileSheet={isRf && !isLg}
                           />
                         )}
                       </div>
@@ -692,6 +842,7 @@ export function CopywriterClient() {
                               setTitlePatternUserCleared(true);
                               setOpenTitlePatternPicker(false);
                             }}
+                            mobileSheet={isRf && !isLg}
                           />
                         )}
                       </div>
@@ -705,47 +856,80 @@ export function CopywriterClient() {
               <p className="mt-2 text-xs text-[#A8A29E]">点击各类别下拉框选择文档</p>
             )}
 
-            <div className="mt-4 space-y-2 border-t border-[#E7E5E4] pt-4">
-              <p className="text-sm text-[#78716C]">正文长度</p>
-              <div className="flex gap-2">
-                {ARTICLE_LENGTH_SEGMENTED.map((o) => (
-                  <button
-                    key={o.value}
-                    type="button"
-                    onClick={() => setArticleLength(o.value)}
-                    title="与任务类参考文档无关，仅控制生成正文的篇幅档位"
-                    className={cn(
-                      "min-h-9 flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                      articleLength === o.value
-                        ? "border-[#1C1917] bg-[#1C1917] text-white"
-                        : "border-[#E7E5E4] bg-white text-[#1C1917] hover:bg-[#FAFAF9]"
-                    )}
-                  >
-                    {o.label}
-                  </button>
-                ))}
+            <div
+              className={cn(
+                "mt-4 border-t border-[#E7E5E4] pt-4",
+                isRf &&
+                  "flex flex-wrap items-center gap-x-3 gap-y-2 border-t-0 pt-3 lg:block lg:space-y-4 lg:border-t lg:pt-4"
+              )}
+            >
+              <div className={cn(isRf && "flex flex-wrap items-center gap-2")}>
+                <p
+                  className={cn(
+                    "text-sm text-[#78716C]",
+                    isRf && "w-auto text-[11px] whitespace-nowrap lg:text-sm"
+                  )}
+                >
+                  正文长度
+                </p>
+                <div className={cn("flex gap-2", isRf && "flex-1 min-w-0 lg:flex-1")}>
+                  {ARTICLE_LENGTH_SEGMENTED.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => setArticleLength(o.value)}
+                      title="与任务类参考文档无关，仅控制生成正文的篇幅档位"
+                      className={cn(
+                        "min-h-9 flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        articleLength === o.value
+                          ? "border-[#1C1917] bg-[#1C1917] text-white"
+                          : "border-[#E7E5E4] bg-white text-[#1C1917] hover:bg-[#FAFAF9]",
+                        isRf &&
+                          "min-h-[26px] rounded-md px-2.5 py-1 text-xs lg:min-h-9 lg:rounded-lg lg:px-3 lg:py-2 lg:text-sm"
+                      )}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="mt-4 space-y-2 border-t border-[#E7E5E4] pt-4">
-              <p className="text-sm text-[#78716C]">人格浓度</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {PERSONA_SOUL_TIERS.map((tier) => (
-                  <button
-                    key={tier.intensity}
-                    type="button"
-                    onClick={() => setPersonaIntensity(tier.intensity)}
-                    title={tier.title}
-                    className={cn(
-                      "min-h-9 rounded-lg border px-2 py-2 text-sm font-medium transition-colors",
-                      personaIntensity === tier.intensity
-                        ? "border-[#1C1917] bg-[#1C1917] text-white"
-                        : "border-[#E7E5E4] bg-white text-[#1C1917] hover:bg-[#FAFAF9]"
-                    )}
-                  >
-                    {tier.label}
-                  </button>
-                ))}
+              <div className={cn(isRf && "flex flex-wrap items-center gap-2 lg:mt-0")}>
+                <p
+                  className={cn(
+                    "text-sm text-[#78716C]",
+                    isRf && "text-[11px] whitespace-nowrap lg:mt-0 lg:text-sm"
+                  )}
+                >
+                  人格浓度
+                </p>
+                <div
+                  className={cn(
+                    "gap-2",
+                    isRf
+                      ? "flex flex-1 flex-wrap gap-1 lg:grid lg:grid-cols-4"
+                      : "grid grid-cols-2 sm:grid-cols-4"
+                  )}
+                >
+                  {PERSONA_SOUL_TIERS.map((tier) => (
+                    <button
+                      key={tier.intensity}
+                      type="button"
+                      onClick={() => setPersonaIntensity(tier.intensity)}
+                      title={tier.title}
+                      className={cn(
+                        "min-h-9 rounded-lg border px-2 py-2 text-sm font-medium transition-colors",
+                        personaIntensity === tier.intensity
+                          ? "border-[#1C1917] bg-[#1C1917] text-white"
+                          : "border-[#E7E5E4] bg-white text-[#1C1917] hover:bg-[#FAFAF9]",
+                        isRf &&
+                          "min-h-[26px] rounded-md px-2 py-1 text-xs lg:min-h-9 lg:rounded-lg lg:py-2 lg:text-sm"
+                      )}
+                    >
+                      {tier.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -753,7 +937,10 @@ export function CopywriterClient() {
               type="button"
               onClick={generateBodyFirst}
               disabled={generating}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-2.5 text-sm font-medium text-white hover:bg-[#1C1917]/90 disabled:opacity-50"
+              className={cn(
+                "mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-2.5 text-sm font-medium text-white hover:bg-[#1C1917]/90 disabled:opacity-50",
+                isRf && "hidden lg:flex"
+              )}
             >
               {generatingBody ? (
                 <>
@@ -776,8 +963,20 @@ export function CopywriterClient() {
         )}
       </div>
 
-      <div className="flex min-h-0 flex-col lg:min-h-[calc(100dvh-9rem)]">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
+      <div
+        className={cn(
+          "flex min-h-0 flex-col lg:min-h-[calc(100dvh-9rem)]",
+          isRf && !showOutputBlockMobile && "hidden lg:flex",
+          isRf && "lg:min-h-0 lg:flex-1"
+        )}
+      >
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm",
+            isRf &&
+              "rounded-none border-0 border-t border-[#E7E5E4] bg-white p-4 shadow-none lg:rounded-lg lg:border lg:p-5 lg:shadow-sm"
+          )}
+        >
           <div className="mb-3 flex shrink-0 items-center justify-between">
             <h3 className="text-sm font-medium text-[#1C1917]">生成结果</h3>
             {hasResultContent && (
@@ -959,16 +1158,20 @@ export function CopywriterClient() {
                             "max-w-full min-w-[200px] flex-1 cursor-pointer rounded-lg border p-2 transition-colors sm:max-w-[calc(50%-4px)]",
                             selectedTitleIdx === idx
                               ? "border-[#1C1917] bg-[#1C1917] text-white ring-1 ring-[#1C1917]"
-                              : "border-[#E7E5E4] bg-white text-[#1C1917]"
+                              : "border-[#E7E5E4] bg-white text-[#1C1917]",
+                            isRf && "flex w-full flex-row items-start gap-2 sm:flex-col sm:items-stretch"
                           )}
                         >
                           <span
                             className={cn(
-                              "block text-[10px] font-medium",
-                              selectedTitleIdx === idx ? "text-white/90" : "text-[#78716C]"
+                              "block shrink-0 text-[10px] font-bold",
+                              selectedTitleIdx === idx ? "text-white/90" : "text-[#78716C]",
+                              isRf &&
+                                "rounded px-1 py-0.5 " +
+                                (selectedTitleIdx === idx ? "bg-white/20" : "bg-black/[0.07]")
                             )}
                           >
-                            【{v.label}】
+                            {v.label}
                           </span>
                           <textarea
                             value={v.text}
@@ -976,12 +1179,13 @@ export function CopywriterClient() {
                             onChange={(e) => updateVariantText(idx, e.target.value)}
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
-                            rows={3}
+                            rows={isRf ? 2 : 3}
                             className={cn(
                               "mt-1 w-full resize-y rounded border bg-transparent px-2 py-1.5 text-sm focus:outline-none focus:ring-2",
                               selectedTitleIdx === idx
                                 ? "border-white/30 text-white placeholder:text-white/50 focus:ring-white/30"
-                                : "border-[#E7E5E4] text-[#1C1917] focus:ring-[#1C1917]/20"
+                                : "border-[#E7E5E4] text-[#1C1917] focus:ring-[#1C1917]/20",
+                              isRf && "mt-0 min-h-0 flex-1 text-[13px] leading-snug sm:mt-1"
                             )}
                             placeholder="标题文案"
                           />
@@ -996,6 +1200,50 @@ export function CopywriterClient() {
         </div>
       </div>
 
+      {isRf && (
+        <div
+          className="pointer-events-none fixed bottom-[calc(68px+env(safe-area-inset-bottom,0px))] left-0 right-0 z-30 px-4 pb-1 pt-8 lg:hidden"
+          style={{
+            background: "linear-gradient(to top, rgb(255 255 255) 62%, transparent)",
+          }}
+        >
+          <div className="pointer-events-auto flex w-full gap-2">
+            {!bodyText.trim() && !generatingBody ? (
+              <button
+                type="button"
+                onClick={generateBodyFirst}
+                disabled={generating}
+                className="flex h-11 min-h-[44px] flex-1 items-center justify-center rounded-[10px] bg-[#1C1917] text-[15px] font-semibold text-white disabled:opacity-50"
+              >
+                {generating ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  "生成正文"
+                )}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={generateBodyFirst}
+                  disabled={generating}
+                  className="flex h-11 min-h-[44px] flex-1 items-center justify-center rounded-[10px] border border-[#E7E5E4] bg-white text-sm font-medium text-[#1C1917] disabled:opacity-50"
+                >
+                  重新生成
+                </button>
+                <button
+                  type="button"
+                  onClick={regenerateTitlesOnly}
+                  disabled={generating || !bodyText.trim()}
+                  className="flex h-11 min-h-[44px] flex-1 items-center justify-center rounded-[10px] bg-[#1C1917] text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  重新生成标题
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

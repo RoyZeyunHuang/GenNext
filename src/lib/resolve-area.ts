@@ -71,3 +71,19 @@ export function getSubAreaForFilter(
   if (areaField != null && String(areaField).trim() !== "") return String(areaField).trim();
   return null;
 }
+
+/**
+ * 从标准化地址 "street, City, ST ZIP" 中提取 City 部分。
+ * 例: "42-20 24th St, Long Island City, NY 11101" → "Long Island City"
+ * 用于邮件模版 {{neighborhood}} 占位符。
+ */
+export function parseCityFromAddress(
+  address: string | null | undefined
+): string | null {
+  if (!address) return null;
+  const m = address.match(/,\s*([^,]+?),\s*(?:NY|NJ|CT)\s+\d{5}/);
+  if (m) return m[1].trim() || null;
+  const m2 = address.match(/,\s*([^,]+?),\s*(?:NY|NJ|CT)\s*$/);
+  if (m2) return m2[1].trim() || null;
+  return null;
+}

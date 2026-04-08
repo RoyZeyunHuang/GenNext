@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { LayoutWithSidebar } from "@/components/LayoutWithSidebar";
-import { AIAssistant } from "@/components/AIAssistant";
+import { AppShell } from "@/components/AppShell";
 
 const dmSans = DM_Sans({
   variable: "--font-sans",
@@ -36,8 +35,7 @@ export default function RootLayout({
       <body
         className={`${dmSans.variable} ${jetbrainsMono.variable} min-h-screen font-sans antialiased`}
       >
-        <LayoutWithSidebar>{children}</LayoutWithSidebar>
-        <AIAssistant />
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
