@@ -10,16 +10,16 @@ import {
   dedupePropertiesByIdPreferHigherUnits,
   isInvoManagedEmailTemplateName,
   invoBaseTemplateNameFromBuildYears,
-  pickInvoMultiDeveloperEmailTemplate,
   sleep,
 } from "@/lib/email-helpers";
 import { INVO_DECK_FILENAME } from "@/lib/email-attachments";
 import {
   AREA_MAP,
   getDisplayArea,
-  getDisplayBoro,
+
   getRegionForArea,
   getSubAreaForFilter,
+  parseCityFromAddress,
   subAreasMatch,
 } from "@/lib/resolve-area";
 
@@ -631,39 +631,28 @@ export function BatchEmailModal({
         baseTplForInvo =
           allTemplates.find((t) => t.name === invoAutoName) ?? tpl;
       }
-      const effectiveTpl = pickInvoMultiDeveloperEmailTemplate(
-        merged,
-        baseTplForInvo,
-        allTemplates
-      );
+      const effectiveTpl = baseTplForInvo;
 
-      let subject: string;
-      let body: string;
       let template_fill_vars: Record<string, string>;
-      let displayPropertyName: string;
-
       if (!merged) {
         template_fill_vars = {
           company_name: rep.company_name ?? "",
           company_role: rep.company_role ?? "",
           property_name: rep.property_name || "",
+          neighborhood:
+            parseCityFromAddress(rep.address) || rep.city || "the area",
         };
-        const contact_name = contactFirstName(rep.contact_name ?? undefined);
-        const vars: Record<string, string> = { ...template_fill_vars, contact_name };
-        subject = applyTemplate(effectiveTpl.subject, vars);
-        body = applyTemplate(effectiveTpl.body, vars);
-        displayPropertyName = rep.property_name || "";
       } else {
         template_fill_vars = buildDeveloperBatchTemplateVars(uniq, {
           company_name: rep.company_name ?? "",
           company_role: rep.company_role ?? "",
         });
-        const contact_name = contactFirstName(rep.contact_name ?? undefined);
-        const vars: Record<string, string> = { ...template_fill_vars, contact_name };
-        subject = applyTemplate(effectiveTpl.subject, vars);
-        body = applyTemplate(effectiveTpl.body, vars);
-        displayPropertyName = template_fill_vars.property_name;
       }
+      const contact_name = contactFirstName(rep.contact_name ?? undefined);
+      const vars: Record<string, string> = { ...template_fill_vars, contact_name };
+      const subject = applyTemplate(effectiveTpl.subject, vars);
+      const body = applyTemplate(effectiveTpl.body, vars);
+      const displayPropertyName = template_fill_vars.property_name || rep.property_name || "";
 
       out.push({
         property_id: rep.property_id,
@@ -787,6 +776,7 @@ export function BatchEmailModal({
                 contact_name: contactFirstName(first.name ?? undefined),
                 property_name: base.property_name || "",
                 company_role: base.company_role ?? "",
+                neighborhood: "the area",
               };
           next[i] = {
             ...base,
@@ -906,6 +896,7 @@ export function BatchEmailModal({
             contact_name: contactFirstName(recipientName ?? undefined),
             property_name: p.property_name || "",
             company_role: p.company_role ?? "",
+            neighborhood: "the area",
           };
       const useRawPerRecipient =
         mode === "template" &&
@@ -1308,7 +1299,7 @@ export function BatchEmailModal({
                       <th className="p-3 text-left">选择</th>
                       <th className="p-3 text-left">楼盘名</th>
                       <th className="p-3 text-left">Address</th>
-                      <th className="p-3 text-left">boro</th>
+                      <th className="p-3 text-left">Neighborhood</th>
                       <th className="p-3 text-left">Build Year</th>
                       <th className="p-3 text-left">Units</th>
                       <th className="p-3 text-left">Price Range</th>
@@ -1329,7 +1320,7 @@ export function BatchEmailModal({
                     ) : (
                       filteredRows.map((r) => {
                         const disabled = !r.contact_name || !r.email;
-                        const boroCell = getDisplayBoro(r.address, r.area);
+                        const neighborhoodCell = parseCityFromAddress(r.address) ?? "—";
                         return (
                           <tr key={r.row_key} className={cn(disabled && "bg-[#FAFAF9] text-[#A8A29E]")}>
                             <td className="p-3">
@@ -1346,7 +1337,7 @@ export function BatchEmailModal({
                                 ? r.address
                                 : "—"}
                             </td>
-                            <td className="p-3 text-[#78716C]">{boroCell}</td>
+                            <td className="p-3 text-[#78716C]">{neighborhoodCell}</td>
                             <td className="p-3 text-[#78716C]">{r.build_year ?? "—"}</td>
                             <td className="p-3 text-[#78716C]">{r.units != null ? r.units : "—"}</td>
                             <td className="p-3 text-[#78716C]">
@@ -1447,13 +1438,10 @@ export function BatchEmailModal({
                   <p className="mb-3 text-xs text-[#78716C]">
                     选 INVO 任一套即可：<strong className="text-[#57534E]">Established / New</strong> 会按楼盘{" "}
                     <strong className="text-[#57534E]">build year</strong> 相对<strong>当前日历年</strong>自动选择（≥
-                    本年 → New，更早 → Established）。同一开发商多选楼盘会合并为一封并自动用{" "}
-                    <code className="rounded bg-[#F5F5F4] px-1 text-[10px]">— Multi</code> 模版。单盘原占位符{" "}
-                    <code className="rounded bg-[#F5F5F4] px-1 text-[10px]">{"{{property_name}}"}</code>
-                    ；多盘模版用{" "}
-                    <code className="rounded bg-[#F5F5F4] px-1 text-[10px]">
-                      {"{{property_intro_sentence}} … {{leasing_support_phrase}} / {{leasing_goals_focus}}"}
-                    </code>
+                    本年 → New，更早 → Established）。同一开发商多选楼盘会合并为一封，{" "}
+                    <code className="rounded bg-[#F5F5F4] px-1 text-[10px]">{"{{property_name}}"}</code> 和{" "}
+                    <code className="rounded bg-[#F5F5F4] px-1 text-[10px]">{"{{neighborhood}}"}</code>{" "}
+                    会自动拼接多个值。
                   </p>
                   <div className="flex flex-wrap items-end justify-between gap-3">
                     <div style={{ minWidth: 280 }}>

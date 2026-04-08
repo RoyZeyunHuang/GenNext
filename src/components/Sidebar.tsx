@@ -1,7 +1,8 @@
 "use client";
 
+import type { MouseEvent } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FolderOpen,
@@ -18,10 +19,18 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/contexts/LocaleContext";
 
-const navItems = [
+const navItemsMain = [
   { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
   { href: "/documents", labelKey: "nav.documents", icon: FolderOpen },
-  { href: "/copywriter", labelKey: "nav.copywriter", icon: PenLine },
+] as const;
+
+const navItemCopywriter = {
+  href: "/copywriter",
+  labelKey: "nav.copywriter",
+  icon: PenLine,
+} as const;
+
+const navItemsAfterContentCreation = [
   { href: "/planning", labelKey: "nav.planning", icon: CalendarRange },
   { href: "/calendar", labelKey: "nav.calendar", icon: Calendar },
   { href: "/crm", labelKey: "nav.crm", icon: Users },
@@ -30,12 +39,31 @@ const navItems = [
   { href: "/settings", labelKey: "nav.settings", icon: Settings },
 ] as const;
 
+function navLinkClick(
+  e: MouseEvent<HTMLAnchorElement>,
+  href: string,
+  router: ReturnType<typeof useRouter>
+) {
+  if (e.defaultPrevented) return;
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (e.button !== 0) return;
+  e.preventDefault();
+  router.push(href);
+}
+
+function navItemIsActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (href === "/dashboard") return false;
+  return pathname.startsWith(href);
+}
+
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { locale, setLocale, t } = useLocale();
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r border-[#E7E5E4] bg-sidebar">
+    <aside data-app-sidebar className="flex h-screen w-56 flex-col border-r border-[#E7E5E4] bg-sidebar">
       {/* Logo */}
       <div className="flex h-14 items-center border-b border-[#E7E5E4] px-4">
         <span className="text-lg font-semibold tracking-tight text-[#1C1917]">
@@ -46,19 +74,65 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex flex-1 flex-col space-y-0.5 overflow-y-auto p-2">
         <div className="flex-1">
-          {navItems.slice(0, -1).map(({ href, labelKey, icon: Icon }) => {
-            const isActive =
-              pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+          {navItemsMain.map(({ href, labelKey, icon: Icon }) => {
+            const isActive = navItemIsActive(pathname, href);
             return (
               <Link
                 key={href}
                 href={href}
+                prefetch
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-[#1C1917] text-white"
                     : "text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]"
                 )}
+                onClick={(e) => navLinkClick(e, href, router)}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {t(labelKey)}
+              </Link>
+            );
+          })}
+          <div className="px-3 pb-1 pt-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A8A29E]">
+              {t("nav.contentCreationSection")}
+            </span>
+          </div>
+          {[navItemCopywriter].map(({ href, labelKey, icon: Icon }) => {
+            const isActive = navItemIsActive(pathname, href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                prefetch
+                className={cn(
+                  "flex items-center gap-3 rounded-lg py-2.5 pl-5 pr-3 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-[#1C1917] text-white"
+                    : "text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]"
+                )}
+                onClick={(e) => navLinkClick(e, href, router)}
+              >
+                <Icon className="h-5 w-5 shrink-0" />
+                {t(labelKey)}
+              </Link>
+            );
+          })}
+          {navItemsAfterContentCreation.slice(0, -1).map(({ href, labelKey, icon: Icon }) => {
+            const isActive = navItemIsActive(pathname, href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                prefetch
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-[#1C1917] text-white"
+                    : "text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]"
+                )}
+                onClick={(e) => navLinkClick(e, href, router)}
               >
                 <Icon className="h-5 w-5 shrink-0" />
                 {t(labelKey)}
@@ -67,16 +141,18 @@ export function Sidebar() {
           })}
         </div>
         <div className="mt-auto border-t border-[#E7E5E4] pt-2">
-          {navItems.slice(-1).map(({ href, labelKey, icon: Icon }) => {
+          {navItemsAfterContentCreation.slice(-1).map(({ href, labelKey, icon: Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
                 key={href}
                 href={href}
+                prefetch
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive ? "bg-[#1C1917] text-white" : "text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]"
                 )}
+                onClick={(e) => navLinkClick(e, href, router)}
               >
                 <Icon className="h-5 w-5 shrink-0" />
                 {t(labelKey)}

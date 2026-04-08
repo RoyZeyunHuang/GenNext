@@ -16,6 +16,7 @@ const PREVIEW_VARS: Record<string, string> = {
   contact_name: "Alex",
   property_name: "The Journal",
   company_role: "Developer",
+  neighborhood: "Jersey City",
 };
 
 type EmailTemplate = {
@@ -133,7 +134,7 @@ export function EmailTemplatesClient() {
 
   const varHint = useMemo(
     () =>
-      "变量：{{company_name}} {{contact_name}} {{property_name}} {{company_role}} — 批量发信可选 INVO — Established / New Buildings 两套模版",
+      "变量：{{company_name}} {{contact_name}} {{property_name}} {{company_role}} {{neighborhood}} — 批量发信可选 INVO — Established / New Buildings 两套模版",
     []
   );
 

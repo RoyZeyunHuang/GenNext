@@ -1,4 +1,4 @@
-import { getDisplayBoro, getSubAreaForFilter } from "./resolve-area";
+import { parseCityFromAddress } from "./resolve-area";
 
 export type CompanyWithContacts = {
   id: string;
@@ -132,84 +132,34 @@ export type BatchPropertyForTemplate = {
   company_role?: string;
 };
 
-/** 邮件里用 borough 全称（Brooklyn、Bronx…），不缩写 */
-function boroughToEmailShort(borough: string): string {
-  const t = borough.trim();
-  if (t === "Other NJ") return "North NJ";
-  return t;
+/** 从楼盘行提取 city：优先从地址解析，其次 DB city 字段 */
+function cityForRow(
+  r: Pick<BatchPropertyForTemplate, "address" | "city">
+): string | null {
+  return (
+    parseCityFromAddress(r.address) ||
+    (r.city ? String(r.city).trim() : null) ||
+    null
+  );
 }
 
 /**
- * 单盘：优先行政区全称（Brooklyn、Bronx…），否则解析出的小区名，最后 city。
+ * 遍历按 units 降序排列的楼盘，取前两个**不同** city。
+ * 若第 1、2 个楼盘 city 相同则顺延到下一个不同的。
  */
-export function submarketLabelForEmailProperty(
-  r: Pick<BatchPropertyForTemplate, "address" | "area" | "city">
-): string | null {
-  const addr = r.address ?? null;
-  const areaField = r.area ?? null;
-  const boro = getDisplayBoro(addr, areaField);
-  if (boro && boro !== "—" && boro !== "其他") {
-    return boroughToEmailShort(boro);
-  }
-  const sub = getSubAreaForFilter(addr, areaField);
-  if (sub && sub.trim()) return sub.trim();
-  const c = String(r.city ?? "").trim();
-  return c || null;
-}
-
-function boroughShortForRow(
-  r: Pick<BatchPropertyForTemplate, "address" | "area">
-): string | null {
-  const boro = getDisplayBoro(r.address ?? null, r.area ?? null);
-  if (!boro || boro === "—" || boro === "其他") return null;
-  return boroughToEmailShort(boro);
-}
-
-/**
- * 最多两个不重复标签：先收「小区」解析名（Williamsburg、South Bronx…），不足再补 Brooklyn/Bronx 等行政区全称，最后 city。
- */
-function collectTwoSubmarketLabels(
-  top2: BatchPropertyForTemplate[],
-  uniq: BatchPropertyForTemplate[]
-): string[] {
+function collectTwoCities(uniq: BatchPropertyForTemplate[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
-  const add = (lab: string | null | undefined) => {
-    if (!lab) return;
-    const t = lab.trim();
-    if (!t) return;
-    const k = t.toLowerCase();
-    if (seen.has(k)) return;
+  for (const r of uniq) {
+    if (out.length >= 2) break;
+    const c = cityForRow(r);
+    if (!c) continue;
+    const k = c.toLowerCase();
+    if (seen.has(k)) continue;
     seen.add(k);
-    out.push(t);
-  };
-
-  const trySub = (r: BatchPropertyForTemplate) => {
-    const s = getSubAreaForFilter(r.address ?? null, r.area ?? null);
-    if (s?.trim()) add(s.trim());
-  };
-
-  for (const r of top2) trySub(r);
-  for (const r of uniq) {
-    if (out.length >= 2) break;
-    trySub(r);
+    out.push(c);
   }
-
-  for (const r of top2) {
-    if (out.length >= 2) break;
-    add(boroughShortForRow(r));
-  }
-  for (const r of uniq) {
-    if (out.length >= 2) break;
-    add(boroughShortForRow(r));
-  }
-
-  for (const r of uniq) {
-    if (out.length >= 2) break;
-    add(String(r.city ?? "").trim() || null);
-  }
-
-  return out.slice(0, 2);
+  return out;
 }
 
 function sortPropertyRowsByUnits<T extends { units?: number | null }>(rows: T[]): T[] {
@@ -229,8 +179,9 @@ export function dedupePropertiesByIdPreferHigherUnits<
 }
 
 /**
- * 批量发信模版变量：同一开发商选中 ≥2 个楼盘时，intro 用 units 最高的两个盘名 +
- * 两个「小区/行政区」标签（Brooklyn、Bronx、Williamsburg 等，由地址+area 解析，非 DB city）。
+ * 批量发信模版变量（multi 和 single 用同一套模版，区别只是变量值）：
+ * - property_name: 单楼 = 楼名，多楼 = "A and B"（units 最高的两个）
+ * - neighborhood: 单楼 = primary city，多楼 = "CityA and CityB"（前两个不同 city）
  */
 export function buildDeveloperBatchTemplateVars(
   rows: BatchPropertyForTemplate[],
@@ -241,45 +192,20 @@ export function buildDeveloperBatchTemplateVars(
   const namesTop2 = top2
     .map((r) => String(r.property_name ?? "").trim())
     .filter(Boolean);
-  const isMulti = uniq.length >= 2;
   const primary = uniq[0];
   const propertyNameSingle = String(primary?.property_name ?? "").trim();
   const propertyNamesJoined = joinEnglishAnd(
     namesTop2.length ? namesTop2 : propertyNameSingle ? [propertyNameSingle] : []
   );
 
-  const subTwo = collectTwoSubmarketLabels(top2, uniq);
-  const subJoined = joinEnglishAnd(subTwo);
-  /** 占位符 cities_two 历史命名保留，内容为小区/行政区短语 */
-  const submarketPhrase = subJoined || "these neighborhoods";
-
-  const property_intro_sentence =
-    isMulti && namesTop2.length >= 2
-      ? `I came across ${joinEnglishAnd(namesTop2)} and wanted to reach out. We noticed your firm owns many properties across ${submarketPhrase}.`
-      : `I came across ${propertyNameSingle} and wanted to reach out.`;
-
-  const leasing_support_phrase =
-    isMulti && namesTop2.length >= 2
-      ? `leasing and retention goals across ${joinEnglishAnd(namesTop2)}`
-      : `${propertyNameSingle}'s leasing and retention goals`;
-
-  /** New Buildings 模版结尾用（无 retention 措辞） */
-  const leasing_goals_focus =
-    isMulti && namesTop2.length >= 2
-      ? `leasing goals across ${joinEnglishAnd(namesTop2)}`
-      : `${propertyNameSingle}'s leasing goals`;
-
-  const subject_property_label = propertyNamesJoined || propertyNameSingle;
+  const citiesTwo = collectTwoCities(uniq);
+  const neighborhood = joinEnglishAnd(citiesTwo) || cityForRow(primary!) || "the area";
 
   return {
     company_name: companyMeta.company_name,
     company_role: companyMeta.company_role,
-    property_name: subject_property_label,
-    property_names_top2: propertyNamesJoined,
-    cities_two: subJoined,
-    property_intro_sentence,
-    leasing_support_phrase,
-    leasing_goals_focus,
+    property_name: propertyNamesJoined || propertyNameSingle,
+    neighborhood,
   };
 }
 
