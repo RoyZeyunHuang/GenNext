@@ -4,7 +4,12 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/rednote-factory/login") {
+  if (pathname === "/rednote-factory/login" || pathname === "/rednote-factory/reset-password") {
+    return NextResponse.next();
+  }
+
+  /** `public/profileimages/*` 静态资源：勿走主站 has_main_access 分支，否则仅 RF 用户会被 302，人设头像裂图 */
+  if (pathname.startsWith("/profileimages/")) {
     return NextResponse.next();
   }
 
