@@ -24,7 +24,6 @@ export async function POST(
     .from("personas")
     .select("id")
     .eq("id", personaId)
-    .eq("user_id", gate.session.userId)
     .maybeSingle();
   if (!persona) return NextResponse.json({ error: "not found" }, { status: 404 });
 

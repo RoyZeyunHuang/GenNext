@@ -51,7 +51,6 @@ export async function POST(req: NextRequest) {
     .from("personas")
     .select("id, bio_md, name")
     .eq("id", persona_id)
-    .eq("user_id", gate.session.userId)
     .maybeSingle();
 
   if (pe) {
