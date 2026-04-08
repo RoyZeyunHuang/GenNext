@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Search, Trash2, Upload } from "lucide-react";
+import { Loader2, Plus, Search, Sparkles, Trash2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MainAppModalPortal } from "@/components/MainAppModalPortal";
+import { PersonaAvatar } from "@/components/persona/PersonaAvatar";
 
 async function parseResponseJson<T = unknown>(res: Response): Promise<T> {
   const text = await res.text();
@@ -30,13 +31,17 @@ function tryParseJsonRecord(text: string): Record<string, unknown> {
 
 type PersonaRow = {
   id: string;
+  user_id: string;
   name: string;
   short_description: string | null;
   bio_md: string;
   source_url: string | null;
+  is_public: boolean;
   created_at: string;
   updated_at: string;
 };
+
+type RfMe = { userId: string; isAdmin: boolean; hasMainAccess: boolean } | null;
 
 type NoteRow = {
   id: string;
@@ -46,14 +51,27 @@ type NoteRow = {
   created_at: string;
 };
 
-export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "default" | "rednote" }) {
+export function PersonaRagTab({
+  layoutVariant = "default",
+  rfMe = null,
+}: {
+  layoutVariant?: "default" | "rednote";
+  rfMe?: RfMe;
+}) {
   const isRf = layoutVariant === "rednote";
   const [personas, setPersonas] = useState<PersonaRow[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"profile" | "notes">("profile");
-  const [profileForm, setProfileForm] = useState({ name: "", short_description: "", bio_md: "" });
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    short_description: "",
+    bio_md: "",
+    is_public: false,
+  });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [generatingShortDesc, setGeneratingShortDesc] = useState(false);
+  const [bulkGeneratingShortDesc, setBulkGeneratingShortDesc] = useState(false);
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [reembedding, setReembedding] = useState(false);
@@ -101,7 +119,7 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
 
   useEffect(() => {
     if (!selected) {
-      setProfileForm({ name: "", short_description: "", bio_md: "" });
+      setProfileForm({ name: "", short_description: "", bio_md: "", is_public: false });
       setNotes([]);
       return;
     }
@@ -109,6 +127,7 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
       name: selected.name,
       short_description: selected.short_description ?? "",
       bio_md: selected.bio_md ?? "",
+      is_public: Boolean(selected.is_public),
     });
   }, [selected]);
 
@@ -173,18 +192,90 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
     }
   };
 
+  const generateShortDescriptionAi = async () => {
+    if (!selectedId || !profileForm.name.trim()) return;
+    setGeneratingShortDesc(true);
+    try {
+      const res = await fetch("/api/ai/persona-short-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          persona_id: selectedId,
+          name: profileForm.name.trim(),
+          bio_md: profileForm.bio_md,
+        }),
+      });
+      const data = await parseResponseJson<{ short_description?: string; error?: string }>(res);
+      if (!res.ok) throw new Error(data.error || "生成失败");
+      const line = typeof data.short_description === "string" ? data.short_description.trim() : "";
+      if (!line) throw new Error("未返回简介");
+      setProfileForm((f) => ({ ...f, short_description: line }));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "生成失败");
+    } finally {
+      setGeneratingShortDesc(false);
+    }
+  };
+
+  const generateAllShortDescriptionsAi = async () => {
+    if (personas.length === 0) return;
+    if (
+      !confirm(
+        "将根据每个灵魂的「名字 + 完整角色档案」用 AI 重写一句话简介，并直接保存到数据库。人数较多时可能需要几十秒，确定继续？"
+      )
+    ) {
+      return;
+    }
+    setBulkGeneratingShortDesc(true);
+    try {
+      const res = await fetch("/api/ai/persona-short-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bulk: true }),
+      });
+      const data = await parseResponseJson<{
+        updated?: number;
+        total?: number;
+        errors?: string[];
+        error?: string;
+      }>(res);
+      if (!res.ok) throw new Error(data.error || "批量生成失败");
+      const errs = Array.isArray(data.errors) ? data.errors : [];
+      alert(
+        `已完成：${data.updated ?? 0} / ${data.total ?? 0} 个` +
+          (errs.length ? `\n部分失败：\n${errs.slice(0, 5).join("\n")}` : "")
+      );
+      await fetchPersonas();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "批量生成失败");
+    } finally {
+      setBulkGeneratingShortDesc(false);
+    }
+  };
+
+  /** rfMe 未加载时不锁定；加载后：主站/超管可改任意，否则仅本人人设可改 */
+  const canEditSelected =
+    !rfMe ||
+    rfMe.hasMainAccess ||
+    rfMe.isAdmin ||
+    (selected ? selected.user_id === rfMe.userId : false);
+
   const saveProfile = async () => {
     if (!selectedId || !profileForm.name.trim()) return;
     setSavingProfile(true);
     try {
+      const payload: Record<string, unknown> = {
+        name: profileForm.name.trim(),
+        short_description: profileForm.short_description.trim() || null,
+        bio_md: profileForm.bio_md,
+      };
+      if (rfMe?.isAdmin) {
+        payload.is_public = profileForm.is_public;
+      }
       const res = await fetch(`/api/personas/${selectedId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: profileForm.name.trim(),
-          short_description: profileForm.short_description.trim() || null,
-          bio_md: profileForm.bio_md,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await parseResponseJson<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error || "保存失败");
@@ -386,13 +477,26 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
           isRf ? "max-h-[40vh] overflow-hidden lg:max-h-none" : ""
         )}
       >
-        <div className="border-b border-[#E7E5E4] p-2">
+        <div className="space-y-2 border-b border-[#E7E5E4] p-2">
           <button
             type="button"
             onClick={() => void createPersona()}
             className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-[#E7E5E4] py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9]"
           >
             <Plus className="h-3.5 w-3.5" /> 新建人设
+          </button>
+          <button
+            type="button"
+            disabled={bulkGeneratingShortDesc || personas.length === 0}
+            onClick={() => void generateAllShortDescriptionsAi()}
+            className="flex w-full items-center justify-center gap-1 rounded-md border border-[#E7E5E4] bg-[#FAFAF9] py-2 text-xs font-medium text-[#1C1917] hover:bg-[#F5F5F4] disabled:opacity-50"
+          >
+            {bulkGeneratingShortDesc ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            全部 AI 一句话简介
           </button>
         </div>
         <div className={cn("max-h-[360px] overflow-y-auto p-2", isRf && "max-h-[min(40vh,320px)] lg:max-h-[calc(100dvh-12rem)]")}>
@@ -416,7 +520,24 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
                     : "text-[#1C1917] hover:bg-[#F5F5F4]"
                 )}
               >
+                <PersonaAvatar
+                  name={p.name}
+                  size={32}
+                  className={cn(
+                    selectedId === p.id ? "ring-2 ring-white/45" : "ring-black/[0.06]"
+                  )}
+                />
                 <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                {p.is_public && (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded px-1 py-0.5 text-[9px] font-medium",
+                      selectedId === p.id ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
+                    )}
+                  >
+                    公开
+                  </span>
+                )}
                 {p.short_description && (
                   <span
                     className={cn(
@@ -439,16 +560,22 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E7E5E4] px-4 py-3">
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-start gap-3">
+                {selected && (
+                  <PersonaAvatar name={selected.name} size={48} className="mt-0.5 ring-black/[0.08]" />
+                )}
+                <div className="min-w-0">
                 <h2 className="truncate text-base font-semibold text-[#1C1917]">{selected?.name}</h2>
                 {selected?.short_description && (
                   <p className="truncate text-xs text-[#78716C]">{selected.short_description}</p>
                 )}
+                </div>
               </div>
               <button
                 type="button"
+                disabled={!canEditSelected}
                 onClick={() => void deletePersona()}
-                className="shrink-0 rounded-md border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
+                className="shrink-0 rounded-md border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
               >
                 删除人设
               </button>
@@ -489,32 +616,65 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
                     <input
                       type="text"
                       value={profileForm.name}
+                      disabled={!canEditSelected}
                       onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
-                      className="h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+                      className="h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 disabled:bg-[#FAFAF9]"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-[#78716C]">一句话简介</label>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <label className="block text-xs font-medium text-[#78716C]">一句话简介</label>
+                      <button
+                        type="button"
+                        disabled={generatingShortDesc || !profileForm.name.trim() || !canEditSelected}
+                        onClick={() => void generateShortDescriptionAi()}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[#E7E5E4] bg-white px-2 py-1 text-[11px] font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
+                        title="根据当前名字与完整角色档案，用 AI 生成第一人称一句简介（可先改档案再点）"
+                      >
+                        {generatingShortDesc ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                        AI 生成
+                      </button>
+                    </div>
                     <input
                       type="text"
                       value={profileForm.short_description}
+                      disabled={!canEditSelected}
                       onChange={(e) => setProfileForm((f) => ({ ...f, short_description: e.target.value }))}
-                      className="h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+                      className="h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 disabled:bg-[#FAFAF9]"
+                      placeholder="第一人称一句，含年龄、身份、性格、爱好等"
                     />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-[#78716C]">完整角色（Markdown）</label>
                     <textarea
                       value={profileForm.bio_md}
+                      disabled={!canEditSelected}
                       onChange={(e) => setProfileForm((f) => ({ ...f, bio_md: e.target.value }))}
                       rows={14}
-                      className="w-full resize-y rounded-lg border border-[#E7E5E4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+                      className="w-full resize-y rounded-lg border border-[#E7E5E4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 disabled:bg-[#FAFAF9]"
                       placeholder="出生地、职业、生活小传、说话方式…"
                     />
                   </div>
+                  {rfMe?.isAdmin && (
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-[#44403C]">
+                      <input
+                        type="checkbox"
+                        checked={profileForm.is_public}
+                        onChange={(e) =>
+                          setProfileForm((f) => ({ ...f, is_public: e.target.checked }))
+                        }
+                        className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
+                      />
+                      <span>对副程序（Rednote Factory）公开 · RF 用户可见此人设</span>
+                    </label>
+                  )}
                   <button
                     type="button"
-                    disabled={savingProfile || !profileForm.name.trim()}
+                    disabled={savingProfile || !profileForm.name.trim() || !canEditSelected}
                     onClick={() => void saveProfile()}
                     className="rounded-lg bg-[#1C1917] px-4 py-2 text-sm font-medium text-white hover:bg-[#1C1917]/90 disabled:opacity-50"
                   >
@@ -528,7 +688,7 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      disabled={reembedding}
+                      disabled={reembedding || !canEditSelected}
                       onClick={() => void reembedAll()}
                       className="flex items-center gap-1 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
                     >
@@ -537,7 +697,7 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
                     </button>
                     <button
                       type="button"
-                      disabled={deduping}
+                      disabled={deduping || !canEditSelected}
                       onClick={() => void dedupeNotes()}
                       className="flex items-center gap-1 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
                     >
@@ -547,7 +707,7 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
                     <label
                       className={cn(
                         "flex cursor-pointer items-center gap-1 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9]",
-                        csvUploading && "pointer-events-none opacity-60"
+                        (csvUploading || !canEditSelected) && "pointer-events-none opacity-60"
                       )}
                     >
                       {csvUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
@@ -555,7 +715,7 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
                       <input
                         type="file"
                         accept=".csv,text/csv"
-                        disabled={csvUploading}
+                        disabled={csvUploading || !canEditSelected}
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
@@ -566,8 +726,9 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
                     </label>
                     <button
                       type="button"
+                      disabled={!canEditSelected}
                       onClick={() => setManualOpen(true)}
-                      className="rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9]"
+                      className="rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
                     >
                       手动添加
                     </button>
@@ -624,6 +785,7 @@ export function PersonaRagTab({ layoutVariant = "default" }: { layoutVariant?: "
                           </div>
                           <button
                             type="button"
+                            disabled={!canEditSelected}
                             onClick={() => void deleteNote(n.id)}
                             className="shrink-0 rounded p-1 text-[#A8A29E] hover:bg-red-50 hover:text-red-600"
                             aria-label="删除"

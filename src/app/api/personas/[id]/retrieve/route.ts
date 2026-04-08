@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
+import { canReadPersona } from "@/lib/persona-access";
 import { embedText } from "@/lib/persona-rag/embeddings";
 import {
   filterRetrievedBySimilarityThreshold,
@@ -21,10 +22,13 @@ export async function POST(
 
   const { data: persona } = await supabase
     .from("personas")
-    .select("id")
+    .select("id, user_id, is_public")
     .eq("id", personaId)
     .maybeSingle();
   if (!persona) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!canReadPersona(gate.session, persona)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const query = typeof body.query === "string" ? body.query.trim() : "";

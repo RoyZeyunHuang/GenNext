@@ -70,12 +70,49 @@ function RednoteLoginForm() {
           }
           router.refresh();
         } else {
+          const trimmedEmail = email.trim();
+          try {
+            const checkRes = await fetch("/api/auth/email-registered", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: trimmedEmail }),
+            });
+            if (checkRes.ok) {
+              const check = (await checkRes.json()) as {
+                registered?: boolean | null;
+                skipped?: boolean;
+              };
+              if (check.registered === true) {
+                setError(t("rednote.emailAlreadyRegistered"));
+                return;
+              }
+            }
+          } catch {
+            /* 预检失败则继续走 signUp，由 identities 兜底 */
+          }
+
           const { data, error: err } = await supabase.auth.signUp({
-            email: email.trim(),
+            email: trimmedEmail,
             password,
           });
           if (err) {
-            setError(t("rednote.signUpError"));
+            const msg = (err.message ?? "").toLowerCase();
+            if (
+              msg.includes("already") ||
+              msg.includes("registered") ||
+              msg.includes("exists") ||
+              err.status === 422
+            ) {
+              setError(t("rednote.emailAlreadyRegistered"));
+            } else {
+              setError(t("rednote.signUpError"));
+            }
+            return;
+          }
+          const identities = data.user?.identities;
+          if (data.user && (!identities || identities.length === 0)) {
+            await supabase.auth.signOut();
+            setError(t("rednote.emailAlreadyRegistered"));
             return;
           }
           if (data.session) {

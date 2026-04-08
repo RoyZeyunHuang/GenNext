@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
+import { canWritePersona } from "@/lib/persona-access";
 import { embedTexts } from "@/lib/persona-rag/embeddings";
 
 export const runtime = "nodejs";
@@ -17,10 +18,13 @@ export async function POST(
 
   const { data: persona } = await supabase
     .from("personas")
-    .select("id")
+    .select("id, user_id, is_public")
     .eq("id", personaId)
     .maybeSingle();
   if (!persona) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!canWritePersona(gate.session, persona)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const { data: notes, error: le } = await supabase
     .from("persona_notes")

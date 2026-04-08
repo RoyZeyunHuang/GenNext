@@ -16,6 +16,7 @@ import {
   type ScanResult,
 } from "@/lib/xhsForbiddenScan";
 import { isTitlePatternCategoryRow, resolvePromptDocRole } from "@/lib/doc-category-constants";
+import { PersonaAvatar } from "@/components/persona/PersonaAvatar";
 
 type Category = { id: string; name: string; icon: string; sort_order?: number };
 type Doc = { id: string; title: string; category_id: string };
@@ -42,7 +43,12 @@ function HighlightedForbiddenText({ text, scan }: { text: string; scan: ScanResu
   );
 }
 
-export function CopywriterClientRAG() {
+export function CopywriterClientRAG({
+  layoutVariant = "default",
+}: {
+  layoutVariant?: "default" | "rednote";
+}) {
+  const isRf = layoutVariant === "rednote";
   const [userInput, setUserInput] = useState("");
   const [personas, setPersonas] = useState<PersonaOpt[]>([]);
   const [personaId, setPersonaId] = useState<string>("");
@@ -170,7 +176,20 @@ export function CopywriterClientRAG() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-start">
+    <div
+      className={cn(
+        "grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-start",
+        isRf && "px-4 pb-4 pt-2 lg:px-6 lg:pb-6 lg:pt-4"
+      )}
+    >
+      {isRf && (
+        <div className="col-span-full lg:col-span-2">
+          <h1 className="text-[15px] font-bold text-[#1C1917] lg:text-lg">黑魔法笔记生成</h1>
+          <p className="mt-0.5 text-[11px] text-[#78716C] lg:text-xs">
+            人设档案请在主站内容工厂维护；此处仅生成正文。
+          </p>
+        </div>
+      )}
       <div className="space-y-4">
         <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
           <div className="mb-4">
@@ -182,7 +201,9 @@ export function CopywriterClientRAG() {
             </div>
             {personas.length === 0 ? (
               <p className="rounded-lg border border-dashed border-[#E7E5E4] bg-[#FAFAF9] px-3 py-6 text-center text-xs text-[#A8A29E]">
-                暂无人设，请先在内容工厂创建人设档案
+                {isRf
+                  ? "暂无人设：请用有主站权限的账号在「内容工厂」创建人设档案后再来生成。"
+                  : "暂无人设，请先在内容工厂创建人设档案"}
               </p>
             ) : (
               <div className="grid grid-cols-3 gap-1.5">
@@ -207,12 +228,21 @@ export function CopywriterClientRAG() {
                           aria-hidden
                         />
                       )}
-                      <div className="truncate pr-3 text-xs font-semibold leading-tight tracking-tight text-[#1C1917]">
-                        {p.name}
+                      <div className="flex gap-2.5 pr-3">
+                        <PersonaAvatar
+                          name={p.name}
+                          size={44}
+                          className={selected ? "ring-2 ring-[#1C1917]/25" : undefined}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs font-semibold leading-tight tracking-tight text-[#1C1917]">
+                            {p.name}
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[#78716C]">
+                            {p.short_description?.trim() || "—"}
+                          </p>
+                        </div>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[#78716C]">
-                        {p.short_description?.trim() || "—"}
-                      </p>
                     </button>
                   );
                 })}
