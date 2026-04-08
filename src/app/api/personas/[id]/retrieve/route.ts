@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
 import { embedText } from "@/lib/persona-rag/embeddings";
 import {
@@ -18,9 +18,9 @@ export async function POST(
   if (!gate.ok) return gate.response;
 
   const { id: personaId } = await params;
-  const supabase = createSupabaseServerClient();
+  const db = getSupabaseAdmin();
 
-  const { data: persona } = await supabase
+  const { data: persona } = await db
     .from("personas")
     .select("id")
     .eq("id", personaId)
@@ -48,7 +48,7 @@ export async function POST(
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
-  const { data: rows, error } = await supabase.rpc("match_persona_notes", {
+  const { data: rows, error } = await db.rpc("match_persona_notes", {
     p_persona_id: personaId,
     p_query_embedding: queryEmbedding,
     p_match_count: PERSONA_RETRIEVE_CANDIDATE_K,
