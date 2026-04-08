@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { maxTokensForBodyStream, normalizeArticleLength } from "@/lib/copy-generate-options";
 import { embedText } from "@/lib/persona-rag/embeddings";
 import { buildPersonaSystemPrompt } from "@/lib/persona-rag/prompt";
@@ -46,8 +45,8 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const sbUser = createSupabaseServerClient();
-  const { data: persona, error: pe } = await sbUser
+  const db = getSupabaseAdmin();
+  const { data: persona, error: pe } = await db
     .from("personas")
     .select("id, bio_md, name")
     .eq("id", persona_id)
@@ -68,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   let taskConstraint: string | undefined;
   if (task_template_doc_id) {
-    const { data: doc } = await supabase.from("docs").select("content").eq("id", task_template_doc_id).maybeSingle();
+    const { data: doc } = await db.from("docs").select("content").eq("id", task_template_doc_id).maybeSingle();
     const t = (doc?.content ?? "").trim();
     if (t) taskConstraint = t;
   }
@@ -90,7 +89,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const { data: candidates, error: me } = await sbUser.rpc("match_persona_notes", {
+  const { data: candidates, error: me } = await db.rpc("match_persona_notes", {
     p_persona_id: persona_id,
     p_query_embedding: queryEmbedding,
     p_match_count: PERSONA_RETRIEVE_FINAL_K,
