@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
 
 export const runtime = "nodejs";
@@ -14,7 +14,6 @@ export async function GET(
     if (!gate.ok) return gate.response;
 
     const { id } = await params;
-    const supabase = createSupabaseServerClient();
 
     const { data: persona, error: pe } = await supabase
       .from("personas")
@@ -64,7 +63,6 @@ export async function PATCH(
       return NextResponse.json({ error: "无有效字段" }, { status: 400 });
     }
 
-    const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
       .from("personas")
       .update(patchDb)
@@ -91,7 +89,6 @@ export async function DELETE(
     if (!gate.ok) return gate.response;
 
     const { id } = await params;
-    const supabase = createSupabaseServerClient();
     const { error } = await supabase.from("personas").delete().eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });

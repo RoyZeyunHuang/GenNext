@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
 
 export const runtime = "nodejs";
@@ -10,8 +10,7 @@ export async function GET() {
     const gate = await requirePersonaRagRoute();
     if (!gate.ok) return gate.response;
 
-    const db = getSupabaseAdmin();
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from("personas")
       .select("id, name, short_description, bio_md, source_url, created_at, updated_at")
       .order("updated_at", { ascending: false });
@@ -44,8 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "name 必填" }, { status: 400 });
     }
 
-    const db = getSupabaseAdmin();
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from("personas")
       .insert({
         user_id: gate.session.userId,

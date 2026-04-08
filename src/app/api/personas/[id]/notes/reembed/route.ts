@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
 import { embedTexts } from "@/lib/persona-rag/embeddings";
 
@@ -14,13 +14,11 @@ export async function POST(
   if (!gate.ok) return gate.response;
 
   const { id: personaId } = await params;
-  const supabase = createSupabaseServerClient();
 
   const { data: persona } = await supabase
     .from("personas")
     .select("id")
     .eq("id", personaId)
-    .eq("user_id", gate.session.userId)
     .maybeSingle();
   if (!persona) return NextResponse.json({ error: "not found" }, { status: 404 });
 
@@ -50,8 +48,7 @@ export async function POST(
     const { error: upErr } = await supabase
       .from("persona_notes")
       .update({ embedding: embeddings[i] })
-      .eq("id", notes[i].id)
-      .eq("user_id", gate.session.userId);
+      .eq("id", notes[i].id);
     if (upErr) {
       return NextResponse.json({ error: upErr.message }, { status: 500 });
     }

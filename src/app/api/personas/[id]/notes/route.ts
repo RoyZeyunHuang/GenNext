@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
 import { embedTexts } from "@/lib/persona-rag/embeddings";
 import { parsePersonaNotesCsv } from "@/lib/persona-rag/csv-notes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function ensurePersonaOwned(
-  supabase: ReturnType<typeof createSupabaseServerClient>,
-  personaId: string,
-  userId: string
-): Promise<boolean> {
-  const { data } = await supabase.from("personas").select("id").eq("id", personaId).eq("user_id", userId).maybeSingle();
-  return !!data;
-}
 
 export async function GET(
   _req: NextRequest,
@@ -24,10 +15,6 @@ export async function GET(
   if (!gate.ok) return gate.response;
 
   const { id: personaId } = await params;
-  const supabase = createSupabaseServerClient();
-  if (!(await ensurePersonaOwned(supabase, personaId, gate.session.userId))) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
-  }
 
   const { data, error } = await supabase
     .from("persona_notes")
@@ -47,10 +34,6 @@ export async function POST(
   if (!gate.ok) return gate.response;
 
   const { id: personaId } = await params;
-  const supabase = createSupabaseServerClient();
-  if (!(await ensurePersonaOwned(supabase, personaId, gate.session.userId))) {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
-  }
 
   const body = await req.json().catch(() => ({}));
 
