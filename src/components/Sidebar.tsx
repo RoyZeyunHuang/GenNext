@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   FolderOpen,
   PenLine,
+  Sparkles,
   Calendar,
   CalendarRange,
   Users,
@@ -22,13 +23,9 @@ import { useLocale } from "@/contexts/LocaleContext";
 const navItemsMain = [
   { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
   { href: "/documents", labelKey: "nav.documents", icon: FolderOpen },
+  { href: "/copywriter", labelKey: "nav.copywriter", icon: PenLine },
+  { href: "/copywriter-rag", labelKey: "nav.copywriterRag", icon: Sparkles },
 ] as const;
-
-const navItemCopywriter = {
-  href: "/copywriter",
-  labelKey: "nav.copywriter",
-  icon: PenLine,
-} as const;
 
 const navItemsAfterContentCreation = [
   { href: "/planning", labelKey: "nav.planning", icon: CalendarRange },
@@ -54,7 +51,8 @@ function navLinkClick(
 function navItemIsActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   if (href === "/dashboard") return false;
-  return pathname.startsWith(href);
+  if (href === "/copywriter" && pathname.startsWith("/copywriter-rag")) return false;
+  return pathname.startsWith(`${href}/`);
 }
 
 export function Sidebar() {
@@ -83,31 +81,6 @@ export function Sidebar() {
                 prefetch
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-[#1C1917] text-white"
-                    : "text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]"
-                )}
-                onClick={(e) => navLinkClick(e, href, router)}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                {t(labelKey)}
-              </Link>
-            );
-          })}
-          <div className="px-3 pb-1 pt-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A8A29E]">
-              {t("nav.contentCreationSection")}
-            </span>
-          </div>
-          {[navItemCopywriter].map(({ href, labelKey, icon: Icon }) => {
-            const isActive = navItemIsActive(pathname, href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                prefetch
-                className={cn(
-                  "flex items-center gap-3 rounded-lg py-2.5 pl-5 pr-3 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-[#1C1917] text-white"
                     : "text-[#78716C] hover:bg-[#F5F5F4] hover:text-[#1C1917]"

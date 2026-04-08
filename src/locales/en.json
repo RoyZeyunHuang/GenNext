@@ -2,8 +2,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "documents": "Content Factory",
-    "contentCreationSection": "Content creation",
-    "copywriter": "Black Magic Notes",
+    "copywriter": "Copywriter",
+    "copywriterRag": "Black Magic Notes",
     "planning": "Planning",
     "calendar": "AI Calendar",
     "crm": "BRM",
@@ -126,6 +126,7 @@
     "kpi": "KPI",
     "documents": "Content Factory",
     "copywriter": "Copywriter",
+    "copywriterRag": "Black Magic Notes",
     "planning": "Planning",
     "calendar": "AI Calendar",
     "news": "News",
@@ -218,6 +219,10 @@
   "copywriter": {
     "title": "Copywriter",
     "subtitle": "Enter requirements; AI matches assets and generates content"
+  },
+  "copywriterRag": {
+    "title": "Black Magic Notes",
+    "subtitle": "Persona + retrieved notes, streaming Xiaohongshu copy"
   },
   "settings": {
     "title": "Settings",

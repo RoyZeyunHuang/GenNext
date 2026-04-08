@@ -13,9 +13,9 @@ export default async function CopywriterRagPage() {
   return (
     <div className="p-6">
       <PageHeader
-        titleKey="copywriter.title"
-        subtitleKey="copywriter.subtitle"
-        pageTitleKey="pages.copywriter"
+        titleKey="copywriterRag.title"
+        subtitleKey="copywriterRag.subtitle"
+        pageTitleKey="pages.copywriterRag"
       />
       <CopywriterClientRAG />
     </div>
