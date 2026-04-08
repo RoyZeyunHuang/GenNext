@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
+import { canReadPersona, canSetPersonaPublic, canWritePersona } from "@/lib/persona-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const PERSONA_SELECT =
+  "id, user_id, name, short_description, bio_md, source_url, is_public, created_at, updated_at";
 
 export async function GET(
   _req: NextRequest,
@@ -17,12 +21,16 @@ export async function GET(
 
     const { data: persona, error: pe } = await supabase
       .from("personas")
-      .select("id, name, short_description, bio_md, source_url, created_at, updated_at")
+      .select(PERSONA_SELECT)
       .eq("id", id)
       .maybeSingle();
 
     if (pe) return NextResponse.json({ error: pe.message }, { status: 500 });
     if (!persona) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+    if (!canReadPersona(gate.session, persona)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
 
     const { count, error: ce } = await supabase
       .from("persona_notes")
@@ -50,7 +58,20 @@ export async function PATCH(
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
 
-    const patchDb: Record<string, string | null> & { updated_at?: string } = {
+    const { data: existing, error: fe } = await supabase
+      .from("personas")
+      .select(PERSONA_SELECT)
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fe) return NextResponse.json({ error: fe.message }, { status: 500 });
+    if (!existing) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+    if (!canWritePersona(gate.session, existing)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+
+    const patchDb: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
 
@@ -58,6 +79,13 @@ export async function PATCH(
     if (typeof body.short_description === "string")
       patchDb.short_description = body.short_description.trim() || null;
     if (typeof body.bio_md === "string") patchDb.bio_md = body.bio_md;
+
+    if (typeof body.is_public === "boolean") {
+      if (!canSetPersonaPublic(gate.session)) {
+        return NextResponse.json({ error: "forbidden: only super admin can set is_public" }, { status: 403 });
+      }
+      patchDb.is_public = body.is_public;
+    }
 
     if (Object.keys(patchDb).length <= 1) {
       return NextResponse.json({ error: "无有效字段" }, { status: 400 });
@@ -67,7 +95,7 @@ export async function PATCH(
       .from("personas")
       .update(patchDb)
       .eq("id", id)
-      .select("id, name, short_description, bio_md, source_url, created_at, updated_at")
+      .select(PERSONA_SELECT)
       .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -89,6 +117,20 @@ export async function DELETE(
     if (!gate.ok) return gate.response;
 
     const { id } = await params;
+
+    const { data: existing, error: fe } = await supabase
+      .from("personas")
+      .select("id, user_id, is_public")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (fe) return NextResponse.json({ error: fe.message }, { status: 500 });
+    if (!existing) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+    if (!canWritePersona(gate.session, existing)) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+
     const { error } = await supabase.from("personas").delete().eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });

@@ -32,6 +32,7 @@
     "needAccount": "Need an account? Sign up",
     "authError": "Sign-in failed. Check your email and password.",
     "signUpError": "Sign-up failed. Try again later.",
+    "emailAlreadyRegistered": "This email is already registered. Please sign in.",
     "signUpCheckEmail": "Check your email to confirm your account (if email confirmation is enabled).",
     "adminContact": "No account? Ask your admin for access.",
     "pages": {

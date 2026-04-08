@@ -105,6 +105,8 @@ export function ContentFactoryClient({
 
   const isRf = layoutVariant === "rednote";
   const showRagTab = canUseRagFeature(rfMe);
+  /** 副程序素材库不展示「人设 RAG 库」，人设只在主站内容工厂配置 */
+  const showPersonaRagTab = showRagTab && !isRf;
 
   useEffect(() => {
     if (contentFactoryTab === "persona-rag") setCategoryMenuId(null);
@@ -419,7 +421,7 @@ export function ContentFactoryClient({
     <div ref={factoryRootRef} className="min-w-0">
       {isRf ? (
         <>
-          {showRagTab && (
+          {showPersonaRagTab && (
             <div className="relative z-20 flex w-full shrink-0 flex-wrap gap-1 border-b border-[#E7E5E4] bg-[#FAFAF9] px-2 py-2">
               <button
                 type="button"
@@ -453,9 +455,9 @@ export function ContentFactoryClient({
               </button>
             </div>
           )}
-          {showRagTab && contentFactoryTab === "persona-rag" ? (
+          {showPersonaRagTab && contentFactoryTab === "persona-rag" ? (
             <div className="flex min-h-0 w-full flex-1 flex-col overflow-auto bg-white p-3 lg:min-h-[calc(100dvh-48px)] lg:p-4">
-              <PersonaRagTab layoutVariant="rednote" />
+              <PersonaRagTab layoutVariant="rednote" rfMe={rfMe} />
             </div>
           ) : (
         <div className="relative flex min-h-0 flex-1 flex-col bg-white lg:min-h-[calc(100dvh-48px)] lg:flex-row">
@@ -736,7 +738,7 @@ export function ContentFactoryClient({
         </>
       ) : (
     <>
-      {showRagTab && (
+      {showPersonaRagTab && (
         <div className="relative z-20 flex flex-wrap gap-1 rounded-lg border border-[#E7E5E4] bg-white p-1">
           <button
             type="button"
@@ -770,8 +772,8 @@ export function ContentFactoryClient({
           </button>
         </div>
       )}
-      {showRagTab && contentFactoryTab === "persona-rag" ? (
-        <PersonaRagTab />
+      {showPersonaRagTab && contentFactoryTab === "persona-rag" ? (
+        <PersonaRagTab rfMe={rfMe} />
       ) : (
     <div className="flex gap-6">
       {/* 左侧：类别列表 */}

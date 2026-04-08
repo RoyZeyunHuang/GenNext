@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, LogOut, PenLine, User } from "lucide-react";
+import { BookOpen, LogOut, PenLine, Sparkles, User } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
 const COPYWRITER = "/rednote-factory/copywriter";
+const COPYWRITER_RAG = "/rednote-factory/copywriter-rag";
 const DOCUMENTS = "/rednote-factory/documents";
 
 function TabItem({
@@ -96,6 +97,7 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const onCopy = pathname === COPYWRITER || pathname.startsWith(`${COPYWRITER}/`);
+  const onRag = pathname === COPYWRITER_RAG || pathname.startsWith(`${COPYWRITER_RAG}/`);
   const onDocs = pathname === DOCUMENTS || pathname.startsWith(`${DOCUMENTS}/`);
 
   return (
@@ -116,6 +118,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onCopy}
             icon={PenLine}
             label="创作"
+          />
+          <SidebarItem
+            href={COPYWRITER_RAG}
+            active={onRag}
+            icon={Sparkles}
+            label="黑魔法"
           />
           <SidebarItem
             href={DOCUMENTS}
@@ -174,6 +182,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onCopy}
             icon={PenLine}
             label="创作"
+          />
+          <TabItem
+            href={COPYWRITER_RAG}
+            active={onRag}
+            icon={Sparkles}
+            label="黑魔法"
           />
           <TabItem
             href={DOCUMENTS}

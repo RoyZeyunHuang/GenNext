@@ -1,6 +1,6 @@
 /**
- * RAG 人设链路：与中间件一致，仅「主站入口」用户（app_metadata.has_main_access）可用。
- * Rednote 子站无该权限的用户不会看到 tab，API 返回 403。
+ * 主站 UI：仅「主站入口」用户（app_metadata.has_main_access）在内容工厂里看到「人设 RAG 库」等入口。
+ * API 鉴权见 `requirePersonaRagRoute`（已登录即可）；副程序素材库不展示人设页。
  */
 export function canUseRagFeature(
   session: { hasMainAccess?: boolean } | null | undefined

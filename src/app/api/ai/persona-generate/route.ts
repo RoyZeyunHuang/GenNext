@@ -5,6 +5,7 @@ import { maxTokensForBodyStream, normalizeArticleLength } from "@/lib/copy-gener
 import { embedText } from "@/lib/persona-rag/embeddings";
 import { buildPersonaSystemPrompt } from "@/lib/persona-rag/prompt";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
+import { canReadPersona } from "@/lib/persona-access";
 import {
   PERSONA_RETRIEVE_FINAL_K,
   classifyRetrievalMode,
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   const { data: persona, error: pe } = await supabase
     .from("personas")
-    .select("id, bio_md, name")
+    .select("id, bio_md, name, user_id, is_public")
     .eq("id", persona_id)
     .maybeSingle();
 
@@ -60,6 +61,12 @@ export async function POST(req: NextRequest) {
   if (!persona) {
     return new Response(JSON.stringify({ error: "persona not found" }), {
       status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (!canReadPersona(gate.session, persona)) {
+    return new Response(JSON.stringify({ error: "forbidden" }), {
+      status: 403,
       headers: { "Content-Type": "application/json" },
     });
   }

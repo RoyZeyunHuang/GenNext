@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
+import { personaListOrFilter } from "@/lib/persona-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const PERSONA_SELECT =
+  "id, user_id, name, short_description, bio_md, source_url, is_public, created_at, updated_at";
 
 export async function GET() {
   try {
     const gate = await requirePersonaRagRoute();
     if (!gate.ok) return gate.response;
 
-    const { data, error } = await supabase
-      .from("personas")
-      .select("id, name, short_description, bio_md, source_url, created_at, updated_at")
-      .order("updated_at", { ascending: false });
+    let q = supabase.from("personas").select(PERSONA_SELECT).order("updated_at", { ascending: false });
+    const orFilter = personaListOrFilter(gate.session);
+    if (orFilter) {
+      q = q.or(orFilter);
+    }
+
+    const { data, error } = await q;
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json(data ?? []);
@@ -51,8 +58,9 @@ export async function POST(req: NextRequest) {
         short_description,
         bio_md,
         source_url,
+        is_public: false,
       })
-      .select("id, name, short_description, bio_md, source_url, created_at, updated_at")
+      .select(PERSONA_SELECT)
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

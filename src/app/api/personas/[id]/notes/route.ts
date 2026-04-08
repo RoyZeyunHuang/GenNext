@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
+import { canReadPersona, canWritePersona } from "@/lib/persona-access";
 import { embedTexts } from "@/lib/persona-rag/embeddings";
 import { parsePersonaNotesCsv } from "@/lib/persona-rag/csv-notes";
 
@@ -15,6 +16,16 @@ export async function GET(
   if (!gate.ok) return gate.response;
 
   const { id: personaId } = await params;
+
+  const { data: persona } = await supabase
+    .from("personas")
+    .select("user_id, is_public")
+    .eq("id", personaId)
+    .maybeSingle();
+  if (!persona) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!canReadPersona(gate.session, persona)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const { data, error } = await supabase
     .from("persona_notes")
@@ -34,6 +45,16 @@ export async function POST(
   if (!gate.ok) return gate.response;
 
   const { id: personaId } = await params;
+
+  const { data: persona } = await supabase
+    .from("personas")
+    .select("user_id, is_public")
+    .eq("id", personaId)
+    .maybeSingle();
+  if (!persona) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!canWritePersona(gate.session, persona)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, Plus, Pencil, Trash2, X, Loader2, Mail } from "lucide-react";
 import { cn, formatThrownError, formatUserFacingError } from "@/lib/utils";
 import { EmailTemplatesClient } from "@/components/settings/EmailTemplatesClient";
+import { PermissionSettingsClient } from "@/components/settings/PermissionSettingsClient";
 
 const COLORS = ["#4a90d9", "#21c354", "#e67e22", "#9b59b6", "#e74c3c", "#1abc9c", "#f39c12", "#3498db"];
 
@@ -197,7 +198,7 @@ export function SettingsClient() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="max-w-3xl space-y-6">
       <div className="rounded-xl border border-[#E7E5E4] bg-white p-6">
         <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#1C1917]">
           <Mail className="h-5 w-5 text-[#78716C]" />
@@ -502,6 +503,8 @@ export function SettingsClient() {
           <p className="py-4 text-sm text-[#78716C]">暂无账号，点击「添加账号」或从 KPI 投放数据导入后会自动同步</p>
         )}
       </div>
+
+      <PermissionSettingsClient />
     </div>
   );
 }

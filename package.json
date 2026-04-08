@@ -11,7 +11,8 @@
     "migrate:032-docs-owner-id": "node scripts/apply-sql-migration.mjs supabase/migrations/032_docs_owner_id.sql",
     "research:consolidate-contacts": "node scripts/consolidate-research-property-contacts.mjs",
     "research:linkedin-lookup": "node scripts/enrich-master-linkedin-lookup.mjs",
-    "research:master-full": "npm run research:consolidate-contacts && npm run research:linkedin-lookup"
+    "research:master-full": "npm run research:consolidate-contacts && npm run research:linkedin-lookup",
+    "archive:persona-rag": "node --env-file=.env.local scripts/export-persona-rag-archive.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
