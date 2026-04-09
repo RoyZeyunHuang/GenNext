@@ -7,6 +7,7 @@ type AdminUserRow = {
   email: string | undefined;
   created_at: string | undefined;
   has_main_access: boolean;
+  persona_generate_unlimited: boolean;
   is_rf_admin: boolean;
 };
 
@@ -48,21 +49,29 @@ export function PermissionSettingsClient() {
     if (me?.isAdmin) void fetchUsers();
   }, [me?.isAdmin, fetchUsers]);
 
-  const toggleMainAccess = async (id: string, next: boolean) => {
+  const patchUserMeta = async (id: string, body: Record<string, boolean>) => {
     setSavingId(id);
     setError(null);
     try {
       const res = await fetch(`/api/admin/users/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ has_main_access: next }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(typeof data.error === "string" ? data.error : "保存失败");
       }
       setUsers((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, has_main_access: next } : u))
+        prev.map((u) =>
+          u.id === id
+            ? {
+                ...u,
+                has_main_access: data.has_main_access === true,
+                persona_generate_unlimited: data.persona_generate_unlimited === true,
+              }
+            : u
+        )
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存失败");
@@ -83,7 +92,7 @@ export function PermissionSettingsClient() {
       </div>
       <p className="mb-4 text-sm text-[#78716C]">
         仅超级管理员可见。主站入口（has_main_access）决定用户能否进入主站 Dashboard / 内容工厂等；副程序账号默认仅有 Rednote
-        Factory。超管人设「对副程序公开」在内容工厂人设页单独设置。
+        Factory。黑魔法生成默认每人每日 15 次（UTC 换日），勾选「黑魔法不限次」可关闭该限制。超管人设「对副程序公开」在内容工厂人设页单独设置。
       </p>
 
       {loading ? (
@@ -95,12 +104,13 @@ export function PermissionSettingsClient() {
         <p className="text-sm text-red-600">{error}</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-[#E7E5E4] bg-white">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead>
               <tr className="border-b border-[#E7E5E4] bg-[#FAFAF9] text-xs font-medium text-[#78716C]">
                 <th className="px-4 py-3">邮箱</th>
                 <th className="px-4 py-3">注册时间</th>
                 <th className="px-4 py-3">主站入口</th>
+                <th className="px-4 py-3">黑魔法不限次</th>
                 <th className="px-4 py-3">超管</th>
               </tr>
             </thead>
@@ -122,12 +132,29 @@ export function PermissionSettingsClient() {
                         type="checkbox"
                         checked={u.has_main_access}
                         disabled={savingId === u.id}
-                        onChange={(e) => void toggleMainAccess(u.id, e.target.checked)}
+                        onChange={(e) =>
+                          void patchUserMeta(u.id, { has_main_access: e.target.checked })
+                        }
                         className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
                       />
                       {savingId === u.id ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin text-[#A8A29E]" />
                       ) : null}
+                    </label>
+                  </td>
+                  <td className="px-4 py-3">
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={u.persona_generate_unlimited}
+                        disabled={savingId === u.id}
+                        onChange={(e) =>
+                          void patchUserMeta(u.id, {
+                            persona_generate_unlimited: e.target.checked,
+                          })
+                        }
+                        className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
+                      />
                     </label>
                   </td>
                   <td className="px-4 py-3 text-[#78716C]">{u.is_rf_admin ? "是（环境变量）" : "—"}</td>

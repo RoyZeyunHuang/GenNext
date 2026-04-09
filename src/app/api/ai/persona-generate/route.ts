@@ -11,6 +11,7 @@ import {
   classifyRetrievalMode,
   normalizePersonaRpcRows,
 } from "@/lib/persona-rag/retrieve-threshold";
+import { tryConsumePersonaGenerateSlot } from "@/lib/persona-generate-quota";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
@@ -119,6 +120,30 @@ export async function POST(req: NextRequest) {
     taskConstraint,
     articleLengthRaw: articleLength,
   });
+
+  if (!gate.session.personaGenerateUnlimited) {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return new Response(
+        JSON.stringify({ error: "服务器未配置 SUPABASE_SERVICE_ROLE_KEY，无法校验黑魔法每日额度" }),
+        { status: 503, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const slot = await tryConsumePersonaGenerateSlot(gate.session.userId);
+    if (slot === null) {
+      return new Response(JSON.stringify({ error: "额度校验失败，请稍后重试" }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (!slot.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: `今日黑魔法生成次数已用完（每日 ${slot.limit} 次），请明日再试或联系管理员开通不限次`,
+        }),
+        { status: 429, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }
 
   const headerPayload = {
     mode: retrievalMode,

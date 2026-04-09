@@ -27,6 +27,7 @@ export async function GET() {
       email: string | undefined;
       created_at: string | undefined;
       has_main_access: boolean;
+      persona_generate_unlimited: boolean;
       is_rf_admin: boolean;
     }[] = [];
 
@@ -44,6 +45,7 @@ export async function GET() {
           email: u.email,
           created_at: u.created_at,
           has_main_access: u.app_metadata?.has_main_access === true,
+          persona_generate_unlimited: u.app_metadata?.persona_generate_unlimited === true,
           is_rf_admin: isRfAdmin(u.email),
         });
       }

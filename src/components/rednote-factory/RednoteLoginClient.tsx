@@ -153,88 +153,101 @@ function RednoteLoginForm() {
     setMessage(null);
   };
 
+  const inputClass =
+    "h-12 w-full rounded-xl border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] shadow-sm outline-none transition placeholder:text-[#A8A29E] focus:border-[#D6D3D1] focus:ring-2 focus:ring-[#1C1917]/15";
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAFAF9] px-7 pb-16">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#F5F5F4] px-5 pb-16 pt-4 sm:px-7">
       <div className="w-full max-w-[400px]">
-        <div className="mb-9 text-center">
+        <div className="mb-8 text-center">
           <div className="text-[30px] font-black tracking-[2px] text-[#1C1917]">REDNOTE</div>
           <div className="mt-1 text-[11px] font-medium tracking-[1.5px] text-[#A8A29E]">FACTORY</div>
         </div>
 
-        <form className="w-full space-y-0" onSubmit={submit}>
-          <label htmlFor="rf-email" className="mb-1.5 block text-xs font-semibold text-[#78716C]">
-            {t("rednote.email")}
-          </label>
-          <input
-            id="rf-email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
-          />
-          {mode === "signUp" && (
-            <p className="-mt-2 mb-3.5 text-[11px] text-[#A8A29E]">{t("rednote.signUpEmailHint")}</p>
-          )}
-          {mode !== "forgotPassword" && (
-            <>
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <label htmlFor="rf-password" className="block text-xs font-semibold text-[#78716C]">
-                  {t("rednote.password")}
-                </label>
-                {mode === "signIn" && (
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-[#1C1917] underline-offset-2 hover:underline"
-                    onClick={() => switchMode("forgotPassword")}
-                  >
-                    {t("rednote.forgotPassword")}
-                  </button>
+        <div className="rounded-2xl border border-[#E7E5E4]/80 bg-white p-6 shadow-[0_2px_12px_-4px_rgba(28,25,23,0.08)] sm:p-8">
+          <form className="flex w-full flex-col gap-5" onSubmit={submit}>
+            <div className="space-y-1.5">
+              <label htmlFor="rf-email" className="block text-xs font-semibold text-[#57534E]">
+                {t("rednote.email")}
+              </label>
+              <input
+                id="rf-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClass}
+              />
+              {mode === "signUp" && (
+                <p className="pt-0.5 text-[11px] leading-snug text-[#A8A29E]">{t("rednote.signUpEmailHint")}</p>
+              )}
+            </div>
+
+            {mode !== "forgotPassword" && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="rf-password" className="block text-xs font-semibold text-[#57534E]">
+                    {t("rednote.password")}
+                  </label>
+                  {mode === "signIn" && (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-[#44403C] underline-offset-2 hover:text-[#1C1917] hover:underline"
+                      onClick={() => switchMode("forgotPassword")}
+                    >
+                      {t("rednote.forgotPassword")}
+                    </button>
+                  )}
+                </div>
+                <input
+                  id="rf-password"
+                  type="password"
+                  autoComplete={mode === "signIn" ? "current-password" : "new-password"}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            )}
+
+            {(error || message) && (
+              <div className="space-y-2">
+                {error && (
+                  <p className="text-sm leading-relaxed text-red-600" role="alert">
+                    {error}
+                  </p>
+                )}
+                {message && (
+                  <p className="text-sm leading-relaxed text-emerald-700" role="status">
+                    {message}
+                  </p>
                 )}
               </div>
-              <input
-                id="rf-password"
-                type="password"
-                autoComplete={mode === "signIn" ? "current-password" : "new-password"}
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
-              />
-            </>
-          )}
+            )}
 
-          {error && (
-            <p className="mb-2 text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
-          {message && (
-            <p className="mb-2 text-sm text-emerald-700" role="status">
-              {message}
-            </p>
-          )}
+            <button
+              type="submit"
+              disabled={loading}
+              aria-busy={loading}
+              className="min-h-12 w-full rounded-xl bg-[#1C1917] text-[15px] font-semibold text-white shadow-sm transition hover:bg-[#292524] hover:shadow active:scale-[0.99] disabled:scale-100 disabled:opacity-55 disabled:shadow-none"
+            >
+              {loading
+                ? t("common.loading")
+                : mode === "forgotPassword"
+                  ? t("rednote.sendResetEmail")
+                  : mode === "signIn"
+                    ? t("rednote.signIn")
+                    : t("rednote.signUp")}
+            </button>
+          </form>
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-1.5 h-12 w-full rounded-[10px] bg-[#1C1917] text-[15px] font-semibold text-white transition hover:bg-[#292524] disabled:opacity-60"
-          >
-            {loading
-              ? t("common.loading")
-              : mode === "forgotPassword"
-                ? t("rednote.sendResetEmail")
-                : mode === "signIn"
-                  ? t("rednote.signIn")
-                  : t("rednote.signUp")}
-          </button>
-        </form>
+        <p className="mt-8 text-center text-[11px] leading-relaxed text-[#A8A29E]">{t("rednote.adminContact")}</p>
 
-        <p className="mt-7 text-center text-xs text-[#A8A29E]">{t("rednote.adminContact")}</p>
-
-        <p className="mt-4 text-center text-sm text-[#78716C]">
+        <p className="mt-3 text-center text-sm text-[#57534E]">
           {mode === "forgotPassword" ? (
             <button
               type="button"

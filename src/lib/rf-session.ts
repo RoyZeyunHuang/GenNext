@@ -7,6 +7,8 @@ export type RfSession = {
   email: string | undefined;
   isAdmin: boolean;
   hasMainAccess: boolean;
+  /** app_metadata：黑魔法生成不限次（由超管在设置里勾选） */
+  personaGenerateUnlimited: boolean;
 };
 
 /**
@@ -41,6 +43,7 @@ export async function getRfSession(): Promise<RfSession | null> {
       email: user.email,
       isAdmin: isRfAdmin(user.email),
       hasMainAccess: user.app_metadata?.has_main_access === true,
+      personaGenerateUnlimited: user.app_metadata?.persona_generate_unlimited === true,
     };
   } catch {
     return null;
