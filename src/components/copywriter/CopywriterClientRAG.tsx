@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, Loader2, ShieldAlert, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -21,6 +21,13 @@ import { PersonaAvatar } from "@/components/persona/PersonaAvatar";
 type Category = { id: string; name: string; icon: string; sort_order?: number };
 type Doc = { id: string; title: string; category_id: string };
 type PersonaOpt = { id: string; name: string; short_description: string | null };
+
+type PersonaQuota = {
+  unlimited: boolean;
+  used: number;
+  limit: number;
+  remaining: number | null;
+};
 
 function HighlightedForbiddenText({ text, scan }: { text: string; scan: ScanResult }) {
   const segs = segmentsForHighlight(text, scan.levelAt);
@@ -62,6 +69,40 @@ export function CopywriterClientRAG({
   const [copied, setCopied] = useState(false);
   const [starred, setStarred] = useState(false);
   const [sensitiveScan, setSensitiveScan] = useState<ScanResult | null>(null);
+  const [quota, setQuota] = useState<PersonaQuota | null>(null);
+
+  const refreshQuota = useCallback(() => {
+    void fetch("/api/rf/me")
+      .then((r) => r.json())
+      .then(
+        (j: {
+          userId?: string | null;
+          personaGenerateUnlimited?: boolean;
+          personaGenerateUsed?: number;
+          personaGenerateLimit?: number;
+          personaGenerateRemaining?: number | null;
+        }) => {
+          if (!j.userId) {
+            setQuota(null);
+            return;
+          }
+          setQuota({
+            unlimited: Boolean(j.personaGenerateUnlimited),
+            used: typeof j.personaGenerateUsed === "number" ? j.personaGenerateUsed : 0,
+            limit: typeof j.personaGenerateLimit === "number" ? j.personaGenerateLimit : 15,
+            remaining:
+              j.personaGenerateRemaining === null || j.personaGenerateRemaining === undefined
+                ? null
+                : j.personaGenerateRemaining,
+          });
+        }
+      )
+      .catch(() => setQuota(null));
+  }, []);
+
+  useEffect(() => {
+    refreshQuota();
+  }, [refreshQuota]);
 
   useEffect(() => {
     void fetch("/api/personas")
@@ -147,6 +188,7 @@ export function CopywriterClientRAG({
       setError(e instanceof Error ? e.message : "生成失败");
     } finally {
       setGenerating(false);
+      void refreshQuota();
     }
   };
 
@@ -186,7 +228,7 @@ export function CopywriterClientRAG({
         <div className="col-span-full lg:col-span-2">
           <h1 className="text-[15px] font-bold text-[#1C1917] lg:text-lg">黑魔法笔记生成</h1>
           <p className="mt-0.5 text-[11px] text-[#78716C] lg:text-xs">
-            人设档案请在主站内容工厂维护；此处仅生成正文。
+            黑魔法全身变🪄
           </p>
         </div>
       )}
@@ -206,7 +248,7 @@ export function CopywriterClientRAG({
                   : "暂无人设，请先在内容工厂创建人设档案"}
               </p>
             ) : (
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-1.5">
                 {personas.map((p) => {
                   const selected = personaId === p.id;
                   return (
@@ -295,9 +337,26 @@ export function CopywriterClientRAG({
             </div>
           </div>
 
+          {quota && (
+            <p className="mt-4 text-[11px] leading-relaxed text-[#78716C] lg:text-xs">
+              {quota.unlimited ? (
+                <span className="text-emerald-700">黑魔法生成：不限次数</span>
+              ) : (
+                <>
+                  今日剩余 <span className="font-semibold text-[#1C1917]">{quota.remaining}</span> /{" "}
+                  {quota.limit} 次（按 UTC 自然日重置）
+                </>
+              )}
+            </p>
+          )}
+
           <button
             type="button"
-            disabled={generating || !personaId}
+            disabled={
+              generating ||
+              !personaId ||
+              (!!quota && !quota.unlimited && quota.remaining === 0)
+            }
             onClick={() => void generate()}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-2.5 text-sm font-medium text-white hover:bg-[#1C1917]/90 disabled:opacity-50"
           >

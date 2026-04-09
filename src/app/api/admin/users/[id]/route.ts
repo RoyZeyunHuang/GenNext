@@ -21,8 +21,18 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  if (typeof body.has_main_access !== "boolean") {
-    return NextResponse.json({ error: "has_main_access 须为布尔值" }, { status: 400 });
+  const hasMain =
+    typeof body.has_main_access === "boolean" ? body.has_main_access : undefined;
+  const personaUnlimited =
+    typeof body.persona_generate_unlimited === "boolean"
+      ? body.persona_generate_unlimited
+      : undefined;
+
+  if (hasMain === undefined && personaUnlimited === undefined) {
+    return NextResponse.json(
+      { error: "请提供 has_main_access 或 persona_generate_unlimited（布尔值）" },
+      { status: 400 }
+    );
   }
 
   try {
@@ -37,11 +47,12 @@ export async function PATCH(
         ? { ...current.user.app_metadata }
         : {};
 
+    const nextMeta = { ...prevMeta };
+    if (hasMain !== undefined) nextMeta.has_main_access = hasMain;
+    if (personaUnlimited !== undefined) nextMeta.persona_generate_unlimited = personaUnlimited;
+
     const { data: updated, error: ue } = await admin.auth.admin.updateUserById(id, {
-      app_metadata: {
-        ...prevMeta,
-        has_main_access: body.has_main_access,
-      },
+      app_metadata: nextMeta,
     });
 
     if (ue) {
@@ -52,6 +63,8 @@ export async function PATCH(
       id: updated.user?.id,
       email: updated.user?.email,
       has_main_access: updated.user?.app_metadata?.has_main_access === true,
+      persona_generate_unlimited:
+        updated.user?.app_metadata?.persona_generate_unlimited === true,
     });
   } catch (e) {
     console.error("[PATCH /api/admin/users/[id]]", e);
