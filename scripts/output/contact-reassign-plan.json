@@ -1,0 +1,580 @@
+{
+  "generatedAt": "2026-04-01T14:30:12.304Z",
+  "sourceReport": "/Users/roycehuang/GenNext/scripts/output/contact-domain-mismatch-report.json",
+  "summary": {
+    "fromMismatches": 18,
+    "readyToReassign": 3,
+    "ambiguous": 6,
+    "unmatched": 9,
+    "duplicateConflict": 0
+  },
+  "proposals": [
+    {
+      "contactId": "dcad3539-40dc-478f-a781-55fe0ee7c93a",
+      "contactName": "David Maundrell III",
+      "contactEmail": "dmaundrell@corcoran.com",
+      "fromCompanyId": "00e5d1f4-cc12-44c0-8b25-da0949acc27a",
+      "fromCompanyName": "Cape Advisors",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "ambiguous",
+      "method": "name_align",
+      "ambiguous": true,
+      "candidates": [
+        {
+          "id": "f2138feb-8991-4983-b2da-69ea432a38b9",
+          "name": "Corcoran New Development",
+          "method": "name_align"
+        },
+        {
+          "id": "d1102572-a2de-4e97-a1de-f98041b8986e",
+          "name": "Corcoran Group Marketing",
+          "method": "name_align"
+        }
+      ],
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "370a2d48-9f3e-473f-99a8-1d8976517e57",
+      "contactName": "Jodi Stasse",
+      "contactEmail": "jstasse@corcoran.com",
+      "fromCompanyId": "00e5d1f4-cc12-44c0-8b25-da0949acc27a",
+      "fromCompanyName": "Cape Advisors",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "ambiguous",
+      "method": "name_align",
+      "ambiguous": true,
+      "candidates": [
+        {
+          "id": "f2138feb-8991-4983-b2da-69ea432a38b9",
+          "name": "Corcoran New Development",
+          "method": "name_align"
+        },
+        {
+          "id": "d1102572-a2de-4e97-a1de-f98041b8986e",
+          "name": "Corcoran Group Marketing",
+          "method": "name_align"
+        }
+      ],
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "b6b3867b-a7f5-483f-a122-cdc9e8b156e7",
+      "contactName": "Property-Specific Inquiries",
+      "contactEmail": "astoriawest@corcoran.com",
+      "fromCompanyId": "00e5d1f4-cc12-44c0-8b25-da0949acc27a",
+      "fromCompanyName": "Cape Advisors",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "ambiguous",
+      "method": "name_align",
+      "ambiguous": true,
+      "candidates": [
+        {
+          "id": "f2138feb-8991-4983-b2da-69ea432a38b9",
+          "name": "Corcoran New Development",
+          "method": "name_align"
+        }
+      ],
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "8ac018ad-aad4-4ffe-bdb4-488c2097e298",
+      "contactName": "Jacqueline Urgo",
+      "contactEmail": "jurgo@themarketingdirectorsinc.com",
+      "fromCompanyId": "07235575-b828-4451-8171-dd9d07c370e9",
+      "fromCompanyName": "Grubb Properties",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "ambiguous",
+      "method": "name_align",
+      "ambiguous": true,
+      "candidates": [
+        {
+          "id": "1f126c63-ab98-4b38-a9c8-91b67dc0ce67",
+          "name": "The Marketing Directors",
+          "method": "name_align"
+        },
+        {
+          "id": "8cdc46d1-d80f-426d-8126-ae39ec22a01e",
+          "name": "The Marketing Directors / Kushner (In-House?)",
+          "method": "name_align"
+        }
+      ],
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "356c8c73-f91c-4cfb-a6bc-f0d267ea6c94",
+      "contactName": "General Leasing",
+      "contactEmail": "leasing@ccmanagers.com",
+      "fromCompanyId": "03354c5a-7c2d-4969-961b-ca37adaea377",
+      "fromCompanyName": "LMXD",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "fadfdc80-b383-4486-9a9b-da762b4228e7",
+      "contactName": "David Wolkoff",
+      "contactEmail": "dwolkoff@hrtld.com",
+      "fromCompanyId": "8b7cf36f-01d3-401e-a3a6-a0d71e7e6859",
+      "fromCompanyName": "G&M Realty",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "df5bf3eb-0cec-4f76-8ded-e60a11fbf5a2",
+      "contactName": "Bob Faith",
+      "contactEmail": "bob@greystar.com",
+      "fromCompanyId": "03354c5a-7c2d-4969-961b-ca37adaea377",
+      "fromCompanyName": "LMXD",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "ambiguous",
+      "method": "name_align",
+      "ambiguous": true,
+      "candidates": [
+        {
+          "id": "98ed5f1b-1dac-43ca-a729-348362a924d6",
+          "name": "Greystar",
+          "method": "name_align"
+        },
+        {
+          "id": "0ad497ea-1f3f-43d2-861d-44982a3c4714",
+          "name": "Court Square / GreyStar",
+          "method": "name_align"
+        }
+      ],
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "6b60622a-370d-432e-8db4-62a27acd8d84",
+      "contactName": "Meilech Eisenberg",
+      "contactEmail": "meilech@wmcap.com",
+      "fromCompanyId": "bdfba37a-e096-4271-b054-552217b592e3",
+      "fromCompanyName": "Watermark Capital Group",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "fdd2ec31-3c3c-47eb-a82d-b10cc020ca9f",
+      "contactName": "Wolfe Landau",
+      "contactEmail": "wlandau@wmcap.com",
+      "fromCompanyId": "bdfba37a-e096-4271-b054-552217b592e3",
+      "fromCompanyName": "Watermark Capital Group",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "7f9fdc03-3e2c-4939-a56b-69b2b85b61a9",
+      "contactName": "Rafe Evans",
+      "contactEmail": "rafeevans@walkermalloy.com",
+      "fromCompanyId": "2efca55b-996d-4b4a-8f43-5dee70f3e542",
+      "fromCompanyName": "Quinlan Development Group",
+      "toCompanyId": "687cd883-b7e6-4a78-9ec0-50a7297117f6",
+      "toCompanyName": "Walker, Malloy & Company, Inc",
+      "confidence": "medium",
+      "method": "name_align",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "2e050e61-20c3-4061-9c8e-fd0f8c57db42",
+      "contactName": "Ilana Schwartz",
+      "contactEmail": "ilana@omg.re",
+      "fromCompanyId": "2331152c-e2ff-49ac-aa7f-40b8695f6925",
+      "fromCompanyName": "Sanz Management",
+      "toCompanyId": "88ebde83-54a5-425b-84a0-1e6c9711d482",
+      "toCompanyName": "OMG Agency",
+      "confidence": "medium",
+      "method": "name_align",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "21922355-10a7-448a-aad7-dbe4c9d09a27",
+      "contactName": "Raymond Werdane",
+      "contactEmail": "info@bohemiarealty.com",
+      "fromCompanyId": "fe8a3030-ed10-45ae-b15f-ec4997fe236d",
+      "fromCompanyName": "The Jay Group",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "ambiguous",
+      "method": "name_align",
+      "ambiguous": true,
+      "candidates": [
+        {
+          "id": "1cbeb34e-62c6-4918-8c2b-e12b4acd30e3",
+          "name": "Bohemia Realty Group",
+          "method": "name_align"
+        },
+        {
+          "id": "537f961d-7fd0-4340-935f-089c2ee823da",
+          "name": "Bohemia Realty Group / Raymond Werdane",
+          "method": "name_align"
+        },
+        {
+          "id": "d298ffab-b8b4-4b22-b629-d10281793fa2",
+          "name": "Bohemia",
+          "method": "name_align"
+        }
+      ],
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "5ac17a76-0a6d-4ead-9b5e-4a6c8af962f7",
+      "contactName": "Mike Jeneralczuk",
+      "contactEmail": "mike@jenermendoza.com",
+      "fromCompanyId": "cd0a8079-ea38-4ad1-8b47-bf37c7b5a582",
+      "fromCompanyName": "Empire Development Fund 2 LLC",
+      "toCompanyId": "777a25f5-3423-4faa-97f7-00fe884f580b",
+      "toCompanyName": "The Jener-Mendoza Team at Living NY",
+      "confidence": "medium",
+      "method": "name_align",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "ba2b953b-671f-4b6e-9fa3-48b18b62e3b6",
+      "contactName": "John Garthchester",
+      "contactEmail": "info@garthchester.com",
+      "fromCompanyId": "f75e6783-e8a9-4c65-894d-4ea675bb1114",
+      "fromCompanyName": "Emmy Homes / Lions Group NY",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "791d45e0-99a2-4690-9ee6-bc7f71834ee8",
+      "contactName": "Megha Moza",
+      "contactEmail": "megha.moza@prominentproperties.com",
+      "fromCompanyId": "2c1d2fb0-d297-4649-975d-045b0cd7d15f",
+      "fromCompanyName": "China Overseas America (COA)",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "938ce615-bd42-44e4-a55b-35953d49efb0",
+      "contactName": "Lloyd Goldman",
+      "contactEmail": "info@bfreo.com",
+      "fromCompanyId": "9b00835c-3f5d-4d9e-b240-b55b921edd12",
+      "fromCompanyName": "BLDG Management",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "f4e42db0-a31d-4a73-84e6-5659e1444fa3",
+      "contactName": "Krystal",
+      "contactEmail": "krystal@nystudents.net",
+      "fromCompanyId": "f762290a-5c00-4142-849b-62f0ff194968",
+      "fromCompanyName": "KK Developments",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    },
+    {
+      "contactId": "8defefd8-d311-45ca-8a96-89025912b300",
+      "contactName": "Jake Lewis",
+      "contactEmail": "jake.lewis@cohl.com",
+      "fromCompanyId": "2f74f1a9-7b1d-4697-b873-b9cac4f5a671",
+      "fromCompanyName": "COA 99 HUDSON, LLC",
+      "toCompanyId": null,
+      "toCompanyName": null,
+      "confidence": "none",
+      "method": "none",
+      "ambiguous": false,
+      "duplicateConflict": false
+    }
+  ],
+  "ambiguous": [
+    {
+      "contactId": "dcad3539-40dc-478f-a781-55fe0ee7c93a",
+      "contactEmail": "dmaundrell@corcoran.com",
+      "contactName": "David Maundrell III",
+      "currentCompanyId": "00e5d1f4-cc12-44c0-8b25-da0949acc27a",
+      "currentCompanyName": "Cape Advisors",
+      "contactDomain": "corcoran.com",
+      "method": "name_align",
+      "candidates": [
+        {
+          "id": "f2138feb-8991-4983-b2da-69ea432a38b9",
+          "name": "Corcoran New Development",
+          "method": "name_align"
+        },
+        {
+          "id": "d1102572-a2de-4e97-a1de-f98041b8986e",
+          "name": "Corcoran Group Marketing",
+          "method": "name_align"
+        }
+      ]
+    },
+    {
+      "contactId": "370a2d48-9f3e-473f-99a8-1d8976517e57",
+      "contactEmail": "jstasse@corcoran.com",
+      "contactName": "Jodi Stasse",
+      "currentCompanyId": "00e5d1f4-cc12-44c0-8b25-da0949acc27a",
+      "currentCompanyName": "Cape Advisors",
+      "contactDomain": "corcoran.com",
+      "method": "name_align",
+      "candidates": [
+        {
+          "id": "f2138feb-8991-4983-b2da-69ea432a38b9",
+          "name": "Corcoran New Development",
+          "method": "name_align"
+        },
+        {
+          "id": "d1102572-a2de-4e97-a1de-f98041b8986e",
+          "name": "Corcoran Group Marketing",
+          "method": "name_align"
+        }
+      ]
+    },
+    {
+      "contactId": "b6b3867b-a7f5-483f-a122-cdc9e8b156e7",
+      "contactEmail": "astoriawest@corcoran.com",
+      "contactName": "Property-Specific Inquiries",
+      "currentCompanyId": "00e5d1f4-cc12-44c0-8b25-da0949acc27a",
+      "currentCompanyName": "Cape Advisors",
+      "contactDomain": "corcoran.com",
+      "method": "name_align",
+      "candidates": [
+        {
+          "id": "f2138feb-8991-4983-b2da-69ea432a38b9",
+          "name": "Corcoran New Development",
+          "method": "name_align"
+        },
+        {
+          "id": "d1102572-a2de-4e97-a1de-f98041b8986e",
+          "name": "Corcoran Group Marketing",
+          "method": "name_align"
+        }
+      ]
+    },
+    {
+      "contactId": "8ac018ad-aad4-4ffe-bdb4-488c2097e298",
+      "contactEmail": "jurgo@themarketingdirectorsinc.com",
+      "contactName": "Jacqueline Urgo",
+      "currentCompanyId": "07235575-b828-4451-8171-dd9d07c370e9",
+      "currentCompanyName": "Grubb Properties",
+      "contactDomain": "themarketingdirectorsinc.com",
+      "method": "name_align",
+      "candidates": [
+        {
+          "id": "1f126c63-ab98-4b38-a9c8-91b67dc0ce67",
+          "name": "The Marketing Directors",
+          "method": "name_align"
+        },
+        {
+          "id": "8cdc46d1-d80f-426d-8126-ae39ec22a01e",
+          "name": "The Marketing Directors / Kushner (In-House?)",
+          "method": "name_align"
+        }
+      ]
+    },
+    {
+      "contactId": "df5bf3eb-0cec-4f76-8ded-e60a11fbf5a2",
+      "contactEmail": "bob@greystar.com",
+      "contactName": "Bob Faith",
+      "currentCompanyId": "03354c5a-7c2d-4969-961b-ca37adaea377",
+      "currentCompanyName": "LMXD",
+      "contactDomain": "greystar.com",
+      "method": "name_align",
+      "candidates": [
+        {
+          "id": "98ed5f1b-1dac-43ca-a729-348362a924d6",
+          "name": "Greystar",
+          "method": "name_align"
+        },
+        {
+          "id": "0ad497ea-1f3f-43d2-861d-44982a3c4714",
+          "name": "Court Square / GreyStar",
+          "method": "name_align"
+        }
+      ]
+    },
+    {
+      "contactId": "21922355-10a7-448a-aad7-dbe4c9d09a27",
+      "contactEmail": "info@bohemiarealty.com",
+      "contactName": "Raymond Werdane",
+      "currentCompanyId": "fe8a3030-ed10-45ae-b15f-ec4997fe236d",
+      "currentCompanyName": "The Jay Group",
+      "contactDomain": "bohemiarealty.com",
+      "method": "name_align",
+      "candidates": [
+        {
+          "id": "1cbeb34e-62c6-4918-8c2b-e12b4acd30e3",
+          "name": "Bohemia Realty Group",
+          "method": "name_align"
+        },
+        {
+          "id": "537f961d-7fd0-4340-935f-089c2ee823da",
+          "name": "Bohemia Realty Group / Raymond Werdane",
+          "method": "name_align"
+        },
+        {
+          "id": "d298ffab-b8b4-4b22-b629-d10281793fa2",
+          "name": "Bohemia",
+          "method": "name_align"
+        }
+      ]
+    }
+  ],
+  "unmatched": [
+    {
+      "contactId": "356c8c73-f91c-4cfb-a6bc-f0d267ea6c94",
+      "companyId": "03354c5a-7c2d-4969-961b-ca37adaea377",
+      "companyName": "LMXD",
+      "contactName": "General Leasing",
+      "contactEmail": "leasing@ccmanagers.com",
+      "contactDomain": "ccmanagers.com",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": false
+    },
+    {
+      "contactId": "fadfdc80-b383-4486-9a9b-da762b4228e7",
+      "companyId": "8b7cf36f-01d3-401e-a3a6-a0d71e7e6859",
+      "companyName": "G&M Realty",
+      "contactName": "David Wolkoff",
+      "contactEmail": "dwolkoff@hrtld.com",
+      "contactDomain": "hrtld.com",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": true
+    },
+    {
+      "contactId": "6b60622a-370d-432e-8db4-62a27acd8d84",
+      "companyId": "bdfba37a-e096-4271-b054-552217b592e3",
+      "companyName": "Watermark Capital Group",
+      "contactName": "Meilech Eisenberg",
+      "contactEmail": "meilech@wmcap.com",
+      "contactDomain": "wmcap.com",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": true
+    },
+    {
+      "contactId": "fdd2ec31-3c3c-47eb-a82d-b10cc020ca9f",
+      "companyId": "bdfba37a-e096-4271-b054-552217b592e3",
+      "companyName": "Watermark Capital Group",
+      "contactName": "Wolfe Landau",
+      "contactEmail": "wlandau@wmcap.com",
+      "contactDomain": "wmcap.com",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": false
+    },
+    {
+      "contactId": "ba2b953b-671f-4b6e-9fa3-48b18b62e3b6",
+      "companyId": "f75e6783-e8a9-4c65-894d-4ea675bb1114",
+      "companyName": "Emmy Homes / Lions Group NY",
+      "contactName": "John Garthchester",
+      "contactEmail": "info@garthchester.com",
+      "contactDomain": "garthchester.com",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": false
+    },
+    {
+      "contactId": "791d45e0-99a2-4690-9ee6-bc7f71834ee8",
+      "companyId": "2c1d2fb0-d297-4649-975d-045b0cd7d15f",
+      "companyName": "China Overseas America (COA)",
+      "contactName": "Megha Moza",
+      "contactEmail": "megha.moza@prominentproperties.com",
+      "contactDomain": "prominentproperties.com",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": true
+    },
+    {
+      "contactId": "938ce615-bd42-44e4-a55b-35953d49efb0",
+      "companyId": "9b00835c-3f5d-4d9e-b240-b55b921edd12",
+      "companyName": "BLDG Management",
+      "contactName": "Lloyd Goldman",
+      "contactEmail": "info@bfreo.com",
+      "contactDomain": "bfreo.com",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": false
+    },
+    {
+      "contactId": "f4e42db0-a31d-4a73-84e6-5659e1444fa3",
+      "companyId": "f762290a-5c00-4142-849b-62f0ff194968",
+      "companyName": "KK Developments",
+      "contactName": "Krystal",
+      "contactEmail": "krystal@nystudents.net",
+      "contactDomain": "nystudents.net",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": false
+    },
+    {
+      "contactId": "8defefd8-d311-45ca-8a96-89025912b300",
+      "companyId": "2f74f1a9-7b1d-4697-b873-b9cac4f5a671",
+      "companyName": "COA 99 HUDSON, LLC",
+      "contactName": "Jake Lewis",
+      "contactEmail": "jake.lewis@cohl.com",
+      "contactDomain": "cohl.com",
+      "reason": "未找到域名/名称对应的公司",
+      "companyWebsite": null,
+      "companyEmail": null,
+      "corporateDomains": [],
+      "matchBasis": "none",
+      "isPrimary": true
+    }
+  ]
+}

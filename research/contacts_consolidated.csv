@@ -1,0 +1,256 @@
+contact_name,contact_email,linkedin,contact_title,developer_company,property_name,source_file,email_confidence
+Sean J. Breslin,sbreslin@avalonbay.com,,Chief Operating Officer,AvalonBay Communities,AVA Fort Greene,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Media Relations,media_relations@avalonbay.com,,,AvalonBay Communities,AVA Fort Greene,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+David L. Picket,dpicket@gothamorg.com,,CEO & President,Gotham Organization,The Ashland,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Bryan Kelly,bkelly@gothamorg.com,,President of Development,Gotham Organization,The Ashland,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Michaella Solar-March,msolarmarch@twotreesny.com,,Chief Marketing Officer,Two Trees Management,300 Ashland Place,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+Aaron Goed,agoed@twotreesny.com,,Sales Director,Two Trees Management,300 Ashland Place,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Derek Katz,dkatz@twotreesny.com,,Portfolio Director,Two Trees Management,300 Ashland Place,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Joe Porritt,jporritt@brodsky.com,,Director of Leasing & Marketing,Brodsky Organization,City Tower at 10 City Point,nyc_luxury_rentals_brooklyn_newark.csv,High
+Jimmy Chen,jchen@brodsky.com,,Associate Director of Renewals,Brodsky Organization,City Tower at 10 City Point,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Erin Gabrielli,egabrielli@atlas-cap.com,,Managing Director,Atlas Capital Group,DKLB BKLN,nyc_luxury_rentals_brooklyn_newark.csv,High
+Brian Jauntig,bjauntig@atlas-cap.com,,Chief Operating Officer,Atlas Capital Group,DKLB BKLN,nyc_luxury_rentals_brooklyn_newark.csv,High
+Hannah Worscheh,hworscheh@atlas-cap.com,,"Director, Asset Management (NY)",Atlas Capital Group,DKLB BKLN,nyc_luxury_rentals_brooklyn_newark.csv,High
+Alexander Nunner,anunner@dermotcompany.com,,"VP, Leasing & Marketing",The Dermot Company,66 Rockwell Place,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+Hannah Waldman,hwaldman@dermotcompany.com,,"Associate VP, Leasing Operations & Marketing",The Dermot Company,66 Rockwell Place,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Sean Sorise,ssorise@dermotcompany.com,,"Director, Asset Management & Capital Projects",The Dermot Company,66 Rockwell Place,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Zoe Elghanayan,zelghanayan@tfcornerstone.com,,Principal & Senior Vice President,TF Cornerstone,595 Dean Street,nyc_luxury_rentals_brooklyn_newark.csv,High
+Brian Givens,bgivens@tfc.com,,Director of Leasing,TF Cornerstone,595 Dean Street,nyc_luxury_rentals_brooklyn_newark.csv,High
+Jared Della Valle,jdellavalle@alloyllc.com,,CEO & Co-Founder,Alloy Development,505 State Street,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+Jennifer Li,jli@alloyllc.com,,Marketing Strategy,Alloy Development,505 State Street,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+Mitchell Gelberg,mgelberg@rosenyc.com,,Senior Managing Director of Multifamily Management,Rose Associates (3rd party PM),505 State Street,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Doug Steiner,dsteiner@steinernyc.com,,Principal,Steiner NYC / Clarett Group,The Brooklyner,nyc_luxury_rentals_brooklyn_newark.csv,Unconfirmed
+Ronne Hackett,rhackett@clarett.com,,"CEO, Clarett Group",Steiner NYC / Clarett Group,The Brooklyner,nyc_luxury_rentals_brooklyn_newark.csv,Unconfirmed
+Kevin Lalezarian,klalezarian@lalezarianproperties.com,,Principal,Lalezarian Properties,BKLYN AIR,nyc_luxury_rentals_brooklyn_newark.csv,Unconfirmed
+Lauren Witkoff,lauren@witkoff.com,,"EVP, Sales & Marketing",Witkoff Group & Apollo Global,The Brook,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+Nadia Meratla,nadia@witkoff.com,,"SVP, Head of Design & Marketing Direction",Witkoff Group & Apollo Global,The Brook,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Wasseem Boraie,wboraie@boraie.com,,Principal / Co-Managing Partner,Boraie Development,ICONIQ 777,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Sam Boraie,sboraie@boraie.com,,Principal / Co-Managing Partner,Boraie Development,ICONIQ 777,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Jeff Rader,jrader@pac-oak.com,,"EVP, Asset Management",Pacific Oak Strategic Opportunity REIT,Eleven80,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+Keith Hall,khall@pac-oak.com,,CEO & Co-Founder,Pacific Oak Strategic Opportunity REIT,Eleven80,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+Nikki Wernick,nwernick@lmdevpartners.com,,"President, Property Management (C+C)",L+M Development Partners,Walker House,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Herminio Torres,htorres@lmdevpartners.com,,"VP, Property Management – Market Rate",L+M Development Partners,Walker House,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+General Leasing,leasing@lmdevpartners.com,,,L+M Development Partners,Walker House,nyc_luxury_rentals_brooklyn_newark.csv,Confirmed
+Marianne Harris,mharris@dranoffproperties.com,,VP of Sales & Marketing,Dranoff Properties,One Theater Square,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Julia Dranoff,jdranoff@dranoffproperties.com,,Managing Director & COO,Dranoff Properties,One Theater Square,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Daniel Spiegel,dspiegel@ksgroup.biz,,CEO & Co-Founder,KS Group / Tona Development,Hoyt Tower,nyc_luxury_rentals_brooklyn_newark.csv,High
+Yehuda Kotkes,ykotkes@ksgroup.biz,,Co-Founder,KS Group / Tona Development,Hoyt Tower,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Yuval Shram,yshram@tayinvestments.com,,"Founder, CEO & President",TAY Investments,Art of Newark,nyc_luxury_rentals_brooklyn_newark.csv,Estimated
+Eliane Longhi,,,Lead Leasing Agent (Signature Realty NJ),Sterling / Bridgewater Capital / New Rock,Iron65,nyc_luxury_rentals_brooklyn_newark.csv,Unconfirmed
+,info@gatewayparkave.com,,,Rock Eagle Properties LLC,The Gateway,nyc_luxury_rentals_goldcoast_nj.csv,Property email
+Matthew Pestronk,,,President & Co-Founder,Post Brothers,The Duchess,nyc_luxury_rentals_goldcoast_nj.csv,@postcre.com domain
+Michael Pestronk,,,Co-Founder,Post Brothers,The Duchess,nyc_luxury_rentals_goldcoast_nj.csv,@postcre.com domain
+Property Management,management@duchessapartments.com,,,Post Brothers,The Duchess,nyc_luxury_rentals_goldcoast_nj.csv,Property email
+Stephen Cassidy,,,President,Denholtz Properties,The Rail at North Bergen,nyc_luxury_rentals_goldcoast_nj.csv,@denholtz.com domain
+Kristine B. Hurlbut,,,SVP of Leasing,Denholtz Properties,The Rail at North Bergen,nyc_luxury_rentals_goldcoast_nj.csv,@denholtz.com domain
+Jeff Fenner,,,Director of Multifamily,Denholtz Properties,The Rail at North Bergen,nyc_luxury_rentals_goldcoast_nj.csv,@denholtz.com domain
+Brian J. Pfistner,info@capodagli.com,,"CEO, Capodagli Property Company",SYM Investments,The Mews,nyc_luxury_rentals_goldcoast_nj.csv,Property mgmt
+Property Management,themews@meridialiving.com,,,SYM Investments,The Mews,nyc_luxury_rentals_goldcoast_nj.csv,Property email
+Howard Milstein,information@milfordmgmt.com,,Chairman,Milstein Properties,The Stonehenge on the Palisades,nyc_luxury_rentals_goldcoast_nj.csv,General
+Greystar (3rd party PM),halfmoonharbourmgr@greystar.com,,,Private LLC,Half Moon Harbour,nyc_luxury_rentals_goldcoast_nj.csv,Property email
+Benjamin Schall,,,CEO & President,AvalonBay Communities,Avalon North Bergen,nyc_luxury_rentals_goldcoast_nj.csv,@avalonbay.com domain
+Sean Breslin,,,COO,AvalonBay Communities,Avalon North Bergen,nyc_luxury_rentals_goldcoast_nj.csv,@avalonbay.com domain
+Nest Seekers (leasing),5711kennedy@nestseekers.com,,,5711 RE LLC,57 Eleven Kennedy,nyc_luxury_rentals_goldcoast_nj.csv,Leasing agent
+George Karasick,gkarasick@oxfordrealtygroup.com,,President,RK 53 Urban Renewal LLC / Oxford Realty,Plaza 53,nyc_luxury_rentals_goldcoast_nj.csv,Inferred
+Property Management,plaza53@oxfordrealtygroup.com,,,RK 53 Urban Renewal LLC / Oxford Realty,Plaza 53,nyc_luxury_rentals_goldcoast_nj.csv,Property email
+Gus Milano,,,President & COO,Hartz Mountain Industries,The Estuary,nyc_luxury_rentals_goldcoast_nj.csv,@hartzmountain.com domain
+Ernie Christopher,echristopher@hartzmountain.com,,SVP Leasing,Hartz Mountain Industries,The Estuary,nyc_luxury_rentals_goldcoast_nj.csv,Inferred
+Gus Milano,,,President & COO,Hartz Mountain Industries,Hamilton Cove,nyc_luxury_rentals_goldcoast_nj.csv,@hartzmountain.com domain
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,The Capstone,nyc_luxury_rentals_goldcoast_nj.csv,@verisresidential.com domain
+Victor D. Rezabala,,,Senior Director of Leasing,Veris Residential,The Capstone,nyc_luxury_rentals_goldcoast_nj.csv,@verisresidential.com domain
+Marshall Tycher,,,Principal,Canoe Brook Development,RB3 / Riverbend 3,nyc_luxury_rentals_goldcoast_nj.csv,@canoebrookdevelopment.com domain
+Jay McDermott,,,Director of Development,Canoe Brook Development,RB3 / Riverbend 3,nyc_luxury_rentals_goldcoast_nj.csv,@canoebrookdevelopment.com domain
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,RiverTrace,nyc_luxury_rentals_goldcoast_nj.csv,@verisresidential.com domain
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,RiverHouse 9,nyc_luxury_rentals_goldcoast_nj.csv,@verisresidential.com domain
+Jay McDermott,,,Director of Development,Rockpoint Group / Canoe Brook Dev,The Declan,nyc_luxury_rentals_goldcoast_nj.csv,@canoebrookdevelopment.com domain
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,RiverHouse 11,nyc_luxury_rentals_goldcoast_nj.csv,@verisresidential.com domain
+Brenda Cioce,,,President,RHO Residential,RiverParc,nyc_luxury_rentals_goldcoast_nj.csv,@rho-residential.com domain
+Brenda Cioce,,,President,RHO Residential,RiversEdge,nyc_luxury_rentals_goldcoast_nj.csv,@rho-residential.com domain
+Gus Milano,,,President & COO,Hartz Mountain / Maxal Group,Harbor 1500,nyc_luxury_rentals_goldcoast_nj.csv,@hartzmountain.com domain
+Gus Milano,,,President & COO,Hartz Mountain Industries,The Reserve at Estuary,nyc_luxury_rentals_goldcoast_nj.csv,@hartzmountain.com domain
+Marshall Tycher,,,Principal,Canoe Brook Development,Riverbend,nyc_luxury_rentals_goldcoast_nj.csv,@canoebrookdevelopment.com domain
+Mark J. Parrell,,,President & CEO,Equity Residential,The Landings at Port Imperial,nyc_luxury_rentals_goldcoast_nj.csv,@eqrworld.com domain
+Kyra Lambo,,,"Assistant VP, National Marketing",Equity Residential,The Landings at Port Imperial,nyc_luxury_rentals_goldcoast_nj.csv,@eqrworld.com domain
+Lisa Silverstein,,,Vice Chairman & CEO,Silverstein Properties,Silver Towers,nyc_luxury_rentals_MASTER.csv,
+Roger A. Silverstein,,,EVP of Leasing,Silverstein Properties,Silver Towers,nyc_luxury_rentals_MASTER.csv,
+Jeff T. Blau,,,CEO,Related Companies,MiMA,nyc_luxury_rentals_MASTER.csv,
+Brian Mayer,,,"President & COO, Related Management",Related Companies,MiMA,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,The Max,nyc_luxury_rentals_MASTER.csv,
+Zoe Elghanayan,,,Principal & SVP,TF Cornerstone,The Max,nyc_luxury_rentals_MASTER.csv,
+Jed Walentas,,,CEO,Two Trees Management,Mercedes House,nyc_luxury_rentals_MASTER.csv,
+Alyssa Zahler,,,Managing Director of Leasing,Two Trees Management,Mercedes House,nyc_luxury_rentals_MASTER.csv,
+Maria Masi,,,"SVP, Multifamily Development",Brookfield Properties,The Eugene,nyc_luxury_rentals_MASTER.csv,
+Maria Masi,,,"SVP, Multifamily Development",Brookfield Properties / Nuveen,8 Spruce St (NY by Gehry),nyc_luxury_rentals_MASTER.csv,
+Gary Barnett,,,Founder & President,Extell Development,555TEN,nyc_luxury_rentals_MASTER.csv,
+Moshe Botnick,,,SVP of Development,Extell Development,555TEN,nyc_luxury_rentals_MASTER.csv,
+Douglas Durst,info@durst.org,,Chairman,Durst Organization,VIA 57 West,nyc_luxury_rentals_MASTER.csv,
+David Picket,,,CEO & President,Gotham Organization,Gotham West,nyc_luxury_rentals_MASTER.csv,
+Bryan Kelly,,,President of Development,Gotham Organization,Gotham West,nyc_luxury_rentals_MASTER.csv,
+Gary Barnett,,,Founder & President,Extell Development,One Manhattan Square,nyc_luxury_rentals_MASTER.csv,
+Moshe Botnick,,,SVP of Development,Extell Development,One Manhattan Square,nyc_luxury_rentals_MASTER.csv,
+Mark J. Parrell,,,President & CEO,Equity Residential,The Brooklyner,nyc_luxury_rentals_MASTER.csv,
+Michael L. Manelis,,,EVP & COO,Equity Residential,The Brooklyner,nyc_luxury_rentals_MASTER.csv,
+David Picket,,,CEO & President,Gotham Organization,The Ashland,nyc_luxury_rentals_MASTER.csv,
+Bryan Kelly,,,President of Development,Gotham Organization,The Ashland,nyc_luxury_rentals_MASTER.csv,
+Benjamin W. Schall,,,CEO & President,AvalonBay Communities,Avalon Willoughby Square,nyc_luxury_rentals_MASTER.csv,
+Sean J. Breslin,,,COO,AvalonBay Communities,Avalon Willoughby Square,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,33 Bond Street,nyc_luxury_rentals_MASTER.csv,
+Zoe Elghanayan,,,Principal & SVP,TF Cornerstone,33 Bond Street,nyc_luxury_rentals_MASTER.csv,
+Lisa Silverstein,,,Vice Chairman & CEO,Silverstein Properties,The Brooklyn Tower,nyc_luxury_rentals_MASTER.csv,
+Roger A. Silverstein,,,EVP of Leasing,Silverstein Properties,The Brooklyn Tower,nyc_luxury_rentals_MASTER.csv,
+Alyssa Zahler,,,Managing Director of Leasing,Two Trees Management,325 Kent Avenue,nyc_luxury_rentals_MASTER.csv,
+Alyssa Zahler,,,Managing Director of Leasing,Two Trees Management,One South First,nyc_luxury_rentals_MASTER.csv,
+Alyssa Zahler,,,Managing Director of Leasing,Two Trees Management,One Domino Square,nyc_luxury_rentals_MASTER.csv,
+Maria Masi,,,"SVP, Multifamily Development",Brookfield Properties / Park Tower Group,One Blue Slip,nyc_luxury_rentals_MASTER.csv,
+Maria Masi,,,"SVP, Multifamily Development",Brookfield Properties / Park Tower Group,Two Blue Slip,nyc_luxury_rentals_MASTER.csv,
+Maria Masi,,,"SVP, Multifamily Development",Brookfield Properties / Park Tower Group,The Bellslip,nyc_luxury_rentals_MASTER.csv,
+Benjamin W. Schall,,,CEO & President,AvalonBay Communities,Avalon Fort Greene,nyc_luxury_rentals_MASTER.csv,
+Maria Masi,,,"SVP, Multifamily Development",Brookfield Properties / Park Tower Group,Eagle + West,nyc_luxury_rentals_MASTER.csv,
+Rob Speyer,,,President & CEO,Tishman Speyer,Jackson Park - Tower 1,nyc_luxury_rentals_MASTER.csv,
+Erik Rose,,,"Managing Director, Residential Development",Tishman Speyer,Jackson Park - Tower 2,nyc_luxury_rentals_MASTER.csv,
+Henry Elghanayan,,,Founder & CEO,Rockrose Development,The Hayden,nyc_luxury_rentals_MASTER.csv,
+Justin Elghanayan,,,President,Rockrose Development,The Hayden,nyc_luxury_rentals_MASTER.csv,
+David Picket,,,CEO & President,Gotham Organization / RiseBoro,Gotham Point,nyc_luxury_rentals_MASTER.csv,
+Bryan Kelly,,,President of Development,Gotham Organization / RiseBoro,Gotham Point,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,4545 Center Blvd,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,4610 Center Blvd,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,47-20 Center Blvd,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,4615 Center Blvd,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,45-40 Center Blvd,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,52-03 Center Blvd,nyc_luxury_rentals_MASTER.csv,
+Sofia Estevez,,,Executive Vice President,TF Cornerstone,Malt Drive,nyc_luxury_rentals_MASTER.csv,
+Charlie Howe,,,VP (Bankside lead),Brookfield Properties,Bankside,nyc_luxury_rentals_MASTER.csv,
+David Barry,,,President & CEO,Ironstate Development / Brookfield,Staten Island Urby,nyc_luxury_rentals_MASTER.csv,
+Harrison LeFrak,,,Vice Chairman & Managing Director,LeFrak Organization,Newport Portfolio,nyc_luxury_rentals_MASTER.csv,
+Adam Silfen,,,President,LeFrak Organization,Newport Portfolio,nyc_luxury_rentals_MASTER.csv,
+Mahbod Nia,,,CEO,Veris Residential,Haus25,nyc_luxury_rentals_MASTER.csv,
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,Haus25,nyc_luxury_rentals_MASTER.csv,
+Mahbod Nia,,,CEO,Veris Residential,Sable,nyc_luxury_rentals_MASTER.csv,
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,Sable,nyc_luxury_rentals_MASTER.csv,
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,Liberty Towers,nyc_luxury_rentals_MASTER.csv,
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,BLVD 401,nyc_luxury_rentals_MASTER.csv,
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,BLVD 425,nyc_luxury_rentals_MASTER.csv,
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,BLVD 475,nyc_luxury_rentals_MASTER.csv,
+Nicole Jones,,,SVP & Chief Marketing Officer,Veris Residential,Soho Lofts,nyc_luxury_rentals_MASTER.csv,
+David Barry,,,President & CEO,Ironstate Development / Panepinto,Columbus Collection - 50 CC,nyc_luxury_rentals_MASTER.csv,
+David Barry,,,President & CEO,Ironstate Development / Panepinto,Columbus Collection - 70 CC,nyc_luxury_rentals_MASTER.csv,
+David Barry,,,President & CEO,Ironstate Development / Panepinto,Columbus Collection - 90 CC,nyc_luxury_rentals_MASTER.csv,
+David Barry,,,President & CEO,Ironstate Development / KRE Group,235 Grand,nyc_luxury_rentals_MASTER.csv,
+Jonathan Kushner,,,President,Ironstate Development / KRE Group,235 Grand,nyc_luxury_rentals_MASTER.csv,
+Jonathan Kushner,,,President,KRE Group,Journal Squared - Tower 1,nyc_luxury_rentals_MASTER.csv,
+Douglas DiMatteo,,,CFO,KRE Group,Journal Squared - Tower 2,nyc_luxury_rentals_MASTER.csv,
+Max Bulbin,,,Director of Acquisitions,KRE Group,Journal Squared - Tower 3,nyc_luxury_rentals_MASTER.csv,
+Gary Barnett,,,Founder & President,Extell Development,Hudson Piers,nyc_luxury_rentals_MASTER.csv,
+Moshe Botnick,,,SVP of Development,Extell Development,Hudson Piers,nyc_luxury_rentals_MASTER.csv,
+David Barry,,,President & CEO,Ironstate Development,Stamford Urby,nyc_luxury_rentals_MASTER.csv,
+Sean J. Breslin,,,,AvalonBay Communities,AVA Fort Greene,nyc_luxury_rentals_MASTER.csv,
+Media Relations,,,,AvalonBay Communities,AVA Fort Greene,nyc_luxury_rentals_MASTER.csv,
+David L. Picket,,,,Gotham Organization,The Ashland,nyc_luxury_rentals_MASTER.csv,
+Michaella Solar-March,,,,Two Trees Management,300 Ashland Place,nyc_luxury_rentals_MASTER.csv,
+Aaron Goed,,,,Two Trees Management,300 Ashland Place,nyc_luxury_rentals_MASTER.csv,
+Derek Katz,,,,Two Trees Management,300 Ashland Place,nyc_luxury_rentals_MASTER.csv,
+Joe Porritt,,,,Brodsky Organization,City Tower at 10 City Point,nyc_luxury_rentals_MASTER.csv,
+Jimmy Chen,,,,Brodsky Organization,City Tower at 10 City Point,nyc_luxury_rentals_MASTER.csv,
+Erin Gabrielli,,,,Atlas Capital Group,DKLB BKLN,nyc_luxury_rentals_MASTER.csv,
+Brian Jauntig,,,,Atlas Capital Group,DKLB BKLN,nyc_luxury_rentals_MASTER.csv,
+Hannah Worscheh,,,,Atlas Capital Group,DKLB BKLN,nyc_luxury_rentals_MASTER.csv,
+Alexander Nunner,,,,The Dermot Company,66 Rockwell Place,nyc_luxury_rentals_MASTER.csv,
+Hannah Waldman,,,,The Dermot Company,66 Rockwell Place,nyc_luxury_rentals_MASTER.csv,
+Sean Sorise,,,,The Dermot Company,66 Rockwell Place,nyc_luxury_rentals_MASTER.csv,
+Michaella Solar-March,,,,Two Trees Management,325 Kent Avenue,nyc_luxury_rentals_MASTER.csv,
+Aaron Goed,,,,Two Trees Management,325 Kent Avenue,nyc_luxury_rentals_MASTER.csv,
+Michaella Solar-March,,,,Two Trees Management,One South First,nyc_luxury_rentals_MASTER.csv,
+Joe Porritt,,,,Brodsky Organization & Greenland USA,Brooklyn Crossing,nyc_luxury_rentals_MASTER.csv,
+Zoe Elghanayan,,,,TF Cornerstone,595 Dean Street,nyc_luxury_rentals_MASTER.csv,
+Brian Givens,,,,TF Cornerstone,595 Dean Street,nyc_luxury_rentals_MASTER.csv,
+Brian Givens,,,,TF Cornerstone,33 Bond Street,nyc_luxury_rentals_MASTER.csv,
+Jared Della Valle,,,,Alloy Development,505 State Street,nyc_luxury_rentals_MASTER.csv,
+Jennifer Li,,,,Alloy Development,505 State Street,nyc_luxury_rentals_MASTER.csv,
+Mitchell Gelberg,,,,Rose Associates (3rd party PM),505 State Street,nyc_luxury_rentals_MASTER.csv,
+Doug Steiner,,,,Steiner NYC / Clarett Group,The Brooklyner,nyc_luxury_rentals_MASTER.csv,
+Ronne Hackett,,,,Steiner NYC / Clarett Group,The Brooklyner,nyc_luxury_rentals_MASTER.csv,
+Kevin Lalezarian,,,,Lalezarian Properties,BKLYN AIR,nyc_luxury_rentals_MASTER.csv,
+Lauren Witkoff,,,,Witkoff Group & Apollo Global,The Brook,nyc_luxury_rentals_MASTER.csv,
+Nadia Meratla,,,,Witkoff Group & Apollo Global,The Brook,nyc_luxury_rentals_MASTER.csv,
+Wasseem Boraie,,,,Boraie Development,ICONIQ 777,nyc_luxury_rentals_MASTER.csv,
+Sam Boraie,,,,Boraie Development,ICONIQ 777,nyc_luxury_rentals_MASTER.csv,
+Jeff Rader,,,,Pacific Oak Strategic Opportunity REIT,Eleven80,nyc_luxury_rentals_MASTER.csv,
+Keith Hall,,,,Pacific Oak Strategic Opportunity REIT,Eleven80,nyc_luxury_rentals_MASTER.csv,
+Nikki Wernick,,,,L+M Development Partners,Walker House,nyc_luxury_rentals_MASTER.csv,
+Herminio Torres,,,,L+M Development Partners,Walker House,nyc_luxury_rentals_MASTER.csv,
+General Leasing,,,,L+M Development Partners,Walker House,nyc_luxury_rentals_MASTER.csv,
+Marianne Harris,,,,Dranoff Properties,One Theater Square,nyc_luxury_rentals_MASTER.csv,
+Julia Dranoff,,,,Dranoff Properties,One Theater Square,nyc_luxury_rentals_MASTER.csv,
+Daniel Spiegel,,,,KS Group / Tona Development,Hoyt Tower,nyc_luxury_rentals_MASTER.csv,
+Yehuda Kotkes,,,,KS Group / Tona Development,Hoyt Tower,nyc_luxury_rentals_MASTER.csv,
+Wasseem Boraie,,,,Boraie Development,50 Rector Park,nyc_luxury_rentals_MASTER.csv,
+Sam Boraie,,,,Boraie Development,50 Rector Park,nyc_luxury_rentals_MASTER.csv,
+Nikki Wernick,,,,L+M Development Partners,Hahne & Co.,nyc_luxury_rentals_MASTER.csv,
+Yuval Shram,,,,TAY Investments,Art of Newark,nyc_luxury_rentals_MASTER.csv,
+Property Management,,,,Post Brothers,The Duchess,nyc_luxury_rentals_MASTER.csv,
+Brian J. Pfistner,,,,SYM Investments,The Mews,nyc_luxury_rentals_MASTER.csv,
+Property Management,,,,SYM Investments,The Mews,nyc_luxury_rentals_MASTER.csv,
+Howard Milstein,,,,Milstein Properties,The Stonehenge on the Palisades,nyc_luxury_rentals_MASTER.csv,
+Greystar (3rd party PM),,,,Private LLC,Half Moon Harbour,nyc_luxury_rentals_MASTER.csv,
+Media Relations,,,,AvalonBay Communities,Avalon North Bergen,nyc_luxury_rentals_MASTER.csv,
+Nest Seekers (leasing),,,,5711 RE LLC,57 Eleven Kennedy,nyc_luxury_rentals_MASTER.csv,
+George Karasick,,,,RK 53 Urban Renewal LLC / Oxford Realty,Plaza 53,nyc_luxury_rentals_MASTER.csv,
+Property Management,,,,RK 53 Urban Renewal LLC / Oxford Realty,Plaza 53,nyc_luxury_rentals_MASTER.csv,
+Ernie Christopher,,,SVP Leasing,Hartz Mountain Industries,The Estuary,nyc_luxury_rentals_MASTER.csv,
+Ernie Christopher,,,SVP Leasing,Hartz Mountain Industries,Hamilton Cove,nyc_luxury_rentals_MASTER.csv,
+Ernie Christopher,,,,Hartz Mountain Industries,Hoboken Point,nyc_luxury_rentals_MASTER.csv,
+Eliane Longhi,,,Lead Leasing Agent (Signature Realty NJ),Sterling / Bridgewater / New Rock,Iron65,email_pitch_final_with_contacts.csv,Unconfirmed
+Stephen Benoit,stephen.benoit@hartzmountain.com,,"Vice President, Leasing & Finance",Hartz Mountain Industries,"The Estuary, Harbor 1500, Hamilton Cove, Hoboken Point, The Reserve at Estuary, Osprey Cove, The Harper at Harmon Meadow",nj_developer_inferred_emails.xlsx,High
+Nicholas Turkovic,nicholas.turkovic@hartzmountain.com,,"Vice President, Property Management",Hartz Mountain Industries,Same as above,nj_developer_inferred_emails.xlsx,High
+Ryan Waggner,ryan.waggner@hartzmountain.com,,AVP of Property Management,Hartz Mountain Industries,Same as above,nj_developer_inferred_emails.xlsx,High
+Phil Laplaca,phil.laplaca@hartzmountain.com,,Senior Property Manager,Hartz Mountain Industries,Same as above,nj_developer_inferred_emails.xlsx,High
+Victor D. Rezabala,vrezabala@verisresidential.com,,Senior Director of Leasing Strategy,Veris Residential,"RiverParc, RiverHouse 11, RiverHouse 9, RiverTrace, The Capstone",nj_developer_inferred_emails.xlsx,High
+Nicole Jones,njones@verisresidential.com,,Chief Marketing Officer,Veris Residential,Same as above,nj_developer_inferred_emails.xlsx,High
+Susan Grosso,sgrosso@verisresidential.com,,Vice President of Marketing,Veris Residential,Same as above,nj_developer_inferred_emails.xlsx,High
+Jay V. Minchilli,jminchilli@verisresidential.com,,SVP of Operations & Asset Management,Veris Residential,Same as above,nj_developer_inferred_emails.xlsx,High
+Erin Beitz,ebeitz@rockhillmgt.com,,"EVP, Residential",Rockpoint / Rockhill Mgmt,The Declan (Weehawken),nj_developer_inferred_emails.xlsx,Low
+Jennifer Salvato Salva,jennifer@capodagli.com,,Regional Property Manager,Capodagli Property Co.,The Mews / Hudson Mews (North Bergen),nj_developer_inferred_emails.xlsx,Medium
+Florencia Mansilla,florencia@capodagli.com,,Marketing Director,Capodagli Property Co.,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Andrea Colbert,andrea@capodagli.com,,Senior Property Manager,Capodagli Property Co.,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Juan Colon,juan@capodagli.com,,Regional Property Manager,Capodagli Property Co.,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Jeff Fenner,jfenner@denholtz.com,,Director of Multifamily,Denholtz Properties,Solo at North Bergen,nj_developer_inferred_emails.xlsx,Very High
+Kristine Hurlbut,khurlbut@denholtz.com,,"SVP, Leasing",Denholtz Properties,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Warren Loy,wloy@denholtz.com,,"SVP, Head of Asset Management",Denholtz Properties,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Yvette Stewart-Glimp,ystewart-glimp@postrents.com,,SVP of Property Management,Post Brothers,The Duchess (North Bergen),nj_developer_inferred_emails.xlsx,Medium
+Melissa Sherman,msherman@postrents.com,,Vice President of Leasing,Post Brothers,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Anthony L. Scotland,ascotland@postrents.com,,SVP of Marketing,Post Brothers,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Jacqueline Kluger,jkluger@postrents.com,,SVP Portfolio Management,Post Brothers,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Vee Judge,vee_judge@avalonbay.com,,"VP, Property Operations",AvalonBay Communities,Avalon North Bergen,nj_developer_inferred_emails.xlsx,High
+Evan Fox,evan_fox@avalonbay.com,,Senior Regional Director of Ops,AvalonBay Communities,Same as above,nj_developer_inferred_emails.xlsx,High
+James Keefe,james_keefe@avalonbay.com,,"Director, Retail Leasing",AvalonBay Communities,Same as above,nj_developer_inferred_emails.xlsx,High
+John Chung,jchung@eastendcap.com,,"VP, Property Accounting",East End Capital,EDGE Apartments (Bayonne),nj_developer_inferred_emails.xlsx,Very High
+Albert Johnson III,ajohnson@eastendcap.com,,"VP, Development",East End Capital,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Moshe (Mo) Schik,mschik@21glen.com,,"Regional Manager, 21 Glen",Accurate Builders / 21 Glen,Citizen Bayonne / The Breton,nj_developer_inferred_emails.xlsx,Low
+Abe Gehler,agehler@21glen.com,,"Regional Director, 21 Glen",Accurate Builders / 21 Glen,Same as above,nj_developer_inferred_emails.xlsx,Low
+Derek Pulcini,dpulcini@21glen.com,,Property Manager,Accurate Builders / 21 Glen,Same as above,nj_developer_inferred_emails.xlsx,Low
+Bobby Beasley,bbeasley@daibes.com,,Director / Area Manager,Daibes Enterprises,"The Alexander, The View, The Oyster (Edgewater)",nj_developer_inferred_emails.xlsx,Very High
+Tracy Peck,tpeck@bnerealestate.com,,"EVP, Head of Property Mgmt",BNE Real Estate Group,Twenty50 (Fort Lee),nj_developer_inferred_emails.xlsx,Very High
+Stephanie Lyden,slyden@bnerealestate.com,,Director of Marketing and Events,BNE Real Estate Group,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Seth Cohen,scohen@bnerealestate.com,,"EVP, Head of Operations",BNE Real Estate Group,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Megan Bauducco,mbauducco@bnerealestate.com,,Regional Property Manager,BNE Real Estate Group,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Victor Cividini,vcividini@sjpproperties.com,,"EVP, Residential",SJP Properties,The Modern Tower A & B (Fort Lee),nj_developer_inferred_emails.xlsx,Very High
+Alexander Erdos,aerdos@sjpproperties.com,,SVP of Leasing & Development,SJP Properties,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Barbara Quintana,bquintana@sjpproperties.com,,"Director, Property Management",SJP Properties,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Matthew R. Breeden,mbreeden@sjpproperties.com,,"VP, Development & Marketing",SJP Properties,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Karen Grace Filopoulos,kfilopoulos@sjpproperties.com,,Resident Account Manager,SJP Properties,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Joseph Landecho,jlandecho@atlanticrealty.com,,Regional Portfolio Property Mgr,Atlantic Realty Dev Corp.,"Next at Xchange, RVR at Xchange (Secaucus)",nj_developer_inferred_emails.xlsx,Medium
+Lesley Varga,lvarga@atlanticrealty.com,,Leasing Manager,Atlantic Realty Dev Corp.,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Zhanna Kalynyak,zkalynyak@atlanticrealty.com,,Leasing Manager,Atlantic Realty Dev Corp.,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Matthew Olmsted,molmsted@atlanticrealty.com,,Property Mgr & Dir of Community,Atlantic Realty Dev Corp.,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Gary Smith,gsmith@atlanticrealty.com,,Regional Leasing Office Manager,Atlantic Realty Dev Corp.,Same as above,nj_developer_inferred_emails.xlsx,Medium
+Courtney Mulligan,cmulligan@russodevelopment.com,,SVP of Marketing & Communications,Russo Development,"Vermella Crossing, West, East (Kearny)",nj_developer_inferred_emails.xlsx,Very High
+John Yurkow,jyurkow@russodevelopment.com,,Vice President of Operations,Russo Development,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Brian Stolar,bstolar@pinnaclecos.com,,CEO,Pinnacle Companies NJ,Bayonne Bay,nj_developer_inferred_emails.xlsx,Low
+Stephanie Eaves,seaves@ingerman.com,,Director of Marketing,Ingerman Group,19 East (Bayonne),nj_developer_inferred_emails.xlsx,Very High
+Brandon Jackmuff,bjackmuff@ingerman.com,,Director of Revenue Management,Ingerman Group,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Maureen Strong,mstrong@ingerman.com,,Regional Property Manager,Ingerman Group,Same as above,nj_developer_inferred_emails.xlsx,Very High
+Ryan Antonelli,rantonelli@greystar.com,,Senior Director,Greystar,The Grand (West New York),nj_developer_inferred_emails.xlsx,Very High
+Ramiro Aburto,raburto@sanzmanagement.com,,Manager,Sanz Management,The Braddock (North Bergen),nj_developer_inferred_emails.xlsx,Low
+Kevin Wilson,kwilson@kushnercompanies.com,,VP Marketing,Kushner Real Estate Group,Hudson Lights (Fort Lee),nj_developer_inferred_emails.xlsx,Low
+Diana Hubert Benedetti,dbenedetti@kushnercompanies.com,,Marketing & Creative Manager,Kushner Real Estate Group,Same as above,nj_developer_inferred_emails.xlsx,Low
+Mariana Martinez,mmartinez@kushnercompanies.com,,Property Manager,Kushner Real Estate Group,Same as above,nj_developer_inferred_emails.xlsx,Low

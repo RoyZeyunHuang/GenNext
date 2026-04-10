@@ -35,3 +35,7 @@ next-env.d.ts
 
 # local backups (e.g. npm run archive:persona-rag)
 /archive/persona-rag/*.json
+
+# local agent / Supabase CLI caches (do not commit)
+.claude/
+supabase/.temp/

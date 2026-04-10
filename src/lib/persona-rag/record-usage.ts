@@ -9,7 +9,7 @@ export async function recordPersonaRagInvocation(
   noteIds: string[],
   userId: string
 ): Promise<void> {
-  const distinct = [...new Set(noteIds.filter(Boolean))];
+  const distinct = Array.from(new Set(noteIds.filter(Boolean)));
   try {
     const admin = getSupabaseAdmin();
     const { error } = await admin.rpc("increment_persona_rag_usage", {

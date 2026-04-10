@@ -1,0 +1,89 @@
+{
+  "properties": [
+    {
+      "csv_name": "Jackson Park 1/2/3",
+      "csv_build_year": "2018",
+      "db_id": "14e38a13-bee2-4583-ab4e-58729a6378ae",
+      "db_build_year": "2017",
+      "action": "overwrite"
+    },
+    {
+      "csv_name": "The Welz",
+      "csv_build_year": "2025",
+      "db_id": "29cbb2e1-6c17-45ce-99f9-9a5c48a01fca",
+      "db_build_year": "2024",
+      "action": "overwrite"
+    },
+    {
+      "csv_name": "Linc LIC",
+      "csv_build_year": "2013",
+      "db_id": "7dfc1a91-1d3f-437c-99ad-8fcc4c4dbfa1",
+      "db_build_year": "2014",
+      "action": "overwrite"
+    },
+    {
+      "csv_name": "The Dupont",
+      "csv_build_year": "2025",
+      "db_id": "e42c356d-4ff5-4627-826f-4498ade2e980",
+      "db_build_year": "2024",
+      "action": "skip"
+    },
+    {
+      "csv_name": "House 55",
+      "csv_build_year": "Under Construction (est. 2025)",
+      "db_id": "b115efc2-2a60-4a70-a1bc-2228e5dc8668",
+      "db_build_year": "2026",
+      "action": "skip"
+    },
+    {
+      "csv_name": "Lumen LIC",
+      "csv_build_year": "Under Construction (est. 2026)",
+      "db_id": "82597758-8ea1-4b2a-8a41-9603f1cd6118",
+      "db_build_year": "2025",
+      "action": "skip"
+    },
+    {
+      "csv_name": "DWTN",
+      "csv_build_year": "2026",
+      "db_id": "c73ef4b3-cb7c-4121-8651-eca4cdbc78ca",
+      "db_build_year": "2025",
+      "action": "overwrite"
+    },
+    {
+      "csv_name": "One Sunset",
+      "csv_build_year": "2025",
+      "db_id": "85f68fd9-6ea7-46c3-80c6-89dc639c0596",
+      "db_build_year": "2026",
+      "action": "overwrite"
+    }
+  ],
+  "contacts": [
+    {
+      "email": "msolarmarch@twotreesny.com",
+      "csv_name": "Michaella Solar-March",
+      "csv_title": "Chief Marketing Officer",
+      "db_name": "Two Trees LinkedIn",
+      "db_title": "",
+      "db_id": "675d42fc-6b52-4da7-91a1-db8ac3444718",
+      "action": "overwrite"
+    },
+    {
+      "email": "erose@tishmanspeyer.com",
+      "csv_name": "Erik Rose",
+      "csv_title": "Senior MD, Head of Residential Dev",
+      "db_name": "https",
+      "db_title": "",
+      "db_id": "595d4b1a-d678-4384-acea-3f8251f02491",
+      "action": "overwrite"
+    },
+    {
+      "email": "bob@greystar.com",
+      "csv_name": "Bob Faith",
+      "csv_title": "Founder, Chairman & CEO",
+      "db_name": "GreyStar LinkedIn",
+      "db_title": "",
+      "db_id": "df5bf3eb-0cec-4f76-8ded-e60a11fbf5a2",
+      "action": "overwrite"
+    }
+  ]
+}
