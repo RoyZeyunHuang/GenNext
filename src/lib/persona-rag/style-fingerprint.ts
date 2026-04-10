@@ -17,11 +17,48 @@ function splitSentences(text: string): string[] {
     .filter(Boolean);
 }
 
-/** 提取所有 emoji（含组合序列） */
+/** 判断码点是否属于常见 emoji 范围 */
+function isEmojiCodePoint(cp: number): boolean {
+  return (
+    (cp >= 0x1f300 && cp <= 0x1f9ff) || // Misc Symbols, Emoticons, Dingbats, etc.
+    (cp >= 0x2600 && cp <= 0x26ff) || // Misc Symbols
+    (cp >= 0x2700 && cp <= 0x27bf) || // Dingbats
+    (cp >= 0x1fa00 && cp <= 0x1fa9f) || // Supplemental Symbols
+    (cp >= 0x1fa70 && cp <= 0x1faff) || // Symbols Extended-A
+    cp === 0x200d || // ZWJ
+    cp === 0xfe0f // Variation selector
+  );
+}
+
+/** 提取所有 emoji（逐码点扫描，兼容低版本 TS target） */
 function extractEmojis(text: string): string[] {
-  const re =
-    /\p{Emoji_Presentation}|\p{Extended_Pictographic}(?:\u200D\p{Extended_Pictographic})*/gu;
-  return [...text.matchAll(re)].map((m) => m[0]);
+  const result: string[] = [];
+  const chars = Array.from(text); // 正确拆分 surrogate pairs
+  let i = 0;
+  while (i < chars.length) {
+    const cp = chars[i].codePointAt(0) ?? 0;
+    if (isEmojiCodePoint(cp)) {
+      let emoji = chars[i];
+      i++;
+      // 吸收后续 ZWJ 序列和 variation selectors
+      while (i < chars.length) {
+        const nextCp = chars[i].codePointAt(0) ?? 0;
+        if (isEmojiCodePoint(nextCp)) {
+          emoji += chars[i];
+          i++;
+        } else {
+          break;
+        }
+      }
+      // 过滤掉纯 ZWJ/variation selector
+      if (emoji.length > 0 && !/^[\u200d\ufe0f]+$/.test(emoji)) {
+        result.push(emoji);
+      }
+    } else {
+      i++;
+    }
+  }
+  return result;
 }
 
 /** 句尾字符归类 */
@@ -34,8 +71,9 @@ function sentenceEndingPattern(sentence: string): string {
   if (last === "？" || last === "?") return "？";
   if (last === "～" || last === "~") return "～";
   if (last === "…" || trimmed.endsWith("...")) return "…";
-  // emoji 结尾
-  if (/\p{Emoji_Presentation}|\p{Extended_Pictographic}/u.test(last)) return "emoji";
+  // emoji 结尾（码点检测）
+  const lastCp = last.codePointAt(0) ?? 0;
+  if (isEmojiCodePoint(lastCp)) return "emoji";
   if (last === "\n") return "换行";
   return "other";
 }
@@ -191,8 +229,8 @@ function findRecurringPhrases(bodies: string[]): string[] {
   for (let n = 2; n <= 6; n++) {
     for (let i = 0; i <= fullClean.length - n; i++) {
       const gram = fullClean.slice(i, i + n);
-      // 跳过纯标点 / 纯 emoji
-      if (/^[\p{P}\p{S}\s]+$/u.test(gram)) continue;
+      // 跳过纯标点 / 纯符号
+      if (/^[^\u4e00-\u9fff\w]+$/.test(gram)) continue;
       ngramCounts.set(gram, (ngramCounts.get(gram) ?? 0) + 1);
     }
   }
