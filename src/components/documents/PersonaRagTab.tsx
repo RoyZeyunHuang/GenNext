@@ -37,6 +37,8 @@ type PersonaRow = {
   bio_md: string;
   source_url: string | null;
   is_public: boolean;
+  /** 黑魔法 persona-generate 累计次数 */
+  generate_invocation_count?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -48,6 +50,8 @@ type NoteRow = {
   title: string;
   body: string;
   metadata: Record<string, unknown> | null;
+  /** 该条笔记在黑魔法 RAG 中进入上下文的累计次数 */
+  rag_invocation_count?: number | null;
   created_at: string;
 };
 
@@ -569,6 +573,11 @@ export function PersonaRagTab({
                 {selected?.short_description && (
                   <p className="truncate text-xs text-[#78716C]">{selected.short_description}</p>
                 )}
+                {selected && (
+                  <p className="mt-0.5 text-[11px] text-[#A8A29E]">
+                    黑魔法累计调用 · {Number(selected.generate_invocation_count ?? 0)} 次
+                  </p>
+                )}
                 </div>
               </div>
               <button
@@ -772,13 +781,23 @@ export function PersonaRagTab({
                         <li key={n.id} className="flex items-start gap-2 px-3 py-2.5">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-[#1C1917]">{n.title}</p>
-                            {(nickname || likes != null || published) && (
+                            {(nickname ||
+                              likes != null ||
+                              published ||
+                              Number(n.rag_invocation_count ?? 0) > 0) && (
                               <p className="mt-0.5 text-[10px] text-[#A8A29E]">
                                 {nickname ? <>昵称 {nickname}</> : null}
                                 {nickname && (likes != null || published) ? " · " : null}
                                 {likes != null ? <>👍 {likes}</> : null}
                                 {likes != null && published ? " · " : null}
                                 {published ? <>发布时间 {published}</> : null}
+                                {(nickname || likes != null || published) &&
+                                Number(n.rag_invocation_count ?? 0) > 0
+                                  ? " · "
+                                  : null}
+                                {Number(n.rag_invocation_count ?? 0) > 0 ? (
+                                  <>RAG 命中 {Number(n.rag_invocation_count)} 次</>
+                                ) : null}
                               </p>
                             )}
                             <p className="line-clamp-2 text-xs text-[#78716C]">{n.body}</p>

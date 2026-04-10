@@ -12,6 +12,8 @@ import {
   normalizePersonaRpcRows,
 } from "@/lib/persona-rag/retrieve-threshold";
 import { tryConsumePersonaGenerateSlot } from "@/lib/persona-generate-quota";
+import { resolvePromptDocRole } from "@/lib/doc-category-constants";
+import { recordPersonaRagInvocation } from "@/lib/persona-rag/record-usage";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
@@ -38,6 +40,11 @@ export async function POST(req: NextRequest) {
     typeof body.task_template_doc_id === "string" && body.task_template_doc_id.trim()
       ? body.task_template_doc_id.trim()
       : undefined;
+  const knowledge_doc_id =
+    typeof body.knowledge_doc_id === "string" && body.knowledge_doc_id.trim()
+      ? body.knowledge_doc_id.trim()
+      : undefined;
+  const separateTitles = body.separate_titles === true;
   const articleLength = normalizeArticleLength(body.article_length);
 
   if (!persona_id || !user_input) {
@@ -79,6 +86,30 @@ export async function POST(req: NextRequest) {
     if (t) taskConstraint = t;
   }
 
+  let knowledgeContent: string | undefined;
+  if (knowledge_doc_id) {
+    const { data: refDoc } = await supabase
+      .from("docs")
+      .select("title, content, category_id")
+      .eq("id", knowledge_doc_id)
+      .maybeSingle();
+    if (refDoc?.category_id) {
+      const { data: cat } = await supabase
+        .from("doc_categories")
+        .select("name")
+        .eq("id", refDoc.category_id)
+        .maybeSingle();
+      const role = resolvePromptDocRole(cat?.name, undefined);
+      if (role === "reference") {
+        const title = (refDoc.title ?? "").trim();
+        const content = (refDoc.content ?? "").trim();
+        if (content) {
+          knowledgeContent = title ? `### ${title}\n${content}` : content;
+        }
+      }
+    }
+  }
+
   let queryEmbedding: number[];
   try {
     queryEmbedding = await embedText(user_input);
@@ -118,6 +149,8 @@ export async function POST(req: NextRequest) {
     retrievedNotes: retrievedNotes.map((n) => ({ title: n.title, body: n.body })),
     retrievalMode,
     taskConstraint,
+    knowledgeContent,
+    bodyOnlyOutput: separateTitles,
     articleLengthRaw: articleLength,
   });
 
@@ -153,6 +186,12 @@ export async function POST(req: NextRequest) {
       similarity: Number(Number(n.similarity).toFixed(4)),
     })),
   };
+
+  void recordPersonaRagInvocation(
+    persona_id,
+    retrievedNotes.map((n) => n.id),
+    gate.session.userId
+  );
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

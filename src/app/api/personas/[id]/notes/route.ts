@@ -29,7 +29,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("persona_notes")
-    .select("id, persona_id, title, body, metadata, created_at")
+    .select("id, persona_id, title, body, metadata, rag_invocation_count, created_at")
     .eq("persona_id", personaId)
     .order("created_at", { ascending: false });
 

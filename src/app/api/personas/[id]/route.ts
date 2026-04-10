@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PERSONA_SELECT =
-  "id, user_id, name, short_description, bio_md, source_url, is_public, created_at, updated_at";
+  "id, user_id, name, short_description, bio_md, source_url, is_public, generate_invocation_count, created_at, updated_at";
 
 export async function GET(
   _req: NextRequest,
