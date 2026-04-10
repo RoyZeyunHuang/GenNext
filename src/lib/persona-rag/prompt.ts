@@ -1,5 +1,11 @@
 import { articleLengthSystemInstruction, normalizeArticleLength, type ArticleLength } from "@/lib/copy-generate-options";
 import type { RetrievalMode } from "@/lib/persona-rag/retrieve-threshold";
+import {
+  extractStyleFingerprint,
+  formatStyleFingerprint,
+  excerptNote,
+  type StyleFingerprint,
+} from "@/lib/persona-rag/style-fingerprint";
 
 export function buildPersonaSystemPrompt({
   personaBio,
@@ -17,25 +23,74 @@ export function buildPersonaSystemPrompt({
   const length = normalizeArticleLength(articleLengthRaw);
   const lengthInstruction = articleLengthSystemInstruction(length);
 
-  let examplesIntro = "";
+  // ── 风格指纹：从范文中程序化提取可量化特征 ──
+  const fingerprint: StyleFingerprint | null = extractStyleFingerprint(retrievedNotes);
+  const fingerprintBlock = fingerprint
+    ? `\n\n<你的写作风格DNA>\n以下是从你过去作品中提炼出的写作风格特征——这才是你写作的"底色"，比任何单篇范文都更能代表你：\n${formatStyleFingerprint(fingerprint)}\n</你的写作风格DNA>`
+    : "";
+
+  // ── 根据 retrievalMode 差异化构建范文引用 ──
+  let examplesBlock = "";
+
   if (retrievedNotes.length > 0) {
     if (retrievalMode === "topic_aligned") {
-      examplesIntro = `\n\n下面是你之前写过的几篇真实笔记（不是模板，是你的过去作品）。它们和这次要写的主题最相关。看完之后用你自己的方式去写新的一篇——不要照抄，但你的语气、视角、措辞可以从这些过去的作品中自然延续。`;
+      // 主题高度相关：保留完整笔记 + 风格指纹
+      // 但强调"创新"而非"仿写"
+      examplesBlock = `${fingerprintBlock}
+
+<与本次主题相关的过去笔记>
+下面是你之前写过的几篇**主题相近**的笔记。它们是你真实写过的内容，可以帮你回忆当时的思路和切入角度。
+
+重要：这些笔记是"参考坐标"，不是"答题模板"。你应该：
+- 从中感受自己当时的表达状态和切入视角
+- 用你的风格DNA自然地写出**全新的内容**
+- 可以延续你一贯的语气和视角，但**角度、结构、具体表述都必须不同**
+- 如果参考笔记和这次话题有重叠，换一个切入点或新的感悟来写
+
+${retrievedNotes
+  .map(
+    (n, i) =>
+      `<过去笔记 ${i + 1}>\n标题：${n.title}\n正文：${n.body}\n</过去笔记 ${i + 1}>`
+  )
+  .join("\n\n")}
+</与本次主题相关的过去笔记>`;
+
     } else if (retrievalMode === "topic_loose") {
-      examplesIntro = `\n\n下面是你之前写过的几篇真实笔记。这次用户想写的主题和你过去的作品**不完全重合**，所以请把这些笔记**主要当作"我平时是怎么说话的"参考**——学你的句式、用词、emoji 习惯、自我表达的方式。**话题内容请以用户的需求为准，不要硬把过去的话题搬过来。**`;
+      // 主题半相关：只展示开头片段 + 风格指纹为主导
+      examplesBlock = `${fingerprintBlock}
+
+<风格参考片段>
+下面是你过去笔记的**开头片段**（不是完整文章）。这次用户想写的主题和你过去作品**不完全重合**，所以这些片段**仅仅用来感受你的说话方式**——你怎么开头、怎么带节奏、用什么语气。
+
+上面的"写作风格DNA"才是你这次写作的主要依据。**话题内容完全以用户需求为准，不要把过去笔记里的话题搬过来。**
+
+${retrievedNotes
+  .map(
+    (n, i) =>
+      `<片段 ${i + 1}>「${n.title}」开头：${excerptNote(n.body, 3)}</片段 ${i + 1}>`
+  )
+  .join("\n")}
+</风格参考片段>`;
+
     } else {
-      examplesIntro = `\n\n下面是你之前写过的几篇真实笔记。注意：这次用户想写的主题和你过去的作品**完全不在一个领域**，所以这几篇笔记**只用来参考你的说话方式**——句子长短、用词偏好、emoji 习惯、自嘲与对话感、口头禅。**绝对不要把这些笔记里的话题、地点、商品、专业术语带到新笔记里。** 新笔记的主题和内容完全来自用户的需求，你只是用"你的嘴"去写它。`;
+      // style_only：主题完全不相关，只用风格指纹 + 极简摘录
+      examplesBlock = `${fingerprintBlock}
+
+<风格感知>
+这次用户想写的主题和你过去的作品**完全不在一个领域**。上面的"写作风格DNA"是你这次写作的核心参考。
+
+下面只给你几个极短的句子片段，帮你"热身"找到自己说话的感觉：
+${retrievedNotes
+  .map(
+    (n, i) =>
+      `${i + 1}. ${excerptNote(n.body, 2)}`
+  )
+  .join("\n")}
+
+注意：这些片段里的**话题、地点、商品、专业术语绝对不要带到新笔记里**。你只是在用"你的嘴"去写一个全新的话题。
+</风格感知>`;
     }
   }
-
-  const examplesBlock = retrievedNotes.length
-    ? `${examplesIntro}\n\n${retrievedNotes
-        .map(
-          (n, i) =>
-            `<你之前写的笔记 ${i + 1}>\n标题：${n.title}\n正文：${n.body}\n</你之前写的笔记 ${i + 1}>`
-        )
-        .join("\n\n")}`
-    : "";
 
   const constraintBlock = taskConstraint
     ? `\n\n这次有几条额外的硬约束（外部要求，必须遵守）：\n${taskConstraint}`
@@ -56,6 +111,7 @@ ${lengthInstruction}
 - 你是在写**自己的**笔记，不是在"模仿某人的风格"
 - 不要用任何固定结构或套路——每次都自然地、由感觉驱动地写
 - 不要刻意堆口头禅或 emoji，自然就好
+- 每次写作都要有**新的切入角度**——即使话题相似，也不要重复过去笔记的结构和论点
 - **严格遵守上面的正文字数要求**，不得明显超出或不足
 - 输出格式：第一行是标题（不写"标题："前缀），空一行，然后是正文。纯文本，不要 markdown。`;
 }
