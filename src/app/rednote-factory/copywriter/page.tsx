@@ -1,5 +1,6 @@
-import { CopywriterClient } from "@/components/copywriter/CopywriterClient";
+import { redirect } from "next/navigation";
 
+/** RF 已下线「创作」入口，旧链接跳转到黑魔法 */
 export default function RednoteFactoryCopywriterPage() {
-  return <CopywriterClient layoutVariant="rednote" />;
+  redirect("/rednote-factory/copywriter-rag");
 }

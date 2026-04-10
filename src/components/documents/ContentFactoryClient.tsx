@@ -64,7 +64,7 @@ export function ContentFactoryClient({
     is_auto_include: false,
     is_public: false,
   });
-  const [docForm, setDocForm] = useState({ title: "", content: "", tags: "", is_public: false });
+  const [docForm, setDocForm] = useState({ title: "", content: "", is_public: false });
   const [savingAutoInclude, setSavingAutoInclude] = useState(false);
   const [rfMe, setRfMe] = useState<{ userId: string; isAdmin: boolean; hasMainAccess: boolean } | null>(null);
   const [docModalReadOnly, setDocModalReadOnly] = useState(false);
@@ -235,7 +235,7 @@ export function ContentFactoryClient({
   };
 
   const openAddDoc = () => {
-    setDocForm({ title: "", content: "", tags: "", is_public: false });
+    setDocForm({ title: "", content: "", is_public: false });
     setDocModalReadOnly(false);
     setDocModal("add");
   };
@@ -244,7 +244,6 @@ export function ContentFactoryClient({
     setDocForm({
       title: d.title,
       content: d.content || "",
-      tags: (d.tags ?? []).join(", "),
       is_public: d.owner_id == null,
     });
     setDocModalReadOnly(readOnly);
@@ -256,7 +255,7 @@ export function ContentFactoryClient({
     const baseBody = {
       title: docForm.title.trim(),
       content: docForm.content.trim() || null,
-      tags: docForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      tags: [] as string[],
     };
     const adminExtra = rfMe?.isAdmin ? { is_public: docForm.is_public } : {};
     if (docModal === "add") {
@@ -342,18 +341,6 @@ export function ContentFactoryClient({
               <p className="mb-1.5 truncate text-xs text-[#78716C]">
                 {(d.content ?? "暂无内容").replace(/\s+/g, " ").slice(0, 80)}
               </p>
-              {(d.tags?.length ?? 0) > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {(d.tags ?? []).map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-[#78716C] bg-[#F5F5F4]"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
             </button>
           </div>
         ))
@@ -400,18 +387,6 @@ export function ContentFactoryClient({
               {(d.content ?? "暂无内容").slice(0, 100)}
               {(d.content?.length ?? 0) > 100 ? "…" : ""}
             </p>
-            {(d.tags?.length ?? 0) > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {(d.tags ?? []).map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded px-1 py-0.5 text-[9px] font-medium text-[#78716C] bg-[#F5F5F4]"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
           </button>
         ))}
       </div>
@@ -947,15 +922,6 @@ export function ContentFactoryClient({
                         )}
                       </div>
                     </div>
-                    {(d.tags?.length ?? 0) > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {(d.tags ?? []).map((tag) => (
-                          <span key={tag} className="rounded bg-[#F5F5F4] px-1.5 py-0.5 text-xs text-[#78716C]">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1133,17 +1099,6 @@ export function ContentFactoryClient({
                   onChange={(e) => setDocForm((f) => ({ ...f, content: e.target.value }))}
                   rows={8}
                   className="w-full resize-none rounded-lg border border-[#E7E5E4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 read-only:bg-[#FAFAF9]"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#78716C]">标签（逗号分隔）</label>
-                <input
-                  type="text"
-                  readOnly={docModalReadOnly}
-                  value={docForm.tags}
-                  onChange={(e) => setDocForm((f) => ({ ...f, tags: e.target.value }))}
-                  placeholder="标签1, 标签2"
-                  className="h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 read-only:bg-[#FAFAF9]"
                 />
               </div>
               {rfMe?.isAdmin && !docModalReadOnly && (

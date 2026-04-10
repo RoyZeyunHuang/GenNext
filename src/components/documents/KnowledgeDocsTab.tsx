@@ -23,7 +23,7 @@ export function KnowledgeDocsTab() {
   const [editing, setEditing] = useState<KnowledgeDoc | null>(null);
   const [showModal, setShowModal] = useState(false);
 
-  const [form, setForm] = useState({ title: "", content: "", type: "other", tags: "", source_url: "" });
+  const [form, setForm] = useState({ title: "", content: "", type: "other", source_url: "" });
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -37,7 +37,7 @@ export function KnowledgeDocsTab() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: "", content: "", type: "other", tags: "", source_url: "" });
+    setForm({ title: "", content: "", type: "other", source_url: "" });
     setShowModal(true);
   };
 
@@ -47,7 +47,6 @@ export function KnowledgeDocsTab() {
       title: item.title,
       content: item.content || "",
       type: item.type || "other",
-      tags: (item.tags || []).join(", "),
       source_url: item.source_url || "",
     });
     setShowModal(true);
@@ -58,7 +57,7 @@ export function KnowledgeDocsTab() {
       title: form.title,
       content: form.content,
       type: form.type,
-      tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      tags: [] as string[],
       source_url: form.source_url || null,
     };
     if (editing) {
@@ -106,13 +105,6 @@ export function KnowledgeDocsTab() {
                 <span className="mb-1.5 inline-block rounded bg-purple-50 px-1.5 py-0.5 text-xs text-purple-600">{TYPE_LABELS[item.type] || item.type}</span>
               )}
               <p className="mb-2 text-xs text-[#78716C] line-clamp-2">{item.content || "暂无内容"}</p>
-              {item.tags && item.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {item.tags.map((tag) => (
-                    <span key={tag} className="rounded bg-[#F5F5F4] px-1.5 py-0.5 text-xs text-[#78716C]">{tag}</span>
-                  ))}
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -143,10 +135,6 @@ export function KnowledgeDocsTab() {
               <div>
                 <label className="mb-1 block text-xs font-medium text-[#78716C]">来源链接</label>
                 <input type="text" value={form.source_url} onChange={(e) => setForm({ ...form, source_url: e.target.value })} placeholder="https://..." className="h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#78716C]">标签（逗号分隔）</label>
-                <input type="text" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="市场, 数据, ..." className="h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">

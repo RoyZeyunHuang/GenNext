@@ -83,7 +83,7 @@ function RednoteResetPasswordForm() {
           setError(err.message || t("rednote.signUpError"));
           return;
         }
-        router.replace("/rednote-factory/copywriter");
+        router.replace("/rednote-factory/copywriter-rag");
         router.refresh();
       } finally {
         setLoading(false);
@@ -136,7 +136,7 @@ function RednoteResetPasswordForm() {
             minLength={6}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+            className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-base text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
           />
           <label htmlFor="rf-confirm-password" className="mb-1.5 block text-xs font-semibold text-[#78716C]">
             {t("rednote.confirmPassword")}
@@ -149,7 +149,7 @@ function RednoteResetPasswordForm() {
             minLength={6}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+            className="mb-3.5 h-[46px] w-full rounded-[10px] border border-[#E7E5E4] bg-white px-3.5 text-base text-[#1C1917] outline-none focus:ring-2 focus:ring-[#1C1917]/20"
           />
           {error && (
             <p className="mb-2 text-sm text-red-600" role="alert">
@@ -159,7 +159,7 @@ function RednoteResetPasswordForm() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-1.5 h-12 w-full rounded-[10px] bg-[#1C1917] text-[15px] font-semibold text-white transition hover:bg-[#292524] disabled:opacity-60"
+            className="mt-1.5 h-12 w-full rounded-[10px] bg-[#1C1917] text-base font-semibold text-white transition hover:bg-[#292524] disabled:opacity-60"
           >
             {loading ? t("common.loading") : t("rednote.resetPasswordSubmit")}
           </button>

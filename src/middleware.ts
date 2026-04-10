@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
   const hasMainAccess = user.app_metadata?.has_main_access === true;
   if (!hasMainAccess) {
     return NextResponse.redirect(
-      new URL("/rednote-factory/copywriter", request.url)
+      new URL("/rednote-factory/copywriter-rag", request.url)
     );
   }
 

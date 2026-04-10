@@ -196,7 +196,7 @@ export function SoulBuilderModal({ open, onClose, categoryId, onSaved }: SoulBui
           category_id: categoryId,
           title: title.trim() || "新灵魂",
           content: soulDraft.trim(),
-          tags: ["灵魂", "AI生成"],
+          tags: [],
         }),
       });
       if (!res.ok) {

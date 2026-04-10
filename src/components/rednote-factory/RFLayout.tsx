@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, LogOut, PenLine, Sparkles, User } from "lucide-react";
+import { BookOpen, LogOut, Sparkles, User, type LucideIcon } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
-const COPYWRITER = "/rednote-factory/copywriter";
 const COPYWRITER_RAG = "/rednote-factory/copywriter-rag";
 const DOCUMENTS = "/rednote-factory/documents";
 
@@ -19,7 +18,7 @@ function TabItem({
 }: {
   href: string;
   active: boolean;
-  icon: typeof PenLine;
+  icon: LucideIcon;
   label: string;
 }) {
   return (
@@ -58,7 +57,7 @@ function SidebarItem({
 }: {
   href: string;
   active: boolean;
-  icon: typeof PenLine;
+  icon: LucideIcon;
   label: string;
 }) {
   return (
@@ -96,7 +95,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
     router.refresh();
   }, [router]);
 
-  const onCopy = pathname === COPYWRITER || pathname.startsWith(`${COPYWRITER}/`);
   const onRag = pathname === COPYWRITER_RAG || pathname.startsWith(`${COPYWRITER_RAG}/`);
   const onDocs = pathname === DOCUMENTS || pathname.startsWith(`${DOCUMENTS}/`);
 
@@ -113,12 +111,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-2">
-          <SidebarItem
-            href={COPYWRITER}
-            active={onCopy}
-            icon={PenLine}
-            label="创作"
-          />
           <SidebarItem
             href={COPYWRITER_RAG}
             active={onRag}
@@ -177,12 +169,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
           className="fixed bottom-0 left-0 right-0 z-40 flex h-[68px] items-start justify-around border-t border-[#E7E5E4] bg-white pt-1.5 lg:hidden"
           style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
         >
-          <TabItem
-            href={COPYWRITER}
-            active={onCopy}
-            icon={PenLine}
-            label="创作"
-          />
           <TabItem
             href={COPYWRITER_RAG}
             active={onRag}

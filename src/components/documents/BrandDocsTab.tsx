@@ -22,7 +22,7 @@ export function BrandDocsTab() {
   const [editing, setEditing] = useState<BrandDoc | null>(null);
   const [showModal, setShowModal] = useState(false);
 
-  const [form, setForm] = useState({ title: "", content: "", property_name: "", tags: "", is_global: false });
+  const [form, setForm] = useState({ title: "", content: "", property_name: "", is_global: false });
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -36,7 +36,7 @@ export function BrandDocsTab() {
 
   const openNew = () => {
     setEditing(null);
-    setForm({ title: "", content: "", property_name: "", tags: "", is_global: false });
+    setForm({ title: "", content: "", property_name: "", is_global: false });
     setShowModal(true);
   };
 
@@ -46,7 +46,6 @@ export function BrandDocsTab() {
       title: item.title,
       content: item.content || "",
       property_name: item.property_name || "",
-      tags: (item.tags || []).join(", "),
       is_global: item.is_global,
     });
     setShowModal(true);
@@ -57,7 +56,7 @@ export function BrandDocsTab() {
       title: form.title,
       content: form.content,
       property_name: form.property_name || null,
-      tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      tags: [] as string[],
       is_global: form.is_global,
     };
     if (editing) {
@@ -124,13 +123,6 @@ export function BrandDocsTab() {
                 </span>
               )}
               <p className="mb-2 text-xs text-[#78716C] line-clamp-2">{item.content || "暂无内容"}</p>
-              {item.tags && item.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {item.tags.map((tag) => (
-                    <span key={tag} className="rounded bg-[#F5F5F4] px-1.5 py-0.5 text-xs text-[#78716C]">{tag}</span>
-                  ))}
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -155,10 +147,6 @@ export function BrandDocsTab() {
               <div>
                 <label className="mb-1 block text-xs font-medium text-[#78716C]">内容</label>
                 <textarea value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} rows={6} className="w-full resize-none rounded-lg border border-[#E7E5E4] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#78716C]">标签（逗号分隔）</label>
-                <input type="text" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="品牌, 定位, ..." className="h-9 w-full rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20" />
               </div>
               <label className="flex items-center gap-2 text-sm text-[#1C1917]">
                 <input type="checkbox" checked={form.is_global} onChange={(e) => setForm({ ...form, is_global: e.target.checked })} className="rounded border-[#E7E5E4] text-[#1C1917] focus:ring-[#1C1917]/20" />

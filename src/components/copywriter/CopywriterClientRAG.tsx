@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Loader2, ShieldAlert, Star } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Loader2, ShieldAlert, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   ARTICLE_LENGTH_SEGMENTED,
   DEFAULT_ARTICLE_LENGTH,
+  normalizeArticleLength,
   type ArticleLength,
 } from "@/lib/copy-generate-options";
 import {
@@ -28,6 +29,8 @@ type PersonaQuota = {
   limit: number;
   remaining: number | null;
 };
+
+type TitleVariant = { type_name: string; text: string };
 
 function HighlightedForbiddenText({ text, scan }: { text: string; scan: ScanResult }) {
   const segs = segmentsForHighlight(text, scan.levelAt);
@@ -62,8 +65,15 @@ export function CopywriterClientRAG({
   const [categories, setCategories] = useState<Category[]>([]);
   const [allDocs, setAllDocs] = useState<Doc[]>([]);
   const [taskDocId, setTaskDocId] = useState<string>("");
-  const [articleLength, setArticleLength] = useState<ArticleLength>(DEFAULT_ARTICLE_LENGTH);
+  const [knowledgeDocId, setKnowledgeDocId] = useState<string>("");
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
+  const [articleLengthSelect, setArticleLengthSelect] = useState<ArticleLength>(DEFAULT_ARTICLE_LENGTH);
+  /** 标题：未选择 | 默认模版（正文后 6 条纽约向标题） */
+  const [titleSelect, setTitleSelect] = useState<string>("default");
   const [generating, setGenerating] = useState(false);
+  const [generatingTitles, setGeneratingTitles] = useState(false);
+  const [titleVariants, setTitleVariants] = useState<TitleVariant[]>([]);
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [output, setOutput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -140,6 +150,23 @@ export function CopywriterClientRAG({
     });
   }, [allDocs, categories, resolvedTitlePatternCategory]);
 
+  /** 内容工厂「知识」类文档（docs 表中 reference 角色，与主站文案知识源一致） */
+  const zhiShiDocs = useMemo(() => {
+    return allDocs.filter((d) => {
+      const cat = categories.find((c) => c.id === d.category_id);
+      if (!cat) return false;
+      return resolvePromptDocRole(cat.name, undefined) === "reference";
+    });
+  }, [allDocs, categories]);
+
+  const showOutputPanel =
+    !isRf ||
+    generating ||
+    generatingTitles ||
+    output.trim() !== "" ||
+    titleError !== null ||
+    titleVariants.length > 0;
+
   useEffect(() => {
     setSensitiveScan(null);
   }, [output]);
@@ -150,19 +177,27 @@ export function CopywriterClientRAG({
       return;
     }
     setGenerating(true);
+    setGeneratingTitles(false);
     setError(null);
+    setTitleError(null);
+    setTitleVariants([]);
     setOutput("");
     setStarred(false);
     setCopied(false);
     try {
+      const articleLengthForApi = normalizeArticleLength(articleLengthSelect);
+      const separateTitles = titleSelect === "default";
+
       const res = await fetch("/api/ai/persona-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           persona_id: personaId,
           user_input: userInput,
-          task_template_doc_id: taskDocId || undefined,
-          article_length: articleLength,
+          task_template_doc_id: taskDocId.trim() || undefined,
+          knowledge_doc_id: knowledgeDocId.trim() || undefined,
+          article_length: articleLengthForApi,
+          separate_titles: separateTitles,
         }),
       });
       if (!res.ok) {
@@ -183,6 +218,34 @@ export function CopywriterClientRAG({
           return;
         }
         setOutput(buf);
+      }
+
+      const finalBody = buf.trim();
+      if (separateTitles && finalBody) {
+        setGeneratingTitles(true);
+        try {
+          const tr = await fetch("/api/ai/persona-generate-title", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              persona_id: personaId,
+              body_text: finalBody,
+              user_input: userInput,
+            }),
+          });
+          const data = (await tr.json().catch(() => ({}))) as {
+            error?: string;
+            titles?: TitleVariant[];
+          };
+          if (!tr.ok) {
+            throw new Error(data.error || `标题生成失败 HTTP ${tr.status}`);
+          }
+          setTitleVariants(Array.isArray(data.titles) ? data.titles : []);
+        } catch (te) {
+          setTitleError(te instanceof Error ? te.message : "标题生成失败");
+        } finally {
+          setGeneratingTitles(false);
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "生成失败");
@@ -206,7 +269,7 @@ export function CopywriterClientRAG({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         user_input: userInput,
-        doc_ids: taskDocId ? [taskDocId] : [],
+        doc_ids: taskDocId.trim() ? [taskDocId] : [],
         persona_template_id: personaId,
         detected_intent: { mode: "persona-rag", persona_id: personaId },
         output: output.trim(),
@@ -227,9 +290,6 @@ export function CopywriterClientRAG({
       {isRf && (
         <div className="col-span-full lg:col-span-2">
           <h1 className="text-[15px] font-bold text-[#1C1917] lg:text-lg">黑魔法笔记生成</h1>
-          <p className="mt-0.5 text-[11px] text-[#78716C] lg:text-xs">
-            黑魔法全身变🪄
-          </p>
         </div>
       )}
       <div className="space-y-4">
@@ -297,44 +357,84 @@ export function CopywriterClientRAG({
             onChange={(e) => setUserInput(e.target.value)}
             rows={5}
             placeholder="想写的话题、角度、要点…"
-            className="w-full rounded-xl border border-[#E7E5E4] bg-[#FAFAF9]/40 px-3.5 py-3 text-sm text-[#1C1917] placeholder:text-[#A8A29E] focus:border-[#D6D3D1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1C1917]/15"
+            className="w-full rounded-xl border border-[#E7E5E4] bg-[#FAFAF9]/40 px-3.5 py-3 text-base text-[#1C1917] placeholder:text-[#A8A29E] focus:border-[#D6D3D1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1C1917]/15 lg:text-sm"
           />
 
-          <div className="mt-4">
-            <label className="mb-1 block text-xs font-medium text-[#78716C]">任务约束（可选）</label>
-            <select
-              value={taskDocId}
-              onChange={(e) => setTaskDocId(e.target.value)}
-              className="h-10 w-full rounded-lg border border-[#E7E5E4] bg-white px-3 text-sm text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+          <div className="mt-4 rounded-xl border border-[#E7E5E4] bg-[#FAFAF9]/50">
+            <button
+              type="button"
+              onClick={() => setMoreOptionsOpen((v) => !v)}
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition hover:bg-[#F5F5F4]/80"
             >
-              <option value="">不选</option>
-              {taskTemplateDocs.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.title}
-                </option>
-              ))}
-            </select>
-          </div>
+              {moreOptionsOpen ? (
+                <ChevronDown className="h-4 w-4 shrink-0 text-[#A8A29E]" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0 text-[#A8A29E]" />
+              )}
+              <span className="min-w-0 flex-1 text-xs font-semibold text-[#1C1917]">深度定制</span>
+            </button>
+            {moreOptionsOpen && (
+              <div className="space-y-4 border-t border-[#E7E5E4] px-3 pb-4 pt-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#78716C]">篇幅</label>
+                  <select
+                    value={articleLengthSelect}
+                    onChange={(e) => setArticleLengthSelect(normalizeArticleLength(e.target.value))}
+                    className="h-10 w-full rounded-lg border border-[#E7E5E4] bg-white px-3 text-base text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 lg:text-sm"
+                  >
+                    {ARTICLE_LENGTH_SEGMENTED.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-medium text-[#78716C]">篇幅</p>
-            <div className="flex gap-2">
-              {ARTICLE_LENGTH_SEGMENTED.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => setArticleLength(o.value)}
-                  className={cn(
-                    "min-h-9 flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                    articleLength === o.value
-                      ? "border-[#1C1917] bg-[#1C1917] text-white"
-                      : "border-[#E7E5E4] bg-white text-[#1C1917] hover:bg-[#FAFAF9]"
-                  )}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#78716C]">知识</label>
+                  <select
+                    value={knowledgeDocId}
+                    onChange={(e) => setKnowledgeDocId(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-[#E7E5E4] bg-white px-3 text-base text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 lg:text-sm"
+                  >
+                    <option value="">未选择</option>
+                    {zhiShiDocs.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#78716C]">任务</label>
+                  <select
+                    value={taskDocId}
+                    onChange={(e) => setTaskDocId(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-[#E7E5E4] bg-white px-3 text-base text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 lg:text-sm"
+                  >
+                    <option value="">未选择</option>
+                    {taskTemplateDocs.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#78716C]">标题</label>
+                  <select
+                    value={titleSelect}
+                    onChange={(e) => setTitleSelect(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-[#E7E5E4] bg-white px-3 text-base text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 lg:text-sm"
+                  >
+                    <option value="">未选择</option>
+                    <option value="default">默认模版</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           {quota && (
@@ -344,7 +444,7 @@ export function CopywriterClientRAG({
               ) : (
                 <>
                   今日剩余 <span className="font-semibold text-[#1C1917]">{quota.remaining}</span> /{" "}
-                  {quota.limit} 次（按 UTC 自然日重置）
+                  {quota.limit} 次
                 </>
               )}
             </p>
@@ -354,25 +454,27 @@ export function CopywriterClientRAG({
             type="button"
             disabled={
               generating ||
+              generatingTitles ||
               !personaId ||
               (!!quota && !quota.unlimited && quota.remaining === 0)
             }
             onClick={() => void generate()}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#1C1917] py-2.5 text-sm font-medium text-white hover:bg-[#1C1917]/90 disabled:opacity-50"
           >
-            {generating ? (
+            {generating || generatingTitles ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                生成中…
+                {generatingTitles ? "生成标题中…" : "生成正文中…"}
               </>
             ) : (
-              "生成正文"
+              "黑魔法生成"
             )}
           </button>
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
       </div>
 
+      {showOutputPanel && (
       <div className="flex min-h-[min(70dvh,520px)] flex-col rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm lg:min-h-[calc(100dvh-10rem)]">
         {output.trim() ? (
           <div className="mb-2 flex shrink-0 justify-end">
@@ -422,7 +524,46 @@ export function CopywriterClientRAG({
               <pre className="whitespace-pre-wrap font-sans">{output}</pre>
             ))}
         </div>
+
+        {(generatingTitles || titleError || titleVariants.length > 0) && (
+          <div className="mt-3 shrink-0 rounded-lg border border-[#E7E5E4] bg-white p-3 shadow-sm">
+            <p className="mb-2 text-xs font-semibold text-[#1C1917]">标题候选</p>
+            {titleError && <p className="mb-2 text-xs text-red-600">{titleError}</p>}
+            {generatingTitles && (
+              <p className="flex items-center gap-1 text-xs text-[#A8A29E]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                根据正文与人设生成 6 条标题…
+              </p>
+            )}
+            {titleVariants.length > 0 && (
+              <ul className="space-y-2">
+                {titleVariants.map((t, i) => (
+                  <li
+                    key={`${t.type_name}-${i}`}
+                    className="rounded-md border border-[#F5F5F4] bg-[#FAFAF9]/80 px-2.5 py-2 text-xs text-[#1C1917]"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <span className="font-medium text-[#78716C]">{t.type_name}</span>
+                        <p className="mt-0.5 whitespace-pre-wrap leading-snug">{t.text}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void navigator.clipboard.writeText(t.text.trim())}
+                        className="shrink-0 rounded p-1 text-[#78716C] hover:bg-[#F5F5F4]"
+                        title="复制该标题"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
+      )}
     </div>
   );
 }

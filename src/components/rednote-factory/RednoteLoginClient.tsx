@@ -39,7 +39,7 @@ function RednoteLoginForm() {
           router.replace(next);
         } else {
           const hasMain = user.app_metadata?.has_main_access === true;
-          router.replace(hasMain ? "/" : "/rednote-factory/copywriter");
+          router.replace(hasMain ? "/" : "/rednote-factory/copywriter-rag");
         }
       }
     });
@@ -78,7 +78,7 @@ function RednoteLoginForm() {
             router.push(next);
           } else {
             const hasMain = data.user?.app_metadata?.has_main_access === true;
-            router.push(hasMain ? "/" : "/rednote-factory/copywriter");
+            router.push(hasMain ? "/" : "/rednote-factory/copywriter-rag");
           }
           router.refresh();
         } else {
@@ -133,7 +133,7 @@ function RednoteLoginForm() {
           }
           if (data.session) {
             const next = safeNextPath(searchParams.get("next"));
-            router.push(next ?? "/rednote-factory/copywriter");
+            router.push(next ?? "/rednote-factory/copywriter-rag");
             router.refresh();
             return;
           }
@@ -154,7 +154,7 @@ function RednoteLoginForm() {
   };
 
   const inputClass =
-    "h-12 w-full rounded-xl border border-[#E7E5E4] bg-white px-3.5 text-[15px] text-[#1C1917] shadow-sm outline-none transition placeholder:text-[#A8A29E] focus:border-[#D6D3D1] focus:ring-2 focus:ring-[#1C1917]/15";
+    "h-12 w-full rounded-xl border border-[#E7E5E4] bg-white px-3.5 text-base text-[#1C1917] shadow-sm outline-none transition placeholder:text-[#A8A29E] focus:border-[#D6D3D1] focus:ring-2 focus:ring-[#1C1917]/15";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#F5F5F4] px-5 pb-16 pt-4 sm:px-7">
@@ -232,7 +232,7 @@ function RednoteLoginForm() {
               type="submit"
               disabled={loading}
               aria-busy={loading}
-              className="min-h-12 w-full rounded-xl bg-[#1C1917] text-[15px] font-semibold text-white shadow-sm transition hover:bg-[#292524] hover:shadow active:scale-[0.99] disabled:scale-100 disabled:opacity-55 disabled:shadow-none"
+              className="min-h-12 w-full rounded-xl bg-[#1C1917] text-base font-semibold text-white shadow-sm transition hover:bg-[#292524] hover:shadow active:scale-[0.99] disabled:scale-100 disabled:opacity-55 disabled:shadow-none"
             >
               {loading
                 ? t("common.loading")
