@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Check, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseBioFields, shortCareerLabel, storyExcerpt, cleanName, cleanAge, shortLocation } from "@/lib/persona-rag/parse-bio-fields";
 import { PersonaAvatar } from "./PersonaAvatar";
@@ -166,11 +166,11 @@ export function SoulCustomizeClient() {
             {templatePersonas.length > 0 && !showTemplates && (
               <button
                 type="button"
-                onClick={() => setShowTemplates(true)}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/10 px-5 py-2 text-[12px] font-medium text-amber-300 transition hover:bg-amber-400/15"
+                disabled
+                className="mt-4 inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-5 py-2 text-[12px] font-medium text-white/25"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                定制我的灵魂
+                即将上线
               </button>
             )}
           </div>
@@ -226,15 +226,13 @@ export function SoulCustomizeClient() {
               );
             })}
             {/* CTA to add more */}
-            {templatePersonas.length > 0 && !showTemplates && (
-              <button
-                type="button"
-                onClick={() => setShowTemplates(true)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.06] py-3 text-[11px] text-white/25 transition hover:border-white/15 hover:text-white/40"
-              >
-                + 定制更多灵魂
-              </button>
-            )}
+            <button
+              type="button"
+              disabled
+              className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.06] py-3 text-[11px] text-white/20"
+            >
+              定制更多灵魂 · 即将上线
+            </button>
           </div>
         )}
       </section>
@@ -253,16 +251,12 @@ export function SoulCustomizeClient() {
               const fields = parseBioFields(p.bio_md ?? "");
               const story = storyExcerpt(fields.story, 80);
               return (
-                <button
+                <div
                   key={p.id}
-                  type="button"
-                  onClick={() => setForkSource(p)}
                   className={cn(
-                    "group relative overflow-hidden rounded-xl text-left transition-all duration-500",
+                    "group relative cursor-not-allowed overflow-hidden rounded-xl text-left opacity-60",
                     "border border-white/[0.07] bg-gradient-to-b from-[#16141A] to-[#0F0E12]",
-                    "shadow-[0_2px_20px_rgba(0,0,0,0.4)]",
-                    "hover:border-amber-400/20 hover:shadow-[0_4px_40px_rgba(217,170,74,0.06)]",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#08070A]"
+                    "shadow-[0_2px_20px_rgba(0,0,0,0.4)]"
                   )}
                 >
                   {/* left accent line */}
@@ -311,13 +305,12 @@ export function SoulCustomizeClient() {
 
                     {/* CTA */}
                     <div className="mt-3 flex justify-end">
-                      <span className="flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-3.5 py-1.5 text-[10px] font-medium text-white/40 transition-all duration-300 group-hover:border-amber-400/30 group-hover:bg-amber-400/10 group-hover:text-amber-300">
-                        定制成我的
-                        <ArrowRight className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-0.5" />
+                      <span className="flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-white/[0.03] px-3.5 py-1.5 text-[10px] font-medium text-white/20">
+                        即将上线
                       </span>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
