@@ -15,7 +15,7 @@ function getTokenSecret(): string {
 }
 
 /** Generate a signed approval token: HMAC(userId) */
-export function generateApproveToken(userId: string): string {
+function generateApproveToken(userId: string): string {
   return createHmac("sha256", getTokenSecret()).update(userId).digest("hex");
 }
 
