@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, LogOut, Sparkles, User, type LucideIcon } from "lucide-react";
+import { BookOpen, Fingerprint, LogOut, MessageSquareHeart, Sparkles, User, type LucideIcon } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
 const COPYWRITER_RAG = "/rednote-factory/copywriter-rag";
+const SOUL_CUSTOMIZE = "/rednote-factory/soul-customize";
 const DOCUMENTS = "/rednote-factory/documents";
+const FEEDBACK = "/rednote-factory/feedback";
 
 function TabItem({
   href,
@@ -96,10 +98,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const onRag = pathname === COPYWRITER_RAG || pathname.startsWith(`${COPYWRITER_RAG}/`);
+  const onSoul = pathname === SOUL_CUSTOMIZE || pathname.startsWith(`${SOUL_CUSTOMIZE}/`);
   const onDocs = pathname === DOCUMENTS || pathname.startsWith(`${DOCUMENTS}/`);
+  const onFeedback = pathname === FEEDBACK || pathname.startsWith(`${FEEDBACK}/`);
 
   return (
-    <div className="flex min-h-[100dvh] bg-[#e8e5e0] lg:bg-[#FAFAF9]">
+    <div className="flex min-h-[100dvh] bg-[#e8e5e0] lg:h-[100dvh] lg:max-h-[100dvh] lg:bg-[#FAFAF9]">
       {/* Desktop sidebar */}
       <aside className="hidden w-[200px] shrink-0 flex-col border-r border-[#E7E5E4] bg-[#FAFAF9] lg:flex">
         <div className="border-b border-[#E7E5E4] px-4 py-4">
@@ -118,10 +122,22 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             label="黑魔法"
           />
           <SidebarItem
+            href={SOUL_CUSTOMIZE}
+            active={onSoul}
+            icon={Fingerprint}
+            label="灵魂定制"
+          />
+          <SidebarItem
             href={DOCUMENTS}
             active={onDocs}
             icon={BookOpen}
             label="素材库"
+          />
+          <SidebarItem
+            href={FEEDBACK}
+            active={onFeedback}
+            icon={MessageSquareHeart}
+            label="反馈"
           />
         </nav>
         <div className="space-y-2 border-t border-[#E7E5E4] p-4">
@@ -176,10 +192,22 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             label="黑魔法"
           />
           <TabItem
+            href={SOUL_CUSTOMIZE}
+            active={onSoul}
+            icon={Fingerprint}
+            label="灵魂定制"
+          />
+          <TabItem
             href={DOCUMENTS}
             active={onDocs}
             icon={BookOpen}
             label="素材库"
+          />
+          <TabItem
+            href={FEEDBACK}
+            active={onFeedback}
+            icon={MessageSquareHeart}
+            label="反馈"
           />
         </nav>
       </div>

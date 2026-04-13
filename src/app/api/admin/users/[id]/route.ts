@@ -27,10 +27,12 @@ export async function PATCH(
     typeof body.persona_generate_unlimited === "boolean"
       ? body.persona_generate_unlimited
       : undefined;
+  const rfApproved =
+    typeof body.rf_approved === "boolean" ? body.rf_approved : undefined;
 
-  if (hasMain === undefined && personaUnlimited === undefined) {
+  if (hasMain === undefined && personaUnlimited === undefined && rfApproved === undefined) {
     return NextResponse.json(
-      { error: "请提供 has_main_access 或 persona_generate_unlimited（布尔值）" },
+      { error: "请提供 has_main_access、persona_generate_unlimited 或 rf_approved（布尔值）" },
       { status: 400 }
     );
   }
@@ -50,6 +52,7 @@ export async function PATCH(
     const nextMeta = { ...prevMeta };
     if (hasMain !== undefined) nextMeta.has_main_access = hasMain;
     if (personaUnlimited !== undefined) nextMeta.persona_generate_unlimited = personaUnlimited;
+    if (rfApproved !== undefined) nextMeta.rf_approved = rfApproved;
 
     const { data: updated, error: ue } = await admin.auth.admin.updateUserById(id, {
       app_metadata: nextMeta,
@@ -65,6 +68,7 @@ export async function PATCH(
       has_main_access: updated.user?.app_metadata?.has_main_access === true,
       persona_generate_unlimited:
         updated.user?.app_metadata?.persona_generate_unlimited === true,
+      rf_approved: updated.user?.app_metadata?.rf_approved === true,
     });
   } catch (e) {
     console.error("[PATCH /api/admin/users/[id]]", e);

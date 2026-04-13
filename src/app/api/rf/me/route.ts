@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { getRfSession } from "@/lib/rf-session";
 import { getPersonaGenerateDailyLimit, getPersonaGenerateUsageToday } from "@/lib/persona-generate-quota";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Threshold: show forced feedback modal after this many total generations */
+const FEEDBACK_AFTER_GENERATIONS = 10;
 
 export async function GET() {
   const session = await getRfSession();
@@ -17,6 +21,8 @@ export async function GET() {
       personaGenerateUsed: 0,
       personaGenerateLimit: getPersonaGenerateDailyLimit(),
       personaGenerateRemaining: null,
+      totalGenerations: 0,
+      feedbackRequired: false,
     });
   }
 
@@ -29,6 +35,34 @@ export async function GET() {
   const remaining =
     session.personaGenerateUnlimited ? null : Math.max(0, limit - used);
 
+  // Fetch total generations + feedback status for forced-feedback logic
+  let totalGenerations = 0;
+  let hasFeedback = false;
+
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const supabase = getSupabaseAdmin();
+    const [genResult, fbResult] = await Promise.all([
+      supabase
+        .from("user_persona_generate_totals")
+        .select("total_generations")
+        .eq("user_id", session.userId)
+        .maybeSingle(),
+      supabase
+        .from("rf_feedback")
+        .select("id")
+        .eq("user_id", session.userId)
+        .limit(1),
+    ]);
+    totalGenerations = genResult.data?.total_generations ?? 0;
+    hasFeedback = (fbResult.data?.length ?? 0) > 0;
+  }
+
+  // Main-site users (hasMainAccess) are exempt from forced feedback
+  const feedbackRequired =
+    !session.hasMainAccess &&
+    totalGenerations >= FEEDBACK_AFTER_GENERATIONS &&
+    !hasFeedback;
+
   return NextResponse.json({
     userId: session.userId,
     email: session.email ?? null,
@@ -38,5 +72,7 @@ export async function GET() {
     personaGenerateUsed: used,
     personaGenerateLimit: limit,
     personaGenerateRemaining: remaining,
+    totalGenerations,
+    feedbackRequired,
   });
 }

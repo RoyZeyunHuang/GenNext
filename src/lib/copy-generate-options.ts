@@ -1,3 +1,5 @@
+import type { PersonaContentKind } from "@/lib/persona-rag/content-kind";
+
 /** 文案生成 `/api/ai/generate` 的正文长度档位（与任务模版文档解耦） */
 export type ArticleLength = "short" | "medium" | "long";
 
@@ -56,6 +58,50 @@ export function articleLengthSystemInstruction(length: ArticleLength): string {
 不超过300 字；`,
   };
   return byLen[length];
+}
+
+/**
+ * 按黑魔法「内容类型」切换篇幅说明（短/中/长 档位不变，上限因形态各异）。
+ */
+export function articleLengthSystemInstructionForPersonaKind(
+  kind: PersonaContentKind,
+  length: ArticleLength
+): string {
+  if (kind === "xiaohongshu") {
+    return articleLengthSystemInstruction(length);
+  }
+
+  const common =
+    "以下长度要求仅针对正文（标题行不计入）。若参考资料（含任务模版）中出现与长度/字数相关的不同要求，一律以本段为准。";
+
+  if (kind === "instagram") {
+    const byLen: Record<ArticleLength, string> = {
+      short: `${common}
+=== Caption 长度：短===
+篇幅偏短，适合一屏内读完；语言以用户在创作提示中指定的为准（未指定则由你与人设合理选择）。`,
+      medium: `${common}
+=== Caption 长度：中===
+中等篇幅；语言以用户在创作提示中指定的为准。`,
+      long: `${common}
+=== Caption 长度：长===
+可分段换行，略长但仍适合社交平台阅读；语言以用户在创作提示中指定的为准。`,
+    };
+    return byLen[length];
+  }
+
+  // oral_script — 纯文字口播，粗估与短中长对应约 30s / 60s / 90s 中文口播量
+  const byOral: Record<ArticleLength, string> = {
+    short: `${common}
+=== 口播稿长度：短（约 30 秒）===
+不超过约 120 字；口语化，可按意群换行，不要舞台提示或 [停顿] 等标记。`,
+    medium: `${common}
+=== 口播稿长度：中（约 60 秒）===
+不超过约 240 字；口语化，可按意群换行，不要舞台提示或 [停顿] 等标记。`,
+    long: `${common}
+=== 口播稿长度：长（约 90 秒）===
+不超过约 360 字；口语化，可按意群换行，不要舞台提示或 [停顿] 等标记。`,
+  };
+  return byOral[length];
 }
 
 /** 人格浓度：0 = 偏中性，100 = 最大化贴近「人格模板」；默认「深」（第三档） */

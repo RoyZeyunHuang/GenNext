@@ -3,7 +3,7 @@
     "dashboard": "概览",
     "documents": "内容工厂",
     "copywriter": "内容创作",
-    "copywriterRag": "黑魔法笔记生成",
+    "copywriterRag": "黑魔法",
     "planning": "内容排期",
     "calendar": "AI日历",
     "crm": "BRM",
@@ -142,7 +142,7 @@
     "kpi": "KPI",
     "documents": "内容工厂",
     "copywriter": "内容创作",
-    "copywriterRag": "黑魔法笔记生成",
+    "copywriterRag": "黑魔法",
     "planning": "内容排期",
     "calendar": "AI 日历",
     "news": "新闻摘要",
@@ -237,7 +237,7 @@
     "subtitle": "输入创作需求，AI 自动匹配素材并生成内容"
   },
   "copywriterRag": {
-    "title": "黑魔法笔记生成",
+    "title": "黑魔法",
     "subtitle": "黑魔法全身变🪄"
   },
   "settings": {

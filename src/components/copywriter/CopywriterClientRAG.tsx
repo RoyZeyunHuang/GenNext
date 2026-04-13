@@ -18,10 +18,11 @@ import {
 } from "@/lib/xhsForbiddenScan";
 import { isTitlePatternCategoryRow, resolvePromptDocRole } from "@/lib/doc-category-constants";
 import { PersonaAvatar } from "@/components/persona/PersonaAvatar";
+import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 
 type Category = { id: string; name: string; icon: string; sort_order?: number };
 type Doc = { id: string; title: string; category_id: string };
-type PersonaOpt = { id: string; name: string; short_description: string | null };
+type PersonaOpt = { id: string; name: string; short_description: string | null; is_public?: boolean; user_id?: string };
 
 type PersonaQuota = {
   unlimited: boolean;
@@ -80,6 +81,8 @@ export function CopywriterClientRAG({
   const [starred, setStarred] = useState(false);
   const [sensitiveScan, setSensitiveScan] = useState<ScanResult | null>(null);
   const [quota, setQuota] = useState<PersonaQuota | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [feedbackRequired, setFeedbackRequired] = useState(false);
 
   const refreshQuota = useCallback(() => {
     void fetch("/api/rf/me")
@@ -91,11 +94,14 @@ export function CopywriterClientRAG({
           personaGenerateUsed?: number;
           personaGenerateLimit?: number;
           personaGenerateRemaining?: number | null;
+          feedbackRequired?: boolean;
         }) => {
           if (!j.userId) {
             setQuota(null);
             return;
           }
+          setFeedbackRequired(Boolean(j.feedbackRequired));
+          setCurrentUserId(j.userId);
           setQuota({
             unlimited: Boolean(j.personaGenerateUnlimited),
             used: typeof j.personaGenerateUsed === "number" ? j.personaGenerateUsed : 0,
@@ -135,6 +141,15 @@ export function CopywriterClientRAG({
       setAllDocs(Array.isArray(docs) ? docs : []);
     });
   }, []);
+
+  const publicPersonas = useMemo(
+    () => (currentUserId ? personas.filter((p) => p.is_public && p.user_id !== currentUserId) : personas.filter((p) => p.is_public)),
+    [personas, currentUserId]
+  );
+  const privatePersonas = useMemo(
+    () => (currentUserId ? personas.filter((p) => p.user_id === currentUserId) : []),
+    [personas, currentUserId]
+  );
 
   const resolvedTitlePatternCategory = useMemo(
     () => categories.find((c) => isTitlePatternCategoryRow(c)),
@@ -264,17 +279,17 @@ export function CopywriterClientRAG({
 
   const handleStar = async () => {
     if (!output.trim() || starred) return;
-    await fetch("/api/generated-copies", {
+    await fetch("/api/docs/star", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        user_input: userInput,
-        doc_ids: taskDocId.trim() ? [taskDocId] : [],
-        persona_template_id: personaId,
-        detected_intent: { mode: "persona-rag", persona_id: personaId },
-        output: output.trim(),
-        platform: "xiaohongshu",
-        starred: true,
+        title: userInput?.trim().slice(0, 60) || undefined,
+        content: output.trim(),
+        metadata: {
+          user_input: userInput,
+          persona_id: personaId,
+          platform: "xiaohongshu",
+        },
       }),
     });
     setStarred(true);
@@ -294,60 +309,95 @@ export function CopywriterClientRAG({
       )}
       <div className="space-y-4">
         <div className="rounded-lg border border-[#E7E5E4] bg-white p-5 shadow-sm">
-          <div className="mb-4">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A8A29E]">
-                灵魂
-              </span>
-              <span className="h-px flex-1 bg-gradient-to-r from-[#E7E5E4] to-transparent" aria-hidden />
-            </div>
-            {personas.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-[#E7E5E4] bg-[#FAFAF9] px-3 py-6 text-center text-xs text-[#A8A29E]">
-                {isRf
-                  ? "暂无人设：请用有主站权限的账号在「内容工厂」创建人设档案后再来生成。"
-                  : "暂无人设，请先在内容工厂创建人设档案"}
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-1.5">
-                {personas.map((p) => {
-                  const selected = personaId === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setPersonaId(p.id)}
-                      className={cn(
-                        "group relative min-w-0 rounded-xl border px-2 py-1.5 text-left transition-all duration-200",
-                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C1917]/25 focus-visible:ring-offset-1",
-                        selected
-                          ? "border-[#1C1917]/25 bg-gradient-to-br from-[#FAFAF9] via-white to-[#F5F5F4] shadow-sm ring-1 ring-[#1C1917]/10"
-                          : "border-[#E7E5E4] bg-white hover:border-[#D6D3D1] hover:shadow-sm"
-                      )}
-                    >
-                      {selected && (
-                        <span
-                          className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#1C1917] ring-1 ring-white"
-                          aria-hidden
-                        />
-                      )}
-                      <div className="flex gap-2.5 pr-3">
-                        <PersonaAvatar
-                          name={p.name}
-                          size={44}
-                          className={selected ? "ring-2 ring-[#1C1917]/25" : undefined}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-xs font-semibold leading-tight tracking-tight text-[#1C1917]">
-                            {p.name}
+          <div className="mb-4 space-y-3">
+            {/* 私人灵魂 */}
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A8A29E]">
+                  我的灵魂
+                </span>
+                <span className="h-px flex-1 bg-gradient-to-r from-[#E7E5E4] to-transparent" aria-hidden />
+              </div>
+              {privatePersonas.length === 0 ? (
+                <a
+                  href="/rednote-factory/soul-customize"
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#E7E5E4] bg-[#FAFAF9] px-3 py-4 text-xs text-[#A8A29E] transition hover:border-[#D6D3D1] hover:text-[#78716C]"
+                >
+                  前往灵魂定制，打造专属人设 →
+                </a>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-1.5">
+                  {privatePersonas.map((p) => {
+                    const selected = personaId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPersonaId(p.id)}
+                        className={cn(
+                          "group relative min-w-0 rounded-xl border px-2 py-1.5 text-left transition-all duration-200",
+                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C1917]/25 focus-visible:ring-offset-1",
+                          selected
+                            ? "border-[#1C1917]/25 bg-gradient-to-br from-[#FAFAF9] via-white to-[#F5F5F4] shadow-sm ring-1 ring-[#1C1917]/10"
+                            : "border-[#E7E5E4] bg-white hover:border-[#D6D3D1] hover:shadow-sm"
+                        )}
+                      >
+                        {selected && (
+                          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#1C1917] ring-1 ring-white" aria-hidden />
+                        )}
+                        <div className="flex gap-2.5 pr-3">
+                          <PersonaAvatar name={p.name} size={44} className={selected ? "ring-2 ring-[#1C1917]/25" : undefined} />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-xs font-semibold leading-tight tracking-tight text-[#1C1917]">{p.name}</div>
+                            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[#78716C]">{p.short_description?.trim() || "—"}</p>
                           </div>
-                          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[#78716C]">
-                            {p.short_description?.trim() || "—"}
-                          </p>
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 公共灵魂 */}
+            {publicPersonas.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A8A29E]">
+                    公共灵魂
+                  </span>
+                  <span className="h-px flex-1 bg-gradient-to-r from-[#E7E5E4] to-transparent" aria-hidden />
+                </div>
+                <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 lg:gap-1.5">
+                  {publicPersonas.map((p) => {
+                    const selected = personaId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPersonaId(p.id)}
+                        className={cn(
+                          "group relative min-w-0 rounded-xl border px-2 py-1.5 text-left transition-all duration-200",
+                          "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C1917]/25 focus-visible:ring-offset-1",
+                          selected
+                            ? "border-[#1C1917]/25 bg-gradient-to-br from-[#FAFAF9] via-white to-[#F5F5F4] shadow-sm ring-1 ring-[#1C1917]/10"
+                            : "border-[#E7E5E4] bg-white hover:border-[#D6D3D1] hover:shadow-sm"
+                        )}
+                      >
+                        {selected && (
+                          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#1C1917] ring-1 ring-white" aria-hidden />
+                        )}
+                        <div className="flex gap-2.5 pr-3">
+                          <PersonaAvatar name={p.name} size={44} className={selected ? "ring-2 ring-[#1C1917]/25" : undefined} />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-xs font-semibold leading-tight tracking-tight text-[#1C1917]">{p.name}</div>
+                            <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-[#78716C]">{p.short_description?.trim() || "—"}</p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -563,6 +613,16 @@ export function CopywriterClientRAG({
           </div>
         )}
       </div>
+      )}
+
+      {/* Forced feedback modal — triggers after 10 generations for non-main-site users */}
+      {feedbackRequired && (
+        <FeedbackModal
+          onSubmitted={() => {
+            setFeedbackRequired(false);
+            void refreshQuota();
+          }}
+        />
       )}
     </div>
   );

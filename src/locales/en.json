@@ -3,7 +3,7 @@
     "dashboard": "Dashboard",
     "documents": "Content Factory",
     "copywriter": "Copywriter",
-    "copywriterRag": "Black Magic Notes",
+    "copywriterRag": "Black Magic",
     "planning": "Planning",
     "calendar": "AI Calendar",
     "crm": "BRM",
@@ -142,7 +142,7 @@
     "kpi": "KPI",
     "documents": "Content Factory",
     "copywriter": "Copywriter",
-    "copywriterRag": "Black Magic Notes",
+    "copywriterRag": "Black Magic",
     "planning": "Planning",
     "calendar": "AI Calendar",
     "news": "News",
@@ -237,7 +237,7 @@
     "subtitle": "Enter requirements; AI matches assets and generates content"
   },
   "copywriterRag": {
-    "title": "Black Magic Notes",
+    "title": "Black Magic",
     "subtitle": "Black magic, full transformation 🪄"
   },
   "settings": {

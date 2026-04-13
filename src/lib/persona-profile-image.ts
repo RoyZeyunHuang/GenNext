@@ -1,6 +1,8 @@
 /** 与 `public/profileimages/*.png` 文件名对应（竖版头像，UI 用 object-top 裁成正方形再圆形显示）。 */
 const KNOWN_FILES = [
   "Aurora",
+  "Bella",
+  "Beverly",
   "Caesy",
   "Cammy",
   "Freya",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/contexts/LocaleContext";
 import { isNystudentsNetEmail } from "@/lib/nystudents-email";
@@ -19,9 +19,18 @@ function RednoteLoginForm() {
   const [mode, setMode] = useState<"signIn" | "signUp" | "forgotPassword">("signIn");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [groupName, setGroupName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /** true when the typed email is NOT nystudents.net — show application fields */
+  const isExternalEmail = useMemo(() => {
+    const trimmed = email.trim();
+    if (!trimmed.includes("@")) return false;
+    return !isNystudentsNetEmail(trimmed);
+  }, [email]);
 
   useEffect(() => {
     document.title = `${t("rednote.pages.login")} | RednoteFactory`;
@@ -53,6 +62,8 @@ function RednoteLoginForm() {
       setLoading(true);
       try {
         const supabase = createSupabaseBrowserClient();
+
+        // ── Forgot password ──
         if (mode === "forgotPassword") {
           const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
             redirectTo: `${window.location.origin}/rednote-factory/reset-password`,
@@ -64,6 +75,8 @@ function RednoteLoginForm() {
           setMessage(t("rednote.resetEmailSent"));
           return;
         }
+
+        // ── Sign in ──
         if (mode === "signIn") {
           const { data, error: err } = await supabase.auth.signInWithPassword({
             email: email.trim(),
@@ -81,70 +94,106 @@ function RednoteLoginForm() {
             router.push(hasMain ? "/" : "/rednote-factory/copywriter-rag");
           }
           router.refresh();
-        } else {
-          const trimmedEmail = email.trim();
-          if (!isNystudentsNetEmail(trimmedEmail)) {
-            setError(t("rednote.emailMustBeNystudents"));
+          return;
+        }
+
+        // ── Sign up ──
+        const trimmedEmail = email.trim();
+
+        // External email → application flow via /api/rf/apply
+        if (isExternalEmail) {
+          if (!displayName.trim()) {
+            setError("请填写称呼");
             return;
           }
-          try {
-            const checkRes = await fetch("/api/auth/email-registered", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: trimmedEmail }),
-            });
-            if (checkRes.ok) {
-              const check = (await checkRes.json()) as {
-                registered?: boolean | null;
-                skipped?: boolean;
-              };
-              if (check.registered === true) {
-                setError(t("rednote.emailAlreadyRegistered"));
-                return;
-              }
-            }
-          } catch {
-            /* 预检失败则继续走 signUp，由 identities 兜底 */
+          if (!groupName.trim()) {
+            setError("请填写所在组名");
+            return;
           }
-
-          const { data, error: err } = await supabase.auth.signUp({
+          const res = await fetch("/api/rf/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: trimmedEmail,
+              password,
+              display_name: displayName.trim(),
+              group_name: groupName.trim(),
+            }),
+          });
+          const data = (await res.json()) as { ok?: boolean; error?: string };
+          if (!res.ok) {
+            setError(data.error || "申请提交失败");
+            return;
+          }
+          // Application submitted — redirect to pending page
+          // Sign in first so middleware can identify the user on the pending page
+          await supabase.auth.signInWithPassword({
             email: trimmedEmail,
             password,
           });
-          if (err) {
-            const msg = (err.message ?? "").toLowerCase();
-            if (
-              msg.includes("already") ||
-              msg.includes("registered") ||
-              msg.includes("exists") ||
-              err.status === 422
-            ) {
-              setError(t("rednote.emailAlreadyRegistered"));
-            } else {
-              setError(t("rednote.signUpError"));
-            }
-            return;
-          }
-          const identities = data.user?.identities;
-          if (data.user && (!identities || identities.length === 0)) {
-            await supabase.auth.signOut();
-            setError(t("rednote.emailAlreadyRegistered"));
-            return;
-          }
-          if (data.session) {
-            const next = safeNextPath(searchParams.get("next"));
-            router.push(next ?? "/rednote-factory/copywriter-rag");
-            router.refresh();
-            return;
-          }
-          setMessage(t("rednote.signUpCheckEmail"));
-          setMode("signIn");
+          router.push("/rednote-factory/pending");
+          router.refresh();
+          return;
         }
+
+        // nystudents.net email → direct signup (unchanged)
+        try {
+          const checkRes = await fetch("/api/auth/email-registered", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: trimmedEmail }),
+          });
+          if (checkRes.ok) {
+            const check = (await checkRes.json()) as {
+              registered?: boolean | null;
+              skipped?: boolean;
+            };
+            if (check.registered === true) {
+              setError(t("rednote.emailAlreadyRegistered"));
+              return;
+            }
+          }
+        } catch {
+          /* 预检失败则继续走 signUp，由 identities 兜底 */
+        }
+
+        const { data, error: err } = await supabase.auth.signUp({
+          email: trimmedEmail,
+          password,
+        });
+        if (err) {
+          const msg = (err.message ?? "").toLowerCase();
+          if (
+            msg.includes("already") ||
+            msg.includes("registered") ||
+            msg.includes("exists") ||
+            err.status === 422
+          ) {
+            setError(t("rednote.emailAlreadyRegistered"));
+          } else {
+            setError(t("rednote.signUpError"));
+          }
+          return;
+        }
+        const identities = data.user?.identities;
+        if (data.user && (!identities || identities.length === 0)) {
+          await supabase.auth.signOut();
+          setError(t("rednote.emailAlreadyRegistered"));
+          return;
+        }
+        if (data.session) {
+          const next = safeNextPath(searchParams.get("next"));
+          router.push(next ?? "/rednote-factory/copywriter-rag");
+          router.refresh();
+          return;
+        }
+        setMessage(t("rednote.signUpCheckEmail"));
+        setMode("signIn");
       } finally {
         setLoading(false);
       }
     },
-    [email, password, mode, router, searchParams, t]
+    [email, password, displayName, groupName, isExternalEmail, mode, router, searchParams, t]
   );
 
   const switchMode = (next: "signIn" | "signUp" | "forgotPassword") => {
@@ -179,8 +228,15 @@ function RednoteLoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
               />
-              {mode === "signUp" && (
-                <p className="pt-0.5 text-[11px] leading-snug text-[#A8A29E]">{t("rednote.signUpEmailHint")}</p>
+              {mode === "signUp" && !isExternalEmail && (
+                <p className="pt-0.5 text-[11px] leading-snug text-[#A8A29E]">
+                  @nystudents.net 邮箱可直接注册
+                </p>
+              )}
+              {mode === "signUp" && isExternalEmail && (
+                <p className="pt-0.5 text-[11px] leading-snug text-amber-600">
+                  非 @nystudents.net 邮箱需提交申请，审核通过后可使用
+                </p>
               )}
             </div>
 
@@ -213,6 +269,40 @@ function RednoteLoginForm() {
               </div>
             )}
 
+            {/* Application fields — only shown for external emails during signup */}
+            {mode === "signUp" && isExternalEmail && (
+              <>
+                <div className="space-y-1.5">
+                  <label htmlFor="rf-display-name" className="block text-xs font-semibold text-[#57534E]">
+                    称呼
+                  </label>
+                  <input
+                    id="rf-display-name"
+                    type="text"
+                    required
+                    placeholder="你的名字"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="rf-group-name" className="block text-xs font-semibold text-[#57534E]">
+                    所在组名
+                  </label>
+                  <input
+                    id="rf-group-name"
+                    type="text"
+                    required
+                    placeholder="你所在的团队 / 组织"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              </>
+            )}
+
             {(error || message) && (
               <div className="space-y-2">
                 {error && (
@@ -240,7 +330,9 @@ function RednoteLoginForm() {
                   ? t("rednote.sendResetEmail")
                   : mode === "signIn"
                     ? t("rednote.signIn")
-                    : t("rednote.signUp")}
+                    : isExternalEmail
+                      ? "提交申请"
+                      : t("rednote.signUp")}
             </button>
           </form>
         </div>

@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { TITLE_OUTPUT_TOOL } from "@/lib/prompt-templates";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
 import { canReadPersona } from "@/lib/persona-access";
+import { normalizePersonaContentKind } from "@/lib/persona-rag/content-kind";
 import {
   PERSONA_TITLE_VARIANT_ORDER,
   buildPersonaTitleSystemPrompt,
@@ -30,6 +31,10 @@ export async function POST(req: NextRequest) {
   const persona_id = typeof body.persona_id === "string" ? body.persona_id.trim() : "";
   const body_text = typeof body.body_text === "string" ? body.body_text.trim() : "";
   const user_input = typeof body.user_input === "string" ? body.user_input.trim() : "";
+  const title_pattern_doc_id =
+    typeof body.title_pattern_doc_id === "string" ? body.title_pattern_doc_id.trim() : "";
+  const contentKind = normalizePersonaContentKind(body.content_kind);
+  const titleContentKind = contentKind === "oral_script" ? "oral_script" : "xiaohongshu";
 
   if (!persona_id || !body_text) {
     return NextResponse.json({ error: "persona_id 与 body_text 必填" }, { status: 400 });
@@ -47,7 +52,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const systemPrompt = buildPersonaTitleSystemPrompt(persona.bio_md || "");
+  let customTemplate: string | null = null;
+  if (title_pattern_doc_id) {
+    const { data: doc } = await supabase
+      .from("docs")
+      .select("content")
+      .eq("id", title_pattern_doc_id)
+      .maybeSingle();
+    if (doc?.content) customTemplate = doc.content;
+  }
+
+  const systemPrompt = buildPersonaTitleSystemPrompt(
+    persona.bio_md || "",
+    customTemplate,
+    titleContentKind
+  );
   const userMessage = buildPersonaTitleUserMessage(user_input, body_text);
 
   const tools: Anthropic.Tool[] = [
@@ -77,13 +96,20 @@ export async function POST(req: NextRequest) {
 
   const result = titleBlock.input as { titles?: { type_name: string; text: string }[] };
   const raw = Array.isArray(result.titles) ? result.titles : [];
-  const sorted = sortPersonaTitlesByVariantOrder(raw);
-  const expected = new Set<string>([...PERSONA_TITLE_VARIANT_ORDER]);
-  const filtered = sorted.filter((t) => expected.has(t.type_name));
-  const titles = filtered.length > 0 ? filtered : sorted;
+
+  let titles: { type_name: string; text: string }[];
+  if (customTemplate) {
+    titles = raw;
+  } else {
+    const sorted = sortPersonaTitlesByVariantOrder(raw);
+    const expected = new Set<string>(Array.from(PERSONA_TITLE_VARIANT_ORDER));
+    const filtered = sorted.filter((t) => expected.has(t.type_name));
+    titles = filtered.length > 0 ? filtered : sorted;
+  }
 
   return NextResponse.json({
     titles,
     phase: "titles",
+    content_kind: contentKind,
   });
 }

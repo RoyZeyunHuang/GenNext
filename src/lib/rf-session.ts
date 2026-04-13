@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { isRfAdmin } from "@/lib/rf-admin";
+import { isNystudentsNetEmail } from "@/lib/nystudents-email";
 
 export type RfSession = {
   userId: string;
@@ -9,6 +10,8 @@ export type RfSession = {
   hasMainAccess: boolean;
   /** app_metadata：黑魔法生成不限次（由超管在设置里勾选） */
   personaGenerateUnlimited: boolean;
+  /** app_metadata：RF 使用已审批（nystudents.net 用户默认 true，外部申请需审批） */
+  rfApproved: boolean;
 };
 
 /**
@@ -38,12 +41,20 @@ export async function getRfSession(): Promise<RfSession | null> {
     } = await supabase.auth.getUser();
     if (!user) return null;
 
+    // nystudents.net users and admins are always approved; others need explicit approval
+    const autoApproved =
+      isRfAdmin(user.email) ||
+      (!!user.email && isNystudentsNetEmail(user.email));
+    const rfApproved =
+      autoApproved || user.app_metadata?.rf_approved === true;
+
     return {
       userId: user.id,
       email: user.email,
       isAdmin: isRfAdmin(user.email),
       hasMainAccess: user.app_metadata?.has_main_access === true,
       personaGenerateUnlimited: user.app_metadata?.persona_generate_unlimited === true,
+      rfApproved,
     };
   } catch {
     return null;

@@ -9,21 +9,28 @@ export const dynamic = "force-dynamic";
 const PERSONA_SELECT =
   "id, user_id, name, short_description, bio_md, source_url, is_public, generate_invocation_count, created_at, updated_at";
 
+/** Extra columns that may not exist if migrations haven't been applied yet. */
+const PERSONA_SELECT_EXTENDED =
+  "id, user_id, name, short_description, self_intro, bio_md, source_url, is_public, source_persona_id, generate_invocation_count, created_at, updated_at";
+
 export async function GET() {
   try {
     const gate = await requirePersonaRagRoute();
     if (!gate.ok) return gate.response;
 
-    let q = supabase.from("personas").select(PERSONA_SELECT).order("updated_at", { ascending: false });
     const orFilter = personaListOrFilter(gate.session);
-    if (orFilter) {
-      q = q.or(orFilter);
+
+    // Try extended select first (with self_intro, source_persona_id); fall back if columns don't exist yet
+    for (const sel of [PERSONA_SELECT_EXTENDED, PERSONA_SELECT]) {
+      let q = supabase.from("personas").select(sel).order("updated_at", { ascending: false });
+      if (orFilter) q = q.or(orFilter);
+      const { data, error } = await q;
+      if (error && sel === PERSONA_SELECT_EXTENDED) continue; // retry with basic
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(data ?? []);
     }
 
-    const { data, error } = await q;
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json(data ?? []);
+    return NextResponse.json([]);
   } catch (e) {
     console.error("[GET /api/personas]", e);
     const message = e instanceof Error ? e.message : "内部错误";

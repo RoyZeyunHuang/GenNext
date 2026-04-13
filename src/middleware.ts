@@ -4,7 +4,11 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/rednote-factory/login" || pathname === "/rednote-factory/reset-password") {
+  if (
+    pathname === "/rednote-factory/login" ||
+    pathname === "/rednote-factory/reset-password" ||
+    pathname === "/rednote-factory/pending"
+  ) {
     return NextResponse.next();
   }
 
@@ -48,8 +52,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Rednote Factory routes — any authenticated user can access
+  // Rednote Factory routes — check rf_approved for non-nystudents users
   if (pathname.startsWith("/rednote-factory")) {
+    const email = user.email ?? "";
+    const isNystudent = email.trim().toLowerCase().endsWith("@nystudents.net");
+    const rfApproved =
+      isNystudent || user.app_metadata?.rf_approved === true;
+    if (!rfApproved) {
+      return NextResponse.redirect(
+        new URL("/rednote-factory/pending", request.url)
+      );
+    }
     return response;
   }
 

@@ -82,6 +82,20 @@ for (let i = 1; i < fcLines.length; i++) {
   }
 }
 
+// ── 补充词库 (supplementary, same format as 总表) ──
+const supDir = path.join(root, "小红书违禁词库");
+const supFiles = fs.readdirSync(supDir).filter((f) => f.startsWith("补充词库") && f.endsWith(".csv"));
+for (const sf of supFiles) {
+  const supText = fs.readFileSync(path.join(supDir, sf), "utf8");
+  const supLines = supText.split(/\r?\n/).filter((l) => l.trim());
+  for (let i = 1; i < supLines.length; i++) {
+    const cols = parseCsvLine(supLines[i]);
+    if (cols.length < 5) continue;
+    addPhrase(cols[3], cols[4], cols[1] || "补充");
+  }
+  console.log("  + loaded", sf, "lines:", supLines.length - 1);
+}
+
 const entries = Array.from(map.values()).sort((a, b) => b.phrase.length - a.phrase.length);
 
 const outPath = path.join(root, "src", "data", "xhs-forbidden-words.json");

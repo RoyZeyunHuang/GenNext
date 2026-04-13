@@ -2,7 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { maxTokensForBodyStream, normalizeArticleLength } from "@/lib/copy-generate-options";
+import { normalizePersonaContentKind } from "@/lib/persona-rag/content-kind";
 import { embedText } from "@/lib/persona-rag/embeddings";
+import { digestNotesForDna } from "@/lib/persona-rag/note-digest";
+import { buildPersonaSystemPromptDna } from "@/lib/persona-rag/prompt-dna";
 import { buildPersonaSystemPrompt } from "@/lib/persona-rag/prompt";
 import { requirePersonaRagRoute } from "@/lib/persona-rag/guard";
 import { canReadPersona } from "@/lib/persona-access";
@@ -21,6 +24,13 @@ const anthropic = new Anthropic({
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type PersonaRagMode = "legacy" | "dna";
+
+function resolvePersonaRagMode(raw: unknown, isAdmin: boolean): PersonaRagMode {
+  if (raw === "dna" && isAdmin) return "dna";
+  return "legacy";
+}
 
 export async function POST(req: NextRequest) {
   const gate = await requirePersonaRagRoute();
@@ -46,6 +56,8 @@ export async function POST(req: NextRequest) {
       : undefined;
   const separateTitles = body.separate_titles === true;
   const articleLength = normalizeArticleLength(body.article_length);
+  const ragMode = resolvePersonaRagMode(body.rag_mode, gate.session.isAdmin);
+  const contentKind = normalizePersonaContentKind(body.content_kind);
 
   if (!persona_id || !user_input) {
     return new Response(JSON.stringify({ error: "persona_id 与 user_input 必填" }), {
@@ -144,15 +156,29 @@ export async function POST(req: NextRequest) {
   const maxScore = Number(retrievedNotes[0]?.similarity ?? 0);
   const retrievalMode = classifyRetrievalMode(maxScore);
 
-  const systemPrompt = buildPersonaSystemPrompt({
-    personaBio: persona.bio_md || "",
-    retrievedNotes: retrievedNotes.map((n) => ({ title: n.title, body: n.body })),
-    retrievalMode,
-    taskConstraint,
-    knowledgeContent,
-    bodyOnlyOutput: separateTitles,
-    articleLengthRaw: articleLength,
-  });
+  const rawNotes = retrievedNotes.map((n) => ({ title: n.title, body: n.body }));
+  const systemPrompt =
+    ragMode === "dna"
+      ? buildPersonaSystemPromptDna({
+          personaBio: persona.bio_md || "",
+          digestedNotes: digestNotesForDna(rawNotes, retrievalMode),
+          retrievalMode,
+          taskConstraint,
+          knowledgeContent,
+          bodyOnlyOutput: separateTitles,
+          articleLengthRaw: articleLength,
+          contentKind,
+        })
+      : buildPersonaSystemPrompt({
+          personaBio: persona.bio_md || "",
+          retrievedNotes: rawNotes,
+          retrievalMode,
+          taskConstraint,
+          knowledgeContent,
+          bodyOnlyOutput: separateTitles,
+          articleLengthRaw: articleLength,
+          contentKind,
+        });
 
   if (!gate.session.personaGenerateUnlimited) {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -180,6 +206,8 @@ export async function POST(req: NextRequest) {
 
   const headerPayload = {
     mode: retrievalMode,
+    rag_mode: ragMode,
+    content_kind: contentKind,
     notes: retrievedNotes.map((n) => ({
       id: n.id,
       title: n.title,
@@ -226,6 +254,8 @@ export async function POST(req: NextRequest) {
       "Content-Type": "text/plain; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "no-cache",
+      "X-Rag-Mode": ragMode,
+      "X-Content-Kind": contentKind,
       "X-Retrieved-Notes": encodeURIComponent(JSON.stringify(headerPayload)),
     },
   });
