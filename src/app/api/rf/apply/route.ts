@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   // nystudents.net users should use normal signup, not apply
   if (isNystudentsNetEmail(trimmedEmail)) {
     return NextResponse.json(
-      { error: "@nystudents.net 邮箱无需申请，直接注册即可" },
+      { error: "该邮箱无需申请，直接注册即可" },
       { status: 400 }
     );
   }

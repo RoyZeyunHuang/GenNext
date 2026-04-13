@@ -230,12 +230,12 @@ function RednoteLoginForm() {
               />
               {mode === "signUp" && !isExternalEmail && (
                 <p className="pt-0.5 text-[11px] leading-snug text-[#A8A29E]">
-                  @nystudents.net 邮箱可直接注册
+                  @nystudents.net / @uswoony.com 邮箱可直接注册
                 </p>
               )}
               {mode === "signUp" && isExternalEmail && (
                 <p className="pt-0.5 text-[11px] leading-snug text-amber-600">
-                  非 @nystudents.net 邮箱需提交申请，审核通过后可使用
+                  其他邮箱需提交申请，审核通过后可使用
                 </p>
               )}
             </div>
