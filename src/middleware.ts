@@ -54,10 +54,13 @@ export async function middleware(request: NextRequest) {
 
   // Rednote Factory routes — check rf_approved for non-nystudents users
   if (pathname.startsWith("/rednote-factory")) {
-    const email = user.email ?? "";
-    const isNystudent = email.trim().toLowerCase().endsWith("@nystudents.net");
+    const email = (user.email ?? "").trim().toLowerCase();
+    const isNystudent = email.endsWith("@nystudents.net");
+    const hasMainAccess = user.app_metadata?.has_main_access === true;
     const rfApproved =
-      isNystudent || user.app_metadata?.rf_approved === true;
+      isNystudent ||
+      hasMainAccess ||
+      user.app_metadata?.rf_approved === true;
     if (!rfApproved) {
       return NextResponse.redirect(
         new URL("/rednote-factory/pending", request.url)
