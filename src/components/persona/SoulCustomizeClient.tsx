@@ -115,7 +115,7 @@ export function SoulCustomizeClient() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#08070A] lg:min-h-0">
+    <div className="min-h-[100dvh] flex-1 bg-[#08070A] lg:min-h-0">
       {/* ── Hero header ── */}
       <header className="relative overflow-hidden border-b border-white/[0.04] px-5 pb-6 pt-5 lg:px-10 lg:pb-8 lg:pt-7">
         {/* radial glow */}
