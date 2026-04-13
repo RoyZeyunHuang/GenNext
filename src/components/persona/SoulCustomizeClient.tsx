@@ -15,6 +15,7 @@ type PersonaItem = {
   self_intro: string | null;
   bio_md: string;
   is_public: boolean;
+  visibility?: string;
   source_persona_id?: string | null;
   generate_invocation_count?: number;
   created_at: string;
@@ -78,14 +79,14 @@ export function SoulCustomizeClient() {
     () =>
       currentUserId
         ? personas.filter((p) => p.user_id === currentUserId)
-        : personas.filter((p) => !p.is_public),
+        : personas.filter((p) => p.user_id === currentUserId || (!p.is_public && p.visibility === "private")),
     [personas, currentUserId]
   );
 
   const templatePersonas = useMemo(
     () =>
       currentUserId
-        ? personas.filter((p) => p.is_public && p.user_id !== currentUserId)
+        ? personas.filter((p) => p.user_id !== currentUserId)
         : [],
     [personas, currentUserId]
   );

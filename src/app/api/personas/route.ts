@@ -7,10 +7,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PERSONA_SELECT =
-  "id, user_id, name, short_description, bio_md, source_url, is_public, generate_invocation_count, created_at, updated_at";
+  "id, user_id, name, short_description, bio_md, source_url, is_public, visibility, generate_invocation_count, created_at, updated_at";
 
 /** Extra columns that may not exist if migrations haven't been applied yet. */
 const PERSONA_SELECT_EXTENDED =
+  "id, user_id, name, short_description, self_intro, bio_md, source_url, is_public, visibility, source_persona_id, generate_invocation_count, created_at, updated_at";
+
+/** Fallback selects without visibility column (pre-migration) */
+const PERSONA_SELECT_LEGACY =
+  "id, user_id, name, short_description, bio_md, source_url, is_public, generate_invocation_count, created_at, updated_at";
+const PERSONA_SELECT_LEGACY_EXT =
   "id, user_id, name, short_description, self_intro, bio_md, source_url, is_public, source_persona_id, generate_invocation_count, created_at, updated_at";
 
 export async function GET() {
@@ -20,13 +26,48 @@ export async function GET() {
 
     const orFilter = personaListOrFilter(gate.session);
 
-    // Try extended select first (with self_intro, source_persona_id); fall back if columns don't exist yet
-    for (const sel of [PERSONA_SELECT_EXTENDED, PERSONA_SELECT]) {
+    // Try selects in order: extended+visibility → basic+visibility → legacy extended → legacy basic
+    for (const sel of [
+      PERSONA_SELECT_EXTENDED,
+      PERSONA_SELECT,
+      PERSONA_SELECT_LEGACY_EXT,
+      PERSONA_SELECT_LEGACY,
+    ]) {
       let q = supabase.from("personas").select(sel).order("updated_at", { ascending: false });
       if (orFilter) q = q.or(orFilter);
       const { data, error } = await q;
-      if (error && sel === PERSONA_SELECT_EXTENDED) continue; // retry with basic
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) continue; // retry with simpler select
+
+      // For "assigned" visibility personas, we need to also include ones where the user is in allowed_users
+      // but Supabase .or() can't do a join-based check. So we do a second query.
+      if (!gate.session.isAdmin && !gate.session.hasMainAccess) {
+        // Check if there are any assigned personas for this user
+        const { data: assignedRows } = await supabase
+          .from("persona_allowed_users")
+          .select("persona_id")
+          .eq("user_id", gate.session.userId);
+
+        if (assignedRows && assignedRows.length > 0) {
+          const assignedIds = assignedRows.map((r) => r.persona_id as string);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const alreadyIds = new Set((data ?? []).map((p: any) => String(p.id)));
+          const missingIds = assignedIds.filter((id) => !alreadyIds.has(id));
+
+          if (missingIds.length > 0) {
+            const { data: assignedPersonas } = await supabase
+              .from("personas")
+              .select(sel)
+              .in("id", missingIds)
+              .eq("visibility", "assigned")
+              .order("updated_at", { ascending: false });
+
+            if (assignedPersonas) {
+              return NextResponse.json([...(data ?? []), ...assignedPersonas]);
+            }
+          }
+        }
+      }
+
       return NextResponse.json(data ?? []);
     }
 
@@ -66,8 +107,9 @@ export async function POST(req: NextRequest) {
         bio_md,
         source_url,
         is_public: false,
+        visibility: "private",
       })
-      .select(PERSONA_SELECT)
+      .select(PERSONA_SELECT_LEGACY)
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Copy, Loader2, ShieldAlert, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 import {
   ARTICLE_LENGTH_SEGMENTED,
   DEFAULT_ARTICLE_LENGTH,
@@ -22,7 +23,7 @@ import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 
 type Category = { id: string; name: string; icon: string; sort_order?: number };
 type Doc = { id: string; title: string; category_id: string };
-type PersonaOpt = { id: string; name: string; short_description: string | null; is_public?: boolean; user_id?: string };
+type PersonaOpt = { id: string; name: string; short_description: string | null; is_public?: boolean; visibility?: string; user_id?: string };
 
 type PersonaQuota = {
   unlimited: boolean;
@@ -142,12 +143,16 @@ export function CopywriterClientRAG({
     });
   }, []);
 
-  const publicPersonas = useMemo(
-    () => (currentUserId ? personas.filter((p) => p.is_public && p.user_id !== currentUserId) : personas.filter((p) => p.is_public)),
-    [personas, currentUserId]
-  );
+  /** Personas grouped by access level for display */
   const privatePersonas = useMemo(
     () => (currentUserId ? personas.filter((p) => p.user_id === currentUserId) : []),
+    [personas, currentUserId]
+  );
+  const publicPersonas = useMemo(
+    () =>
+      currentUserId
+        ? personas.filter((p) => p.user_id !== currentUserId && (p.visibility === "public" || (!p.visibility && p.is_public)))
+        : personas.filter((p) => p.visibility === "public" || (!p.visibility && p.is_public)),
     [personas, currentUserId]
   );
 
@@ -228,7 +233,7 @@ export function CopywriterClientRAG({
         if (done) break;
         buf += decoder.decode(value, { stream: true });
         if (buf.startsWith("ERROR: ")) {
-          setError(buf.slice(7));
+          setError(formatAiErrorForUser(buf.slice(7)));
           setOutput("");
           return;
         }
@@ -257,13 +262,13 @@ export function CopywriterClientRAG({
           }
           setTitleVariants(Array.isArray(data.titles) ? data.titles : []);
         } catch (te) {
-          setTitleError(te instanceof Error ? te.message : "标题生成失败");
+          setTitleError(formatAiErrorForUser(te));
         } finally {
           setGeneratingTitles(false);
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "生成失败");
+      setError(formatAiErrorForUser(e));
     } finally {
       setGenerating(false);
       void refreshQuota();

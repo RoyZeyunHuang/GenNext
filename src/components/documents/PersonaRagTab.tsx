@@ -29,6 +29,8 @@ function tryParseJsonRecord(text: string): Record<string, unknown> {
   return {};
 }
 
+type PersonaVisibility = "private" | "main_site" | "public" | "assigned";
+
 type PersonaRow = {
   id: string;
   user_id: string;
@@ -37,10 +39,19 @@ type PersonaRow = {
   bio_md: string;
   source_url: string | null;
   is_public: boolean;
+  visibility?: PersonaVisibility;
+  allowed_user_ids?: string[];
   /** 黑魔法 persona-generate 累计次数 */
   generate_invocation_count?: number | null;
   created_at: string;
   updated_at: string;
+};
+
+const VISIBILITY_LABELS: Record<PersonaVisibility, string> = {
+  private: "仅管理员",
+  main_site: "主站用户",
+  public: "完全公开",
+  assigned: "指定用户",
 };
 
 type RfMe = { userId: string; isAdmin: boolean; hasMainAccess: boolean } | null;
@@ -72,7 +83,10 @@ export function PersonaRagTab({
     short_description: "",
     bio_md: "",
     is_public: false,
+    visibility: "private" as PersonaVisibility,
+    allowed_user_ids: [] as string[],
   });
+  const [allUsers, setAllUsers] = useState<{ id: string; email: string }[]>([]);
   const [savingProfile, setSavingProfile] = useState(false);
   const [generatingShortDesc, setGeneratingShortDesc] = useState(false);
   const [bulkGeneratingShortDesc, setBulkGeneratingShortDesc] = useState(false);
@@ -119,11 +133,24 @@ export function PersonaRagTab({
     void fetchPersonas();
   }, [fetchPersonas]);
 
+  // Fetch user list for "assigned" visibility picker (admin only)
+  useEffect(() => {
+    if (!rfMe?.isAdmin) return;
+    void fetch("/api/admin/users")
+      .then((r) => r.json())
+      .then((data: { id: string; email?: string }[]) => {
+        if (Array.isArray(data)) {
+          setAllUsers(data.map((u) => ({ id: u.id, email: u.email ?? "—" })));
+        }
+      })
+      .catch(() => setAllUsers([]));
+  }, [rfMe?.isAdmin]);
+
   const selected = personas.find((p) => p.id === selectedId) ?? null;
 
   useEffect(() => {
     if (!selected) {
-      setProfileForm({ name: "", short_description: "", bio_md: "", is_public: false });
+      setProfileForm({ name: "", short_description: "", bio_md: "", is_public: false, visibility: "private", allowed_user_ids: [] });
       setNotes([]);
       return;
     }
@@ -132,6 +159,8 @@ export function PersonaRagTab({
       short_description: selected.short_description ?? "",
       bio_md: selected.bio_md ?? "",
       is_public: Boolean(selected.is_public),
+      visibility: (selected.visibility as PersonaVisibility) || (selected.is_public ? "public" : "private"),
+      allowed_user_ids: selected.allowed_user_ids ?? [],
     });
   }, [selected]);
 
@@ -274,7 +303,11 @@ export function PersonaRagTab({
         bio_md: profileForm.bio_md,
       };
       if (rfMe?.isAdmin) {
-        payload.is_public = profileForm.is_public;
+        payload.visibility = profileForm.visibility;
+        payload.is_public = profileForm.visibility === "public";
+        if (profileForm.visibility === "assigned") {
+          payload.allowed_user_ids = profileForm.allowed_user_ids;
+        }
       }
       const res = await fetch(`/api/personas/${selectedId}`, {
         method: "PATCH",
@@ -532,14 +565,20 @@ export function PersonaRagTab({
                   )}
                 />
                 <span className="min-w-0 flex-1 truncate">{p.name}</span>
-                {p.is_public && (
+                {(p.visibility ?? (p.is_public ? "public" : "private")) !== "private" && (
                   <span
                     className={cn(
                       "shrink-0 rounded px-1 py-0.5 text-[9px] font-medium",
-                      selectedId === p.id ? "bg-white/20 text-white" : "bg-emerald-50 text-emerald-700"
+                      selectedId === p.id
+                        ? "bg-white/20 text-white"
+                        : (p.visibility ?? (p.is_public ? "public" : "private")) === "public"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : (p.visibility) === "main_site"
+                            ? "bg-blue-50 text-blue-700"
+                            : "bg-amber-50 text-amber-700"
                     )}
                   >
-                    公开
+                    {VISIBILITY_LABELS[(p.visibility as PersonaVisibility) ?? (p.is_public ? "public" : "private")]}
                   </span>
                 )}
                 {p.short_description && (
@@ -669,17 +708,63 @@ export function PersonaRagTab({
                     />
                   </div>
                   {rfMe?.isAdmin && (
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-[#44403C]">
-                      <input
-                        type="checkbox"
-                        checked={profileForm.is_public}
-                        onChange={(e) =>
-                          setProfileForm((f) => ({ ...f, is_public: e.target.checked }))
-                        }
-                        className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
-                      />
-                      <span>对副程序（Rednote Factory）公开 · RF 用户可见此人设</span>
-                    </label>
+                    <div className="space-y-3 rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-[#78716C]">可见范围</label>
+                        <select
+                          value={profileForm.visibility}
+                          onChange={(e) =>
+                            setProfileForm((f) => ({
+                              ...f,
+                              visibility: e.target.value as PersonaVisibility,
+                              is_public: e.target.value === "public",
+                            }))
+                          }
+                          className="w-full rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20"
+                        >
+                          <option value="private">仅管理员 — 只有我能看到</option>
+                          <option value="main_site">主站用户 — 主站用户可见</option>
+                          <option value="public">完全公开 — 所有 RF 用户可见</option>
+                          <option value="assigned">指定用户 — 手动分配可见的人</option>
+                        </select>
+                      </div>
+                      {profileForm.visibility === "assigned" && (
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-[#78716C]">
+                            可见用户（勾选）
+                          </label>
+                          <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-[#E7E5E4] bg-white p-2">
+                            {allUsers.length === 0 ? (
+                              <p className="text-xs text-[#A8A29E]">加载中…</p>
+                            ) : (
+                              allUsers.map((u) => (
+                                <label key={u.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-[#F5F5F4]">
+                                  <input
+                                    type="checkbox"
+                                    checked={profileForm.allowed_user_ids.includes(u.id)}
+                                    onChange={(e) => {
+                                      setProfileForm((f) => ({
+                                        ...f,
+                                        allowed_user_ids: e.target.checked
+                                          ? [...f.allowed_user_ids, u.id]
+                                          : f.allowed_user_ids.filter((x) => x !== u.id),
+                                      }));
+                                    }}
+                                    className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
+                                  />
+                                  <span className="truncate text-[#44403C]">{u.email}</span>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                          {profileForm.allowed_user_ids.length > 0 && (
+                            <p className="mt-1 text-[10px] text-[#A8A29E]">
+                              已选 {profileForm.allowed_user_ids.length} 人
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                   <button
                     type="button"
