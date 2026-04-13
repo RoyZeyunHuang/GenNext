@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Send, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 import { MainAppModalPortal } from "@/components/MainAppModalPortal";
 import {
   SOUL_BOOTSTRAP_USER_MESSAGE,
@@ -154,8 +155,7 @@ export function SoulBuilderModal({ open, onClose, categoryId, onSaved }: SoulBui
           );
         }
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setError(msg);
+        setError(formatAiErrorForUser(e));
         setMessages((prev) => prev.filter((m) => m.id !== assistantId));
       } finally {
         setStreaming(false);

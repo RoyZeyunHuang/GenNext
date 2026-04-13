@@ -18,6 +18,7 @@ import {
   usageMetaHeaders,
 } from "@/lib/anthropic-usage-log";
 import { isTitlePatternCategoryRow, resolvePromptDocRole } from "@/lib/doc-category-constants";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
@@ -278,8 +279,9 @@ export async function POST(req: NextRequest) {
                 }
               }
             } catch (err) {
-              const errMsg = err instanceof Error ? err.message : String(err);
-              controller.enqueue(encoder.encode("ERROR: " + errMsg));
+              controller.enqueue(
+                encoder.encode("ERROR: " + formatAiErrorForUser(err))
+              );
             } finally {
               controller.close();
             }
@@ -373,8 +375,9 @@ export async function POST(req: NextRequest) {
               }
             }
           } catch (err) {
-            const errMsg = err instanceof Error ? err.message : String(err);
-            controller.enqueue(encoder.encode("ERROR: " + errMsg));
+            controller.enqueue(
+              encoder.encode("ERROR: " + formatAiErrorForUser(err))
+            );
           } finally {
             controller.close();
           }
@@ -502,8 +505,9 @@ export async function POST(req: NextRequest) {
             }
           }
         } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          controller.enqueue(encoder.encode("ERROR: " + errMsg));
+          controller.enqueue(
+            encoder.encode("ERROR: " + formatAiErrorForUser(err))
+          );
         } finally {
           controller.close();
         }
@@ -519,7 +523,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "请求失败" }),
+      JSON.stringify({ error: formatAiErrorForUser(e) }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

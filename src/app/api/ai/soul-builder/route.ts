@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 import { NextRequest, NextResponse } from "next/server";
 import {
   SOUL_BOOTSTRAP_USER_MESSAGE,
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
         console.error("[soul-builder]", error);
         send({
           type: "error",
-          message: error instanceof Error ? error.message : String(error),
+          message: formatAiErrorForUser(error),
           success: false,
         });
         controller.close();

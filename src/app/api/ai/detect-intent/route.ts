@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 import { NextRequest, NextResponse } from "next/server";
 import { buildDetectIntentSystemPrompt, RECOMMEND_TOOL } from "@/lib/prompt-templates";
 import { resolvePromptDocRole } from "@/lib/doc-category-constants";
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ suggested_docs: result.suggested_docs });
   } catch (e) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "意图分析失败" },
+      { error: formatAiErrorForUser(e) },
       { status: 500 }
     );
   }

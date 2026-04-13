@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 
 const SYSTEM_PROMPT =
   "你是一个专业的营销文案师，熟悉地产行业。根据提供的产品档案资料，生成符合要求的文案内容，保持品牌调性一致。";
@@ -66,8 +67,9 @@ export async function POST(req: NextRequest) {
             }
           }
         } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          controller.enqueue(encoder.encode("ERROR: " + errMsg));
+          controller.enqueue(
+            encoder.encode("ERROR: " + formatAiErrorForUser(err))
+          );
         } finally {
           controller.close();
         }
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "请求失败" }),
+      JSON.stringify({ error: formatAiErrorForUser(e) }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

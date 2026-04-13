@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Plus, Trash2, X, Loader2, Download } from "lucide-react";
+import { Plus, Trash2, X, Loader2, Download, Pencil } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -139,6 +139,8 @@ export function CampaignReportTab({
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Report | null>(null);
   const [creating, setCreating] = useState(false);
+  /** 非 null 时主区展示编辑表单 */
+  const [editingReport, setEditingReport] = useState<Report | null>(null);
 
   const fetchReports = useCallback(async () => {
     const res = await fetch("/api/kpi/campaign-reports");
@@ -167,6 +169,7 @@ export function CampaignReportTab({
             onClick={() => {
               setCreating(true);
               setSelected(null);
+              setEditingReport(null);
             }}
             className="flex items-center gap-1 rounded-lg bg-[#1C1917] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1C1917]/90"
           >
@@ -189,12 +192,14 @@ export function CampaignReportTab({
                   onClick={() => {
                     setSelected(r);
                     setCreating(false);
+                    setEditingReport(null);
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       setSelected(r);
                       setCreating(false);
+                      setEditingReport(null);
                     }
                   }}
                   className={cn(
@@ -221,7 +226,19 @@ export function CampaignReportTab({
                   <div className="mt-0.5 text-[10px] text-[#A8A29E]">
                     {new Date(r.created_at).toLocaleDateString("zh-CN")}
                   </div>
-                  <div className="mt-2 flex justify-end">
+                  <div className="mt-2 flex justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelected(r);
+                        setCreating(false);
+                        setEditingReport(r);
+                      }}
+                      className="flex items-center gap-0.5 rounded px-2 py-0.5 text-[10px] text-[#78716C] hover:bg-[#F5F5F4]"
+                    >
+                      <Pencil className="h-3 w-3" /> 编辑
+                    </button>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -250,8 +267,22 @@ export function CampaignReportTab({
               setSelected(r);
             }}
           />
+        ) : editingReport ? (
+          <NewReportForm
+            editReport={editingReport}
+            notesDataVersion={notesDataVersion}
+            onClose={() => setEditingReport(null)}
+            onCreated={(r) => {
+              setReports((prev) => prev.map((x) => (x.id === r.id ? r : x)));
+              setSelected(r);
+              setEditingReport(null);
+            }}
+          />
         ) : selected ? (
-          <ReportView report={selected} />
+          <ReportView
+            report={selected}
+            onEdit={() => setEditingReport(selected)}
+          />
         ) : (
           <p className="py-20 text-center text-sm text-[#78716C]">
             选择左侧报告查看，或点击「New Report」
@@ -262,14 +293,26 @@ export function CampaignReportTab({
   );
 }
 
-function ReportView({ report }: { report: Report }) {
+function ReportView({
+  report,
+  onEdit,
+}: {
+  report: Report;
+  onEdit: () => void;
+}) {
   if (parseIsPaidCampaign(report)) {
-    return <PaidCampaignReportView report={report} />;
+    return <PaidCampaignReportView report={report} onEdit={onEdit} />;
   }
-  return <OrganicCampaignReportView report={report} />;
+  return <OrganicCampaignReportView report={report} onEdit={onEdit} />;
 }
 
-function PaidCampaignReportView({ report }: { report: Report }) {
+function PaidCampaignReportView({
+  report,
+  onEdit,
+}: {
+  report: Report;
+  onEdit: () => void;
+}) {
   const pdfPageRef = useRef<HTMLDivElement>(null);
   const [pdfWorking, setPdfWorking] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -384,19 +427,29 @@ function PaidCampaignReportView({ report }: { report: Report }) {
               投放 Campaign
               数据来自「笔记投放数据」上传的 xhs_paid_daily，与下方汇总一致。
             </p>
-            <button
-              type="button"
-              onClick={() => void handleDownloadPdf()}
-              disabled={pdfWorking}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
-            >
-              {pdfWorking ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="h-3.5 w-3.5" />
-              )}
-              {pdfWorking ? "生成 PDF…" : "下载 PDF"}
-            </button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onEdit}
+                className="flex items-center gap-1.5 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9]"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                编辑
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDownloadPdf()}
+                disabled={pdfWorking}
+                className="flex items-center gap-1.5 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
+              >
+                {pdfWorking ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {pdfWorking ? "生成 PDF…" : "下载 PDF"}
+              </button>
+            </div>
           </div>
           {pdfError && (
             <p className="text-xs text-red-600">{pdfError}</p>
@@ -559,7 +612,13 @@ function PaidCampaignReportView({ report }: { report: Report }) {
 }
 
 /** 与 KPI「全量笔记」Tab 相同；PDF 使用独立 794px 排版页截图，避免裁切 */
-function OrganicCampaignReportView({ report }: { report: Report }) {
+function OrganicCampaignReportView({
+  report,
+  onEdit,
+}: {
+  report: Report;
+  onEdit: () => void;
+}) {
   const pdfPageRef = useRef<HTMLDivElement>(null);
   const [pdfWorking, setPdfWorking] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -642,19 +701,29 @@ function OrganicCampaignReportView({ report }: { report: Report }) {
               下载 PDF
               时会生成专用排版页（794px 宽、完整纵向内容），与下方展示数据一致，避免在仪表盘容器内截图被裁切。
             </p>
-            <button
-              type="button"
-              onClick={() => void handleDownloadPdf()}
-              disabled={pdfWorking}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
-            >
-              {pdfWorking ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="h-3.5 w-3.5" />
-              )}
-              {pdfWorking ? "生成 PDF…" : "下载 PDF"}
-            </button>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={onEdit}
+                className="flex items-center gap-1.5 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9]"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                编辑
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDownloadPdf()}
+                disabled={pdfWorking}
+                className="flex items-center gap-1.5 rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-xs font-medium text-[#1C1917] hover:bg-[#FAFAF9] disabled:opacity-50"
+              >
+                {pdfWorking ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                {pdfWorking ? "生成 PDF…" : "下载 PDF"}
+              </button>
+            </div>
           </div>
           {pdfError && (
             <p className="text-xs text-red-600">{pdfError}</p>
@@ -715,11 +784,16 @@ function NewReportForm({
   notesDataVersion = 0,
   onClose,
   onCreated,
+  editReport,
 }: {
   notesDataVersion?: number;
   onClose: () => void;
   onCreated: (r: Report) => void;
+  /** 传入则为编辑已有报告 */
+  editReport?: Report | null;
 }) {
+  const isEdit = Boolean(editReport?.id);
+
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -738,13 +812,23 @@ function NewReportForm({
     "h-9 rounded-lg border border-[#E7E5E4] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20";
 
   useEffect(() => {
+    if (isEdit && editReport) {
+      setTitle(editReport.title);
+      setSummary(editReport.summary ?? "");
+      setDateFrom(editReport.date_from);
+      setDateTo(editReport.date_to);
+      setIsPaidCampaign(parseIsPaidCampaign(editReport));
+      setSelectedKeys(parseReportNoteKeys(editReport) ?? []);
+      setSaveError(null);
+      return;
+    }
     const today = new Date().toISOString().slice(0, 10);
     const firstDay = new Date();
     firstDay.setDate(1);
     const monthStart = firstDay.toISOString().slice(0, 10);
     setDateFrom((prev) => prev || monthStart);
     setDateTo((prev) => prev || today);
-  }, []);
+  }, [isEdit, editReport?.id]);
 
   useEffect(() => {
     if (!dateFrom || !dateTo) return;
@@ -801,9 +885,39 @@ function NewReportForm({
 
   const save = async () => {
     if (!title.trim() || !dateFrom || !dateTo) return;
+    if (isEdit && !editReport) return;
     setSaveError(null);
     setSaving(true);
     try {
+      const notePayload =
+        selectedKeys.length > 0 ? JSON.stringify(selectedKeys) : null;
+
+      if (isEdit && editReport) {
+        const res = await fetch(`/api/kpi/campaign-reports/${editReport.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title.trim(),
+            summary: summary ?? "",
+            date_from: dateFrom,
+            date_to: dateTo,
+            note_keys_json: notePayload,
+            is_paid_campaign: isPaidCampaign,
+          }),
+        });
+        const report = await res.json().catch(() => ({}));
+        if (!res.ok || report.error) {
+          setSaveError(
+            typeof report.error === "string"
+              ? report.error
+              : `保存失败（HTTP ${res.status}）`
+          );
+          return;
+        }
+        onCreated(report as Report);
+        return;
+      }
+
       const res = await fetch("/api/kpi/campaign-reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -840,7 +954,9 @@ function NewReportForm({
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-[#1C1917]">新建 Campaign Report</h3>
+        <h3 className="text-sm font-medium text-[#1C1917]">
+          {isEdit ? "编辑 Campaign Report" : "新建 Campaign Report"}
+        </h3>
         <button
           type="button"
           onClick={onClose}
@@ -856,7 +972,7 @@ function NewReportForm({
           <label className="flex cursor-pointer items-start gap-2 text-xs text-[#1C1917]">
             <input
               type="radio"
-              name="campaign_kind"
+              name={isEdit ? `campaign_kind_edit_${editReport?.id}` : "campaign_kind_new"}
               checked={!isPaidCampaign}
               onChange={() => {
                 setIsPaidCampaign(false);
@@ -874,7 +990,7 @@ function NewReportForm({
           <label className="flex cursor-pointer items-start gap-2 text-xs text-[#1C1917]">
             <input
               type="radio"
-              name="campaign_kind"
+              name={isEdit ? `campaign_kind_edit_${editReport?.id}` : "campaign_kind_new"}
               checked={isPaidCampaign}
               onChange={() => {
                 setIsPaidCampaign(true);
@@ -1020,7 +1136,7 @@ function NewReportForm({
         className="mt-4 flex h-9 items-center gap-1 rounded-lg bg-[#1C1917] px-4 text-xs font-medium text-white hover:bg-[#1C1917]/90 disabled:opacity-50"
       >
         {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-        保存报告
+        {isEdit ? "保存修改" : "保存报告"}
       </button>
       {saveError && (
         <p className="mt-2 text-xs text-red-600">{saveError}</p>

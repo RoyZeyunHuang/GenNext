@@ -3,7 +3,7 @@
  */
 
 export const AI_NETWORK_USER_MESSAGE =
-  "AI 网络太忙了，请稍等一分钟再试！";
+  "太多人请求了，让虚拟人忙一下，等一分钟！";
 
 function stringifyUnknown(err: unknown): string {
   if (err instanceof Error) return err.message;

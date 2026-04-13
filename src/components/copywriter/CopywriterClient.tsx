@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { Copy, Star, Loader2, Sparkles, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 import { splitBodyAndStreamTitles } from "@/lib/copy-stream-titles";
 
 function isAbortError(e: unknown): boolean {
@@ -303,7 +304,7 @@ export function CopywriterClient({
       setSelectedDocs(suggested);
       setSelectedDocIds(new Set(suggested.map((d: SelectedItem) => d.doc_id)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "意图分析失败");
+      setError(formatAiErrorForUser(e));
     } finally {
       setDetecting(false);
     }
@@ -421,7 +422,7 @@ export function CopywriterClient({
             const chunk = decoder.decode(value, { stream: true });
             result += chunk;
             if (result.startsWith("ERROR: ")) {
-              setError(result.slice(7));
+              setError(formatAiErrorForUser(result.slice(7)));
               setTitleVariants([]);
               return;
             }
@@ -439,7 +440,7 @@ export function CopywriterClient({
       } catch (e) {
         if (isAbortError(e)) return;
         if (runId !== undefined && runId !== generateRunIdRef.current) return;
-        setError(e instanceof Error ? e.message : "生成标题失败");
+        setError(formatAiErrorForUser(e));
       } finally {
         setGeneratingTitles(false);
       }
@@ -488,7 +489,7 @@ export function CopywriterClient({
         result += chunk;
         if (result.startsWith("ERROR: ")) {
           if (runId !== generateRunIdRef.current) return;
-          setError(result.slice(7));
+          setError(formatAiErrorForUser(result.slice(7)));
           setBodyText("");
           return;
         }
@@ -516,7 +517,7 @@ export function CopywriterClient({
     } catch (e) {
       if (isAbortError(e)) return;
       if (runId !== generateRunIdRef.current) return;
-      setError(e instanceof Error ? e.message : "生成正文失败");
+      setError(formatAiErrorForUser(e));
     } finally {
       if (runId === generateRunIdRef.current) {
         setGeneratingBody(false);

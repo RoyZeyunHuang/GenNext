@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Loader2, MessageSquare, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 
 interface Message {
   id: string;
@@ -129,7 +130,7 @@ export function AIAssistant() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, content: `错误：${err instanceof Error ? err.message : String(err)}` }
+            ? { ...m, content: `错误：${formatAiErrorForUser(err)}` }
             : m
         )
       );

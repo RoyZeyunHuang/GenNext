@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
@@ -473,7 +474,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error("AI Chat error:", error);
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : String(error), success: false },
+        { error: formatAiErrorForUser(error), success: false },
         { status: 500 }
       );
     }
@@ -544,7 +545,7 @@ export async function POST(req: NextRequest) {
         console.error("AI Chat stream error:", error);
         send({
           type: "error",
-          message: error instanceof Error ? error.message : String(error),
+          message: formatAiErrorForUser(error),
           success: false,
         });
         controller.close();

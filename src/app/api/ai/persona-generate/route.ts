@@ -17,6 +17,7 @@ import {
 import { tryConsumePersonaGenerateSlot } from "@/lib/persona-generate-quota";
 import { resolvePromptDocRole } from "@/lib/doc-category-constants";
 import { recordPersonaRagInvocation } from "@/lib/persona-rag/record-usage";
+import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
         { status: 503, headers: { "Content-Type": "application/json" } }
       );
     }
-    return new Response(JSON.stringify({ error: msg }), {
+    return new Response(JSON.stringify({ error: formatAiErrorForUser(e) }), {
       status: 502,
       headers: { "Content-Type": "application/json" },
     });
@@ -241,8 +242,9 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        controller.enqueue(encoder.encode("ERROR: " + errMsg));
+        controller.enqueue(
+          encoder.encode("ERROR: " + formatAiErrorForUser(err))
+        );
       } finally {
         controller.close();
       }
