@@ -5,6 +5,7 @@ import { Search, Plus, Pencil, Trash2, X, Loader2, Mail } from "lucide-react";
 import { cn, formatThrownError, formatUserFacingError } from "@/lib/utils";
 import { EmailTemplatesClient } from "@/components/settings/EmailTemplatesClient";
 import { PermissionSettingsClient } from "@/components/settings/PermissionSettingsClient";
+import { QuotaManagementClient } from "@/components/settings/QuotaManagementClient";
 
 const COLORS = ["#4a90d9", "#21c354", "#e67e22", "#9b59b6", "#e74c3c", "#1abc9c", "#f39c12", "#3498db"];
 
@@ -505,6 +506,7 @@ export function SettingsClient() {
       </div>
 
       <PermissionSettingsClient />
+      <QuotaManagementClient />
     </div>
   );
 }

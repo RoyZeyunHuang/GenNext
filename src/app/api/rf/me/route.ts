@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRfSession } from "@/lib/rf-session";
-import { getPersonaGenerateDailyLimit, getPersonaGenerateUsageToday } from "@/lib/persona-generate-quota";
+import { getPersonaGenerateWeeklyLimit, getPersonaGenerateUsageThisWeek } from "@/lib/persona-generate-quota";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -19,17 +19,17 @@ export async function GET() {
       hasMainAccess: false,
       personaGenerateUnlimited: false,
       personaGenerateUsed: 0,
-      personaGenerateLimit: getPersonaGenerateDailyLimit(),
+      personaGenerateLimit: getPersonaGenerateWeeklyLimit(),
       personaGenerateRemaining: null,
       totalGenerations: 0,
       feedbackRequired: false,
     });
   }
 
-  const limit = getPersonaGenerateDailyLimit();
+  const limit = getPersonaGenerateWeeklyLimit();
   let used = 0;
   if (!session.personaGenerateUnlimited && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    used = await getPersonaGenerateUsageToday(session.userId);
+    used = await getPersonaGenerateUsageThisWeek(session.userId);
   }
 
   const remaining =

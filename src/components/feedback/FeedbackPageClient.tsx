@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, MessageSquareHeart, Send, Sparkles } from "lucide-react";
+import { Loader2, MessageSquareHeart, Send, Sparkles, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MIN_CHARS = 15;
@@ -21,6 +21,10 @@ export function FeedbackPageClient() {
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<FeedbackItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [quotaReason, setQuotaReason] = useState("");
+  const [requestingQuota, setRequestingQuota] = useState(false);
+  const [quotaResult, setQuotaResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [quotaInfo, setQuotaInfo] = useState<{ used: number; limit: number; remaining: number | null; unlimited: boolean } | null>(null);
 
   const charCount = content.trim().length;
   const canSubmit = charCount >= MIN_CHARS;
@@ -37,6 +41,18 @@ export function FeedbackPageClient() {
 
   useEffect(() => {
     loadHistory();
+    // Load quota info
+    void fetch("/api/rf/me")
+      .then((r) => r.json())
+      .then((j: { personaGenerateUsed?: number; personaGenerateLimit?: number; personaGenerateRemaining?: number | null; personaGenerateUnlimited?: boolean }) => {
+        setQuotaInfo({
+          used: j.personaGenerateUsed ?? 0,
+          limit: j.personaGenerateLimit ?? 15,
+          remaining: j.personaGenerateRemaining ?? null,
+          unlimited: j.personaGenerateUnlimited ?? false,
+        });
+      })
+      .catch(() => {});
   }, [loadHistory]);
 
   const handleSubmit = async () => {
@@ -64,6 +80,27 @@ export function FeedbackPageClient() {
       setError(e instanceof Error ? e.message : "提交失败");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRequestQuota = async () => {
+    if (requestingQuota) return;
+    setRequestingQuota(true);
+    setQuotaResult(null);
+    try {
+      const res = await fetch("/api/rf/request-quota", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: quotaReason.trim() }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; message?: string };
+      if (!res.ok) throw new Error(data.error || "提交失败");
+      setQuotaResult({ ok: true, msg: data.message || "申请已提交" });
+      setQuotaReason("");
+    } catch (e) {
+      setQuotaResult({ ok: false, msg: e instanceof Error ? e.message : "提交失败" });
+    } finally {
+      setRequestingQuota(false);
     }
   };
 
@@ -158,6 +195,62 @@ export function FeedbackPageClient() {
           )}
         </button>
       </div>
+
+      {/* Request more quota */}
+      {quotaInfo && !quotaInfo.unlimited && (
+        <div className="mt-6 rounded-2xl border border-[#E7E5E4] bg-white p-5 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <Zap className="h-4.5 w-4.5 text-amber-500" />
+            <h2 className="text-[15px] font-bold text-[#1C1917]">申请更多次数</h2>
+          </div>
+          <p className="mb-1 text-[13px] text-[#78716C]">
+            本周已使用 <span className="font-semibold text-[#1C1917]">{quotaInfo.used}</span> / {quotaInfo.limit} 次黑魔法生成
+            {quotaInfo.remaining !== null && quotaInfo.remaining > 0 && (
+              <span className="text-emerald-600">（剩余 {quotaInfo.remaining} 次）</span>
+            )}
+            {quotaInfo.remaining === 0 && (
+              <span className="text-red-500">（已用完）</span>
+            )}
+          </p>
+          <p className="mb-3 text-[12px] text-[#A8A29E]">
+            每次申请批准后增加 15 次，管理员通常很快处理
+          </p>
+
+          <textarea
+            value={quotaReason}
+            onChange={(e) => setQuotaReason(e.target.value)}
+            rows={2}
+            maxLength={200}
+            placeholder="简单说明需要更多次数的原因（选填）"
+            className="w-full resize-none rounded-xl border border-[#E7E5E4] bg-[#FAFAF9]/50 px-4 py-2.5 text-sm text-[#1C1917] placeholder:text-[#A8A29E] focus:border-[#D6D3D1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1C1917]/15"
+          />
+
+          {quotaResult && (
+            <p className={cn("mt-2 text-xs", quotaResult.ok ? "text-emerald-600" : "text-red-600")}>
+              {quotaResult.msg}
+            </p>
+          )}
+
+          <button
+            type="button"
+            disabled={requestingQuota}
+            onClick={() => void handleRequestQuota()}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600 active:scale-[0.98] disabled:opacity-50"
+          >
+            {requestingQuota ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                提交中…
+              </>
+            ) : (
+              <>
+                <Zap className="h-4 w-4" />
+                申请 +15 次
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* History */}
       <div className="mt-8">

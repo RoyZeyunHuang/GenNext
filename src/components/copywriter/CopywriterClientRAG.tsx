@@ -498,7 +498,7 @@ export function CopywriterClientRAG({
                 <span className="text-emerald-700">黑魔法生成：不限次数</span>
               ) : (
                 <>
-                  今日剩余 <span className="font-semibold text-[#1C1917]">{quota.remaining}</span> /{" "}
+                  本周剩余 <span className="font-semibold text-[#1C1917]">{quota.remaining}</span> /{" "}
                   {quota.limit} 次
                 </>
               )}

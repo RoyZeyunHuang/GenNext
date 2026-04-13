@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
   if (!gate.session.personaGenerateUnlimited) {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return new Response(
-        JSON.stringify({ error: "服务器未配置 SUPABASE_SERVICE_ROLE_KEY，无法校验黑魔法每日额度" }),
+        JSON.stringify({ error: "服务器未配置 SUPABASE_SERVICE_ROLE_KEY，无法校验黑魔法每周额度" }),
         { status: 503, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
     if (!slot.allowed) {
       return new Response(
         JSON.stringify({
-          error: `今日黑魔法生成次数已用完（每日 ${slot.limit} 次），请明日再试或联系管理员开通不限次`,
+          error: `本周黑魔法生成次数已用完（每周 ${slot.limit} 次），请下周再试或在反馈页申请更多次数`,
         }),
         { status: 429, headers: { "Content-Type": "application/json" } }
       );

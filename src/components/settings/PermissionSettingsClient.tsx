@@ -94,7 +94,7 @@ export function PermissionSettingsClient() {
       </div>
       <p className="mb-4 text-sm text-[#78716C]">
         仅超级管理员可见。主站入口（has_main_access）决定用户能否进入主站 Dashboard / 内容工厂等；副程序账号默认仅有 Rednote
-        Factory。黑魔法生成默认每人每日 15 次（UTC 换日），勾选「黑魔法不限次」可关闭该限制。超管人设「对副程序公开」在内容工厂人设页单独设置。
+        Factory。黑魔法生成默认每人每周 15 次（UTC 周一重置），勾选「黑魔法不限次」可关闭该限制。超管人设可见性在内容工厂人设页单独设置。
       </p>
 
       {loading ? (
