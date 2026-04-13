@@ -49,8 +49,9 @@ export async function GET() {
 
         if (assignedRows && assignedRows.length > 0) {
           const assignedIds = assignedRows.map((r) => r.persona_id as string);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const alreadyIds = new Set((data ?? []).map((p: any) => String(p.id)));
+          const alreadyIds = new Set(
+            (data ?? []).map((p) => String((p as unknown as Record<string, unknown>).id))
+          );
           const missingIds = assignedIds.filter((id) => !alreadyIds.has(id));
 
           if (missingIds.length > 0) {
