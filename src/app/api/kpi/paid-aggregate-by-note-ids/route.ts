@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import {
-  fetchLatestRowsForPublishRange,
-  noteRowKey,
-} from "@/lib/kpi-latest-notes-in-range";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,30 +18,10 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const from = sp.get("from") ?? "";
   const to = sp.get("to") ?? "";
-  const noteIdsCsv = (sp.get("note_ids") ?? "")
+  const noteIds = (sp.get("note_ids") ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const noteKeys = sp.getAll("note_key").map((s) => s.trim()).filter(Boolean);
-  const allNotesInRange = sp.get("all_notes_in_campaign_range") === "1";
-
-  let noteIds = noteIdsCsv;
-
-  if (noteIds.length === 0 && from && to && (noteKeys.length > 0 || allNotesInRange)) {
-    const rows = await fetchLatestRowsForPublishRange(from, to);
-    let filtered = rows;
-    if (noteKeys.length > 0) {
-      const allowed = new Set(noteKeys);
-      filtered = rows.filter((r) => allowed.has(noteRowKey(r)));
-    }
-    noteIds = Array.from(
-      new Set(
-        filtered
-          .map((r) => (r.note_id ? String(r.note_id).trim() : ""))
-          .filter(Boolean)
-      )
-    );
-  }
 
   if (noteIds.length === 0) {
     return NextResponse.json(EMPTY);

@@ -387,3 +387,92 @@ export function CampaignReportPdfDocument({
     </div>
   );
 }
+
+export type PaidCampaignPdfMetrics = {
+  spend: number;
+  note_count: number;
+  impressions: number;
+  interactions: number;
+  completion_5s_rate: number;
+  avg_ctr: number;
+};
+
+/** 投放 Campaign 专用 PDF：仅 xhs_paid_daily 汇总指标 */
+export function CampaignPaidCampaignPdfDocument({
+  report,
+  metrics,
+}: {
+  report: CampaignReportPdfMeta;
+  metrics: PaidCampaignPdfMetrics;
+}) {
+  const pct = (v: number) => `${(v * 100).toFixed(2)}%`;
+  const gridClass = "grid grid-cols-3 gap-3";
+
+  return (
+    <div
+      className="campaign-paid-report-pdf-root box-border overflow-visible bg-white text-[#1C1917]"
+      style={{
+        width: 794,
+        padding: "36px 36px 40px",
+        fontFamily:
+          'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+      }}
+    >
+      <header className="mb-6">
+        <h1 className="m-0 text-[22px] font-bold tracking-tight text-[#1C1917]">
+          {report.title}
+        </h1>
+        {report.summary && (
+          <p className="mt-2.5 text-[13px] leading-relaxed text-[#78716C]">
+            {report.summary}
+          </p>
+        )}
+        <p className="mt-2.5 text-[12px] text-[#A8A29E]">
+          投放 Campaign（笔记投放数据 xhs_paid_daily，日期：{report.date_from} →{" "}
+          {report.date_to}）
+        </p>
+      </header>
+
+      <div className={`${gridClass} mb-3`}>
+        <div className="rounded-lg border border-[#E7E5E4] bg-white p-4 shadow-sm">
+          <div className="text-[13px] text-[#78716C]">消费</div>
+          <div className="mt-1.5 text-[26px] font-bold text-[#1C1917]">
+            ¥{metrics.spend.toLocaleString()}
+          </div>
+        </div>
+        <div className="rounded-lg border border-[#E7E5E4] bg-white p-4 shadow-sm">
+          <div className="text-[13px] text-[#78716C]">笔记数</div>
+          <div className="mt-1.5 text-[26px] font-bold text-[#1C1917]">
+            {metrics.note_count.toLocaleString()}
+          </div>
+        </div>
+        <div className="rounded-lg border border-[#E7E5E4] bg-white p-4 shadow-sm">
+          <div className="text-[13px] text-[#78716C]">总曝光（展现量）</div>
+          <div className="mt-1.5 text-[26px] font-bold text-[#1C1917]">
+            {metrics.impressions.toLocaleString()}
+          </div>
+        </div>
+      </div>
+      <div className={gridClass}>
+        <div className="rounded-lg border border-[#E7E5E4] bg-white p-4 shadow-sm">
+          <div className="text-[13px] text-[#78716C]">总互动</div>
+          <div className="mt-1.5 text-[26px] font-bold text-[#1C1917]">
+            {metrics.interactions.toLocaleString()}
+          </div>
+        </div>
+        <div className="rounded-lg border border-[#E7E5E4] bg-white p-4 shadow-sm">
+          <div className="text-[13px] text-[#78716C]">5s 完播率</div>
+          <div className="mt-1.5 text-[26px] font-bold text-[#1C1917]">
+            {pct(metrics.completion_5s_rate)}
+          </div>
+        </div>
+        <div className="rounded-lg border border-[#E7E5E4] bg-white p-4 shadow-sm">
+          <div className="text-[13px] text-[#78716C]">平均点击率</div>
+          <div className="mt-1.5 text-[26px] font-bold text-[#1C1917]">
+            {pct(metrics.avg_ctr)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
