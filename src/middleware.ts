@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
   // Rednote Factory routes — check rf_approved for non-nystudents users
   if (pathname.startsWith("/rednote-factory")) {
     const email = (user.email ?? "").trim().toLowerCase();
-    const isNystudent = email.endsWith("@nystudents.net") || email.endsWith("@uswoony.com");
+    const isNystudent = email.endsWith("@nystudents.net") || email.endsWith("@uswoony.com") || email.endsWith("@theairea.com");
     const hasMainAccess = user.app_metadata?.has_main_access === true;
     const rfApproved =
       isNystudent ||
