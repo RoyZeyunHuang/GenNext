@@ -7,7 +7,7 @@ import { sendEmail } from "@/lib/resend";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ADMIN_EMAIL = "zyhuang@nystudents.net";
+const ADMIN_EMAIL = "royhuang0103@gmail.com";
 
 /** HMAC secret for approval tokens — falls back to service role key */
 function getTokenSecret(): string {

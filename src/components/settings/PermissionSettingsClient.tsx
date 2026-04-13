@@ -8,6 +8,7 @@ type AdminUserRow = {
   created_at: string | undefined;
   has_main_access: boolean;
   persona_generate_unlimited: boolean;
+  rf_approved: boolean;
   is_rf_admin: boolean;
 };
 
@@ -69,6 +70,7 @@ export function PermissionSettingsClient() {
                 ...u,
                 has_main_access: data.has_main_access === true,
                 persona_generate_unlimited: data.persona_generate_unlimited === true,
+                rf_approved: data.rf_approved === true,
               }
             : u
         )
@@ -111,6 +113,7 @@ export function PermissionSettingsClient() {
                 <th className="px-4 py-3">注册时间</th>
                 <th className="px-4 py-3">主站入口</th>
                 <th className="px-4 py-3">黑魔法不限次</th>
+                <th className="px-4 py-3">RF 批准</th>
                 <th className="px-4 py-3">超管</th>
               </tr>
             </thead>
@@ -152,6 +155,19 @@ export function PermissionSettingsClient() {
                           void patchUserMeta(u.id, {
                             persona_generate_unlimited: e.target.checked,
                           })
+                        }
+                        className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
+                      />
+                    </label>
+                  </td>
+                  <td className="px-4 py-3">
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={u.rf_approved}
+                        disabled={savingId === u.id}
+                        onChange={(e) =>
+                          void patchUserMeta(u.id, { rf_approved: e.target.checked })
                         }
                         className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
                       />

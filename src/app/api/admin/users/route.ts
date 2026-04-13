@@ -28,6 +28,7 @@ export async function GET() {
       created_at: string | undefined;
       has_main_access: boolean;
       persona_generate_unlimited: boolean;
+      rf_approved: boolean;
       is_rf_admin: boolean;
     }[] = [];
 
@@ -46,6 +47,7 @@ export async function GET() {
           created_at: u.created_at,
           has_main_access: u.app_metadata?.has_main_access === true,
           persona_generate_unlimited: u.app_metadata?.persona_generate_unlimited === true,
+          rf_approved: u.app_metadata?.rf_approved === true,
           is_rf_admin: isRfAdmin(u.email),
         });
       }
