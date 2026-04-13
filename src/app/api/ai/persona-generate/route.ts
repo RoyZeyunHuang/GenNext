@@ -18,6 +18,7 @@ import { tryConsumePersonaGenerateSlot } from "@/lib/persona-generate-quota";
 import { resolvePromptDocRole } from "@/lib/doc-category-constants";
 import { recordPersonaRagInvocation } from "@/lib/persona-rag/record-usage";
 import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY,
@@ -222,9 +223,23 @@ export async function POST(req: NextRequest) {
     gate.session.userId
   );
 
+  // Capture metadata for logging
+  const logMeta = {
+    userId: gate.session.userId,
+    personaId: persona_id,
+    personaName: persona.name ?? "",
+    prompt: user_input,
+    articleLength,
+    contentKind,
+    ragMode,
+    taskTemplate: taskConstraint?.slice(0, 200),
+    knowledgeDoc: knowledgeContent?.slice(0, 200),
+  };
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      const chunks: string[] = [];
       try {
         const response = await anthropic.messages.stream({
           model: "claude-sonnet-4-20250514",
@@ -238,6 +253,7 @@ export async function POST(req: NextRequest) {
             event.delta?.type === "text_delta" &&
             event.delta.text
           ) {
+            chunks.push(event.delta.text);
             controller.enqueue(encoder.encode(event.delta.text));
           }
         }
@@ -247,6 +263,24 @@ export async function POST(req: NextRequest) {
         );
       } finally {
         controller.close();
+        // Log generation asynchronously (fire-and-forget)
+        if (chunks.length > 0 && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          const admin = getSupabaseAdmin();
+          admin.from("generation_logs").insert({
+            user_id: logMeta.userId,
+            persona_id: logMeta.personaId,
+            persona_name: logMeta.personaName,
+            prompt: logMeta.prompt,
+            result: chunks.join(""),
+            article_length: logMeta.articleLength,
+            content_kind: logMeta.contentKind,
+            rag_mode: logMeta.ragMode,
+            task_template: logMeta.taskTemplate ?? null,
+            knowledge_doc: logMeta.knowledgeDoc ?? null,
+          }).then(({ error }) => {
+            if (error) console.error("[generation_logs] insert error:", error.message);
+          });
+        }
       }
     },
   });
