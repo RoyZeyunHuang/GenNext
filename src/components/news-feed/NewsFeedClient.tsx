@@ -100,7 +100,7 @@ function ArticleCard({
 
   return (
     <div
-      className="mb-2 cursor-pointer overflow-hidden rounded-[10px] bg-white active:opacity-80"
+      className="mb-2 block break-inside-avoid cursor-pointer overflow-hidden rounded-[10px] bg-white active:opacity-80 [-webkit-column-break-inside:avoid] [page-break-inside:avoid]"
       onClick={onOpen}
     >
       {/* Image / placeholder */}
