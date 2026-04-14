@@ -120,6 +120,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-2">
           <SidebarItem
+            href={NEWS_FEED}
+            active={onNewsFeed}
+            icon={Newspaper}
+            label="新闻推送"
+          />
+          <SidebarItem
             href={COPYWRITER_RAG}
             active={onRag}
             icon={Sparkles}
@@ -142,12 +148,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onTeam}
             icon={Users}
             label="我的团队"
-          />
-          <SidebarItem
-            href={NEWS_FEED}
-            active={onNewsFeed}
-            icon={Newspaper}
-            label="新闻推送"
           />
           <SidebarItem
             href={FEEDBACK}
@@ -202,6 +202,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
           style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
         >
           <TabItem
+            href={NEWS_FEED}
+            active={onNewsFeed}
+            icon={Newspaper}
+            label="新闻"
+          />
+          <TabItem
             href={COPYWRITER_RAG}
             active={onRag}
             icon={Sparkles}
@@ -224,12 +230,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onTeam}
             icon={Users}
             label="团队"
-          />
-          <TabItem
-            href={NEWS_FEED}
-            active={onNewsFeed}
-            icon={Newspaper}
-            label="新闻"
           />
           <TabItem
             href={FEEDBACK}
