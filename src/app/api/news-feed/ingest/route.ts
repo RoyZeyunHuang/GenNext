@@ -24,25 +24,14 @@ export const dynamic = "force-dynamic";
  * }
  */
 export async function POST(req: NextRequest) {
-  // Auth check
-  const apiKey = process.env.NEWS_FEED_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "NEWS_FEED_API_KEY not configured on server" },
-      { status: 500 }
-    );
-  }
-
-  const authHeader = req.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-  if (token !== apiKey) {
-    return NextResponse.json(
-      {
-        error: "Unauthorized",
-        hint: `token_len=${token.length}, expected_len=${apiKey.length}, token_start=${token.slice(0, 6)}`,
-      },
-      { status: 401 }
-    );
+  // Auth check — optional: if NEWS_FEED_API_KEY is set, require Bearer token
+  const apiKey = process.env.NEWS_FEED_API_KEY?.trim();
+  if (apiKey) {
+    const authHeader = req.headers.get("authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (token !== apiKey) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   const body = await req.json().catch(() => ({}));
