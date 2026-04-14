@@ -26,6 +26,14 @@ type Category = { id: string; name: string; icon: string; sort_order?: number };
 type Doc = { id: string; title: string; category_id: string };
 type PersonaOpt = { id: string; name: string; short_description: string | null; is_public?: boolean; visibility?: string; user_id?: string };
 
+/** 三种内容形态——与后端 persona-rag/content-kind.ts 的 PersonaContentKind 一一对应 */
+type ContentKind = "xiaohongshu" | "instagram" | "oral_script";
+const CONTENT_KIND_OPTIONS: { value: ContentKind; emoji: string; label: string }[] = [
+  { value: "xiaohongshu", emoji: "📕", label: "小红书笔记" },
+  { value: "instagram", emoji: "📸", label: "Instagram" },
+  { value: "oral_script", emoji: "🎙️", label: "口播稿" },
+];
+
 type PersonaQuota = {
   unlimited: boolean;
   used: number;
@@ -72,6 +80,8 @@ export function CopywriterClientRAG({
   const [taskDocId, setTaskDocId] = useState<string>("");
   const [knowledgeDocId, setKnowledgeDocId] = useState<string>("");
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
+  /** 内容形态（仅主站暴露 UI；RF 强制小红书） */
+  const [contentKind, setContentKind] = useState<ContentKind>("xiaohongshu");
   const [articleLengthSelect, setArticleLengthSelect] = useState<ArticleLength>(DEFAULT_ARTICLE_LENGTH);
   /** 标题：未选择 | 默认模版（正文后 6 条纽约向标题） */
   const [titleSelect, setTitleSelect] = useState<string>("default");
@@ -286,6 +296,7 @@ export function CopywriterClientRAG({
           knowledge_doc_id: knowledgeDocId.trim() || undefined,
           article_length: articleLengthForApi,
           separate_titles: separateTitles,
+          content_kind: contentKind,
         }),
       });
       if (!res.ok) {
@@ -319,6 +330,7 @@ export function CopywriterClientRAG({
               persona_id: personaId,
               body_text: finalBody,
               user_input: userInput,
+              content_kind: contentKind,
             }),
           });
           const data = (await tr.json().catch(() => ({}))) as {
@@ -474,6 +486,39 @@ export function CopywriterClientRAG({
               </div>
             )}
           </div>
+
+          {!isRf && (
+            <div className="mb-3">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A8A29E]">
+                  内容形态
+                </span>
+                <span className="h-px flex-1 bg-gradient-to-r from-[#E7E5E4] to-transparent" aria-hidden />
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {CONTENT_KIND_OPTIONS.map((o) => {
+                  const selected = contentKind === o.value;
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      onClick={() => setContentKind(o.value)}
+                      className={cn(
+                        "flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs transition",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C1917]/25 focus-visible:ring-offset-1",
+                        selected
+                          ? "border-[#1C1917]/25 bg-gradient-to-br from-[#FAFAF9] via-white to-[#F5F5F4] font-semibold text-[#1C1917] shadow-sm ring-1 ring-[#1C1917]/10"
+                          : "border-[#E7E5E4] bg-white text-[#78716C] hover:border-[#D6D3D1] hover:text-[#1C1917]"
+                      )}
+                    >
+                      <span aria-hidden>{o.emoji}</span>
+                      <span>{o.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <textarea
             value={userInput}
