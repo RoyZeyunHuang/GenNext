@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getRfSession } from "@/lib/rf-session";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { findNewsDocId } from "@/lib/news-to-doc";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/news-feed/[id] — 文章全文 */
+/** GET /api/news-feed/[id] — 文章全文（含 bookmarked + doc_id） */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -31,5 +33,11 @@ export async function GET(
     .eq("article_id", id)
     .maybeSingle();
 
-  return NextResponse.json({ ...article, bookmarked: !!bm });
+  const bookmarked = !!bm;
+  // 若已收藏，查对应 doc_id（用于「生成」跳转 copywriter 时预选知识库）
+  const doc_id = bookmarked
+    ? await findNewsDocId(getSupabaseAdmin(), session.userId, id)
+    : null;
+
+  return NextResponse.json({ ...article, bookmarked, doc_id });
 }

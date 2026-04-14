@@ -12,6 +12,7 @@ import {
   Share2,
   Sparkles,
   TrendingUp,
+  X,
 } from "lucide-react";
 
 /* ─── Types ─── */
@@ -30,6 +31,33 @@ type ArticleFull = ArticleSummary & {
   content: string;
   source_url: string | null;
   created_at: string;
+  doc_id: string | null;
+};
+
+type PromptKey = "share" | "experience" | "market";
+
+const PROMPT_TEMPLATES: Record<
+  PromptKey,
+  { emoji: string; label: string; desc: string; text: string }
+> = {
+  share: {
+    emoji: "📰",
+    label: "分享这条新闻资讯",
+    desc: "把新闻的重点信息转化成小红书笔记",
+    text: "写一篇分享以下新闻资讯的笔记",
+  },
+  experience: {
+    emoji: "✨",
+    label: "亲历活动 / 体验",
+    desc: "我去了 / 参加了，分享真实经历",
+    text: "我参加了这个活动，写一篇笔记分享我的经历",
+  },
+  market: {
+    emoji: "💼",
+    label: "给客户的市场观察",
+    desc: "地产 / 政策类新闻，解读给客户看",
+    text: "基于这条新闻写一篇给客户的市场观察/解读笔记",
+  },
 };
 
 /* ─── Helpers ─── */
@@ -62,22 +90,29 @@ function gradientFor(id: string): string {
   return palettes[Math.abs(hash) % palettes.length];
 }
 
-/** Pseudo "likes count" derived from id — XHS cards always show a number */
-function pseudoLikes(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 131 + id.charCodeAt(i)) | 0;
-  const n = (Math.abs(hash) % 9900) + 100;
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}w`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
-}
-
 /** Variable aspect ratio for masonry feel */
 function aspectFor(id: string): string {
   const options = ["aspect-[3/4]", "aspect-[4/5]", "aspect-square", "aspect-[3/4]", "aspect-[4/5]"];
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 17 + id.charCodeAt(i)) | 0;
   return options[Math.abs(hash) % options.length];
+}
+
+/** 标签药丸色板：根据 tag 字符串 hash 稳定分配 */
+function tagPillClass(tag: string): string {
+  const palettes = [
+    "bg-rose-100 text-rose-700",
+    "bg-sky-100 text-sky-700",
+    "bg-emerald-100 text-emerald-700",
+    "bg-amber-100 text-amber-800",
+    "bg-violet-100 text-violet-700",
+    "bg-pink-100 text-pink-700",
+    "bg-teal-100 text-teal-700",
+    "bg-fuchsia-100 text-fuchsia-700",
+  ];
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) hash = (hash * 131 + tag.charCodeAt(i)) | 0;
+  return palettes[Math.abs(hash) % palettes.length];
 }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -93,7 +128,6 @@ function ArticleCard({
   onToggleLike: () => void;
 }) {
   const hasImage = !!article.image_url;
-  const likes = useMemo(() => pseudoLikes(article.id), [article.id]);
   const gradient = useMemo(() => gradientFor(article.id), [article.id]);
   const aspect = useMemo(() => aspectFor(article.id), [article.id]);
   const initial = (article.source_name ?? "新").slice(0, 1);
@@ -140,7 +174,24 @@ function ArticleCard({
           {article.title}
         </p>
 
-        {/* Footer: source + likes */}
+        {/* Colorful tag pills */}
+        {article.tags.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {article.tags.map((t) => (
+              <span
+                key={t}
+                className={cn(
+                  "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                  tagPillClass(t)
+                )}
+              >
+                #{t}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Footer: source + bookmark status icon */}
         <div className="mt-1.5 flex items-center justify-between text-[11px] text-[#999]">
           <div className="flex min-w-0 items-center gap-1">
             <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-[8px] font-bold text-white">
@@ -154,6 +205,7 @@ function ArticleCard({
               onToggleLike();
             }}
             className="flex shrink-0 items-center gap-0.5"
+            aria-label={article.bookmarked ? "已收藏" : "收藏"}
           >
             <Heart
               className={cn(
@@ -161,9 +213,78 @@ function ArticleCard({
                 article.bookmarked ? "fill-rose-500 text-rose-500" : "text-[#999]"
               )}
             />
-            <span>{likes}</span>
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* Generate Sheet — 3 prompt templates            */
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+function GenerateSheet({
+  onPick,
+  onClose,
+  busy,
+}: {
+  onPick: (key: PromptKey) => void;
+  onClose: () => void;
+  busy: boolean;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 lg:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-t-2xl bg-white p-4 pb-6 lg:rounded-2xl"
+        style={{ paddingBottom: "max(24px, env(safe-area-inset-bottom))" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="text-[15px] font-bold text-[#222]">选一个写作角度</p>
+            <p className="mt-0.5 text-[11px] text-[#999]">
+              AI 会用这条新闻作为知识库、按你选的角度写
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#999] hover:bg-[#F5F5F5]"
+            aria-label="关闭"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {(Object.keys(PROMPT_TEMPLATES) as PromptKey[]).map((key) => {
+            const opt = PROMPT_TEMPLATES[key];
+            return (
+              <button
+                key={key}
+                disabled={busy}
+                onClick={() => onPick(key)}
+                className="flex w-full items-start gap-3 rounded-xl border border-[#EEE] bg-white p-3 text-left transition hover:border-rose-200 hover:bg-rose-50/40 active:scale-[0.99] disabled:opacity-50"
+              >
+                <span className="text-2xl leading-none">{opt.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-semibold text-[#222]">
+                    {opt.label}
+                  </p>
+                  <p className="mt-0.5 text-[12px] leading-snug text-[#999]">
+                    {opt.desc}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {busy && (
+          <p className="mt-3 text-center text-[12px] text-[#999]">跳转中…</p>
+        )}
       </div>
     </div>
   );
@@ -185,37 +306,54 @@ function ArticleDetail({
 }) {
   const hasImage = !!article.image_url;
   const gradient = useMemo(() => gradientFor(article.id), [article.id]);
-  const likes = useMemo(() => pseudoLikes(article.id), [article.id]);
   const initial = (article.source_name ?? "新").slice(0, 1);
 
   return (
     <div className="flex min-h-full flex-col bg-white">
-      {/* Top bar */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[#F0F0F0] bg-white/95 px-3 py-2.5 backdrop-blur-sm">
+      {/* Top bar: back / source / bookmark / generate */}
+      <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-[#F0F0F0] bg-white/95 px-3 py-2.5 backdrop-blur-sm">
         <button
           onClick={onBack}
-          className="flex items-center gap-1 rounded-full p-1.5 text-[#222] hover:bg-[#F5F5F5]"
+          className="flex shrink-0 items-center gap-1 rounded-full p-1.5 text-[#222] hover:bg-[#F5F5F5]"
+          aria-label="返回"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-xs font-bold text-white">
             {initial}
           </span>
-          <span className="text-sm font-medium text-[#222]">{article.source_name ?? "新闻"}</span>
+          <span className="truncate text-sm font-medium text-[#222]">
+            {article.source_name ?? "新闻"}
+          </span>
         </div>
+        {/* Bookmark in top bar */}
+        <button
+          onClick={onToggleBookmark}
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition",
+            article.bookmarked
+              ? "bg-amber-50 text-amber-700"
+              : "bg-[#F5F5F5] text-[#555] hover:bg-[#EEE]"
+          )}
+          aria-label={article.bookmarked ? "已收藏" : "收藏"}
+        >
+          <Bookmark
+            className={cn(
+              "h-3.5 w-3.5",
+              article.bookmarked && "fill-amber-400 text-amber-500"
+            )}
+          />
+          {article.bookmarked ? "已收藏" : "收藏"}
+        </button>
+        {/* Generate */}
         <button
           type="button"
-          title="即将上线"
-          onClick={() => {
-            if (typeof window !== "undefined") {
-              window.alert("AI 生成功能即将上线，敬请期待 ✨");
-            }
-          }}
-          className="flex cursor-not-allowed items-center gap-1 rounded-full bg-[#E5E5E5] px-3 py-1.5 text-xs font-medium text-[#999]"
+          onClick={onGenerate}
+          className="flex shrink-0 items-center gap-1 rounded-full bg-rose-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-600"
         >
           <Sparkles className="h-3 w-3" />
-          生成·即将上线
+          生成
         </button>
       </div>
 
@@ -245,13 +383,16 @@ function ArticleDetail({
           {article.content}
         </div>
 
-        {/* Tags */}
+        {/* Tags — colorful pills */}
         {article.tags.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {article.tags.map((t) => (
               <span
                 key={t}
-                className="text-[13px] font-medium text-[#1e5dc0]"
+                className={cn(
+                  "inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-medium",
+                  tagPillClass(t)
+                )}
               >
                 #{t}
               </span>
@@ -288,27 +429,22 @@ function ArticleDetail({
             onClick={onToggleBookmark}
             className="flex flex-col items-center gap-0.5"
           >
-            <Heart
+            <Bookmark
               className={cn(
                 "h-6 w-6 transition",
-                article.bookmarked ? "fill-rose-500 text-rose-500" : "text-[#555]"
+                article.bookmarked ? "fill-amber-400 text-amber-500" : "text-[#555]"
               )}
             />
             <span className="text-[10px] text-[#999]">
-              {article.bookmarked ? "已收藏" : likes}
+              {article.bookmarked ? "已收藏" : "收藏"}
             </span>
           </button>
           <button
-            onClick={onToggleBookmark}
+            onClick={onGenerate}
             className="flex flex-col items-center gap-0.5"
           >
-            <Bookmark
-              className={cn(
-                "h-6 w-6",
-                article.bookmarked ? "fill-amber-400 text-amber-400" : "text-[#555]"
-              )}
-            />
-            <span className="text-[10px] text-[#999]">收藏</span>
+            <Sparkles className="h-6 w-6 text-rose-500" />
+            <span className="text-[10px] text-rose-500">生成笔记</span>
           </button>
           <button className="flex flex-col items-center gap-0.5 opacity-40">
             <MessageCircle className="h-6 w-6 text-[#555]" />
@@ -337,6 +473,10 @@ export function NewsFeedClient() {
   const [openArticle, setOpenArticle] = useState<ArticleFull | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Generate sheet state
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetBusy, setSheetBusy] = useState(false);
+
   const fetchList = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ page: "1", limit: "50" });
@@ -353,41 +493,121 @@ export function NewsFeedClient() {
     fetchList();
   }, [fetchList]);
 
+  /**
+   * 详情视图用 history.pushState 占一条历史记录，而不改 URL。
+   * 这样 iOS 边缘右滑 / 浏览器返回会触发 popstate → 关闭详情回到列表，
+   * 不会再直接跳到 /news-feed 之前的页面（如黑魔法 / 外部站）。
+   */
   const openDetail = async (id: string) => {
     setDetailLoading(true);
     const res = await fetch(`/api/news-feed/${id}`);
     if (res.ok) {
-      setOpenArticle(await res.json());
-      window.scrollTo({ top: 0 });
+      const data: ArticleFull = await res.json();
+      setOpenArticle(data);
+      if (typeof window !== "undefined") {
+        window.history.pushState(
+          { newsDetail: data.id },
+          "",
+          window.location.href
+        );
+        window.scrollTo({ top: 0 });
+      }
     }
     setDetailLoading(false);
   };
 
+  const closeDetail = useCallback(() => {
+    if (typeof window !== "undefined" && window.history.state?.newsDetail) {
+      // 触发浏览器 back，popstate handler 会清空 openArticle
+      window.history.back();
+    } else {
+      setOpenArticle(null);
+    }
+  }, []);
+
+  // 监听浏览器返回（含 iOS 边缘滑动）
+  useEffect(() => {
+    const handler = () => {
+      // popstate 触发时，把详情关闭
+      setOpenArticle(null);
+      setSheetOpen(false);
+    };
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
+
   const toggleBookmark = async (id: string) => {
     const res = await fetch(`/api/news-feed/${id}/bookmark`, { method: "POST" });
     if (!res.ok) return;
-    const { bookmarked } = await res.json();
-    setArticles((prev) => prev.map((a) => (a.id === id ? { ...a, bookmarked } : a)));
+    const { bookmarked, doc_id } = await res.json();
+    setArticles((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, bookmarked } : a))
+    );
     if (openArticle?.id === id) {
-      setOpenArticle((prev) => (prev ? { ...prev, bookmarked } : prev));
+      setOpenArticle((prev) =>
+        prev ? { ...prev, bookmarked, doc_id: doc_id ?? null } : prev
+      );
     }
   };
 
-  const generateFromArticle = (article: ArticleFull) => {
-    const text = `【${article.title}】\n\n${article.content}`;
-    const encoded = encodeURIComponent(text);
-    router.push(`/rednote-factory/copywriter-rag?news_ref=${encoded}`);
+  /** 从 sheet 选了模板后：确保 doc 存在 → 跳转 copywriter */
+  const handleGenerate = async (key: PromptKey) => {
+    if (!openArticle) return;
+    setSheetBusy(true);
+    try {
+      let docId = openArticle.doc_id;
+      if (!docId) {
+        // 未收藏：自动收藏一下生成 doc
+        const res = await fetch(`/api/news-feed/${openArticle.id}/bookmark`, {
+          method: "POST",
+        });
+        if (res.ok) {
+          const { bookmarked, doc_id } = await res.json();
+          if (bookmarked && doc_id) {
+            docId = doc_id;
+            // 同步 UI 状态
+            setOpenArticle((prev) =>
+              prev ? { ...prev, bookmarked: true, doc_id: doc_id } : prev
+            );
+            setArticles((prev) =>
+              prev.map((a) =>
+                a.id === openArticle.id ? { ...a, bookmarked: true } : a
+              )
+            );
+          }
+        }
+      }
+      if (!docId) {
+        window.alert("无法进入生成页面，请重试");
+        return;
+      }
+      router.push(
+        `/rednote-factory/copywriter-rag?news_doc_id=${encodeURIComponent(docId)}&prompt_key=${key}`
+      );
+    } finally {
+      setSheetBusy(false);
+      setSheetOpen(false);
+    }
   };
 
   // Detail view
   if (openArticle) {
     return (
-      <ArticleDetail
-        article={openArticle}
-        onBack={() => setOpenArticle(null)}
-        onToggleBookmark={() => toggleBookmark(openArticle.id)}
-        onGenerate={() => generateFromArticle(openArticle)}
-      />
+      <>
+        <ArticleDetail
+          article={openArticle}
+          onBack={closeDetail}
+          onToggleBookmark={() => toggleBookmark(openArticle.id)}
+          onGenerate={() => setSheetOpen(true)}
+        />
+        {sheetOpen && (
+          <GenerateSheet
+            onPick={handleGenerate}
+            onClose={() => setSheetOpen(false)}
+            busy={sheetBusy}
+          />
+        )}
+      </>
     );
   }
 

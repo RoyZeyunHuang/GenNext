@@ -89,12 +89,40 @@ export function CopywriterClientRAG({
   const [feedbackRequired, setFeedbackRequired] = useState(false);
 
   // Pre-fill from news feed (one-click generate)
+  // 新方案：新闻详情 → 选写作角度 → 带 news_doc_id + prompt_key 跳过来
+  // 旧方案（news_ref 直接塞全文）保留向后兼容
   useEffect(() => {
     const newsRef = searchParams.get("news_ref");
-    if (newsRef) {
+    const newsDocId = searchParams.get("news_doc_id");
+    const promptKey = searchParams.get("prompt_key");
+
+    if (newsDocId) {
+      // 将在 docs 加载后的 useEffect 里绑定到 knowledgeDocId（见下）
+      setMoreOptionsOpen(true);
+    }
+    if (promptKey) {
+      const presets: Record<string, string> = {
+        share: "写一篇分享以下新闻资讯的笔记",
+        experience: "我参加了这个活动，写一篇笔记分享我的经历",
+        market: "基于这条新闻写一篇给客户的市场观察/解读笔记",
+      };
+      const text = presets[promptKey];
+      if (text) setUserInput(text);
+    } else if (newsRef) {
       setUserInput(newsRef);
     }
   }, [searchParams]);
+
+  // docs 加载完后，若 URL 带 news_doc_id，且该 doc 在拉到的列表里，预选到知识库下拉
+  useEffect(() => {
+    const newsDocId = searchParams.get("news_doc_id");
+    if (!newsDocId) return;
+    if (allDocs.length === 0) return;
+    const match = allDocs.find((d) => d.id === newsDocId);
+    if (match) {
+      setKnowledgeDocId(newsDocId);
+    }
+  }, [searchParams, allDocs]);
 
   const refreshQuota = useCallback(() => {
     void fetch("/api/rf/me")
