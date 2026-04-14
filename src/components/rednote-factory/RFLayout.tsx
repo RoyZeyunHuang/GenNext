@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Fingerprint, LogOut, MessageSquareHeart, Sparkles, User, type LucideIcon } from "lucide-react";
+import { BookOpen, Fingerprint, LogOut, MessageSquareHeart, Newspaper, Sparkles, User, Users, type LucideIcon } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
 const COPYWRITER_RAG = "/rednote-factory/copywriter-rag";
 const SOUL_CUSTOMIZE = "/rednote-factory/soul-customize";
 const DOCUMENTS = "/rednote-factory/documents";
+const TEAM = "/rednote-factory/team";
+const NEWS_FEED = "/rednote-factory/news-feed";
 const FEEDBACK = "/rednote-factory/feedback";
 
 function TabItem({
@@ -100,6 +102,8 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
   const onRag = pathname === COPYWRITER_RAG || pathname.startsWith(`${COPYWRITER_RAG}/`);
   const onSoul = pathname === SOUL_CUSTOMIZE || pathname.startsWith(`${SOUL_CUSTOMIZE}/`);
   const onDocs = pathname === DOCUMENTS || pathname.startsWith(`${DOCUMENTS}/`);
+  const onTeam = pathname === TEAM || pathname.startsWith(`${TEAM}/`);
+  const onNewsFeed = pathname === NEWS_FEED || pathname.startsWith(`${NEWS_FEED}/`);
   const onFeedback = pathname === FEEDBACK || pathname.startsWith(`${FEEDBACK}/`);
 
   return (
@@ -132,6 +136,18 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onDocs}
             icon={BookOpen}
             label="素材库"
+          />
+          <SidebarItem
+            href={TEAM}
+            active={onTeam}
+            icon={Users}
+            label="我的团队"
+          />
+          <SidebarItem
+            href={NEWS_FEED}
+            active={onNewsFeed}
+            icon={Newspaper}
+            label="新闻推送"
           />
           <SidebarItem
             href={FEEDBACK}
@@ -202,6 +218,18 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onDocs}
             icon={BookOpen}
             label="素材库"
+          />
+          <TabItem
+            href={TEAM}
+            active={onTeam}
+            icon={Users}
+            label="团队"
+          />
+          <TabItem
+            href={NEWS_FEED}
+            active={onNewsFeed}
+            icon={Newspaper}
+            label="新闻"
           />
           <TabItem
             href={FEEDBACK}

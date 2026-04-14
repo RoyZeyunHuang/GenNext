@@ -7,6 +7,15 @@ export function docsOwnerOrFilter(session: RfSession | null): string | null {
   return `owner_id.is.null,owner_id.eq.${session.userId}`;
 }
 
+/**
+ * Build filter for team docs: only docs belonging to teams the user is in.
+ * Returns team_id values to filter by, or null if no team filter needed.
+ */
+export function docsTeamFilter(teamId: string | null): string | null {
+  if (!teamId) return null;
+  return teamId;
+}
+
 /** Admin / mainAccess can edit anything in the pool. RF → own only. */
 export function canModifyByOwner(session: RfSession | null, ownerId: string | null): boolean {
   if (!session) return true;

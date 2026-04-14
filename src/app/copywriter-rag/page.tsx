@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { CopywriterClientRAG } from "@/components/copywriter/CopywriterClientRAG";
 import { PageHeader } from "@/components/PageHeader";
@@ -17,7 +18,9 @@ export default async function CopywriterRagPage() {
         subtitleKey="copywriterRag.subtitle"
         pageTitleKey="pages.copywriterRag"
       />
-      <CopywriterClientRAG />
+      <Suspense>
+        <CopywriterClientRAG />
+      </Suspense>
     </div>
   );
 }

@@ -35,7 +35,7 @@ export async function PUT(
 
   const { data: existing, error: fetchErr } = await supabase
     .from("docs")
-    .select("id, owner_id, category_id")
+    .select("id, owner_id, category_id, team_id")
     .eq("id", id)
     .maybeSingle();
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
@@ -69,6 +69,14 @@ export async function PUT(
 
   const { data, error } = await supabase.from("docs").update(updates).eq("id", id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Record team contribution on edit
+  const docTeamId = (data.team_id ?? existing.team_id) as string | null;
+  if (docTeamId && session) {
+    const { recordTeamContribution } = await import("@/lib/team-membership");
+    recordTeamContribution(docTeamId, session.userId, "doc_edit", 1, id);
+  }
+
   return NextResponse.json(data);
 }
 

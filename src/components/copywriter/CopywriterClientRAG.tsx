@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, Copy, Loader2, ShieldAlert, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
@@ -61,11 +62,13 @@ export function CopywriterClientRAG({
   layoutVariant?: "default" | "rednote";
 }) {
   const isRf = layoutVariant === "rednote";
+  const searchParams = useSearchParams();
   const [userInput, setUserInput] = useState("");
   const [personas, setPersonas] = useState<PersonaOpt[]>([]);
   const [personaId, setPersonaId] = useState<string>("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [allDocs, setAllDocs] = useState<Doc[]>([]);
+  const [teamNames, setTeamNames] = useState<Record<string, string>>({});
   const [taskDocId, setTaskDocId] = useState<string>("");
   const [knowledgeDocId, setKnowledgeDocId] = useState<string>("");
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
@@ -84,6 +87,14 @@ export function CopywriterClientRAG({
   const [quota, setQuota] = useState<PersonaQuota | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [feedbackRequired, setFeedbackRequired] = useState(false);
+
+  // Pre-fill from news feed (one-click generate)
+  useEffect(() => {
+    const newsRef = searchParams.get("news_ref");
+    if (newsRef) {
+      setUserInput(newsRef);
+    }
+  }, [searchParams]);
 
   const refreshQuota = useCallback(() => {
     void fetch("/api/rf/me")
@@ -134,12 +145,41 @@ export function CopywriterClientRAG({
   }, []);
 
   useEffect(() => {
-    Promise.all([
+    // Fetch personal/public docs and categories
+    const base = Promise.all([
       fetch("/api/docs/categories").then((r) => r.json()),
       fetch("/api/docs").then((r) => r.json()),
-    ]).then(([cats, docs]) => {
-      setCategories(Array.isArray(cats) ? cats : []);
-      setAllDocs(Array.isArray(docs) ? docs : []);
+    ]);
+    // Also fetch user's team docs
+    const teamFetch = fetch("/api/teams")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(async (teams: { id: string; name: string }[]) => {
+        if (!Array.isArray(teams) || teams.length === 0) return { teamDocs: [] as typeof allDocs, teamCats: [] as typeof categories, teamNames: {} as Record<string, string> };
+        const teamNames: Record<string, string> = {};
+        for (const t of teams) teamNames[t.id] = t.name;
+        const results = await Promise.all(
+          teams.map((t) =>
+            Promise.all([
+              fetch(`/api/docs/categories?team_id=${t.id}`).then((r) => r.json()),
+              fetch(`/api/docs?team_id=${t.id}`).then((r) => r.json()),
+            ]).then(([cats, docs]) => ({
+              cats: Array.isArray(cats) ? cats : [],
+              docs: Array.isArray(docs) ? docs : [],
+            }))
+          )
+        );
+        return {
+          teamDocs: results.flatMap((r) => r.docs),
+          teamCats: results.flatMap((r) => r.cats),
+          teamNames,
+        };
+      })
+      .catch(() => ({ teamDocs: [] as typeof allDocs, teamCats: [] as typeof categories, teamNames: {} as Record<string, string> }));
+
+    Promise.all([base, teamFetch]).then(([[cats, docs], { teamDocs, teamCats, teamNames }]) => {
+      setCategories(Array.isArray(cats) ? [...cats, ...teamCats] : teamCats);
+      setAllDocs(Array.isArray(docs) ? [...docs, ...teamDocs] : teamDocs);
+      setTeamNames(teamNames);
     });
   }, []);
 
@@ -453,11 +493,27 @@ export function CopywriterClientRAG({
                     className="h-10 w-full rounded-lg border border-[#E7E5E4] bg-white px-3 text-base text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 lg:text-sm"
                   >
                     <option value="">未选择</option>
-                    {zhiShiDocs.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.title}
-                      </option>
-                    ))}
+                    {(() => {
+                      const personal = zhiShiDocs.filter((d) => !(d as Record<string, unknown>).team_id);
+                      const teamDocs = zhiShiDocs.filter((d) => (d as Record<string, unknown>).team_id);
+                      return (
+                        <>
+                          {personal.length > 0 && teamDocs.length > 0 && <optgroup label="我的文档">{personal.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}</optgroup>}
+                          {personal.length > 0 && teamDocs.length === 0 && personal.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                          {Object.entries(
+                            teamDocs.reduce<Record<string, typeof teamDocs>>((acc, d) => {
+                              const tid = (d as Record<string, unknown>).team_id as string;
+                              (acc[tid] ??= []).push(d);
+                              return acc;
+                            }, {})
+                          ).map(([tid, docs]) => (
+                            <optgroup key={tid} label={teamNames[tid] ?? "团队"}>
+                              {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                            </optgroup>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </select>
                 </div>
 
@@ -469,11 +525,27 @@ export function CopywriterClientRAG({
                     className="h-10 w-full rounded-lg border border-[#E7E5E4] bg-white px-3 text-base text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/20 lg:text-sm"
                   >
                     <option value="">未选择</option>
-                    {taskTemplateDocs.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.title}
-                      </option>
-                    ))}
+                    {(() => {
+                      const personal = taskTemplateDocs.filter((d) => !(d as Record<string, unknown>).team_id);
+                      const teamDocs = taskTemplateDocs.filter((d) => (d as Record<string, unknown>).team_id);
+                      return (
+                        <>
+                          {personal.length > 0 && teamDocs.length > 0 && <optgroup label="我的文档">{personal.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}</optgroup>}
+                          {personal.length > 0 && teamDocs.length === 0 && personal.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                          {Object.entries(
+                            teamDocs.reduce<Record<string, typeof teamDocs>>((acc, d) => {
+                              const tid = (d as Record<string, unknown>).team_id as string;
+                              (acc[tid] ??= []).push(d);
+                              return acc;
+                            }, {})
+                          ).map(([tid, docs]) => (
+                            <optgroup key={tid} label={teamNames[tid] ?? "团队"}>
+                              {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                            </optgroup>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </select>
                 </div>
 

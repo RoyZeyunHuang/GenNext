@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { CopywriterClientRAG } from "@/components/copywriter/CopywriterClientRAG";
 
 export default function RednoteFactoryCopywriterRagPage() {
-  return <CopywriterClientRAG layoutVariant="rednote" />;
+  return (
+    <Suspense>
+      <CopywriterClientRAG layoutVariant="rednote" />
+    </Suspense>
+  );
 }

@@ -10,10 +10,19 @@ export async function GET(req: NextRequest) {
   const session = await getRfSession();
   const { searchParams } = new URL(req.url);
   const with_counts = searchParams.get("with_counts") === "true";
+  const team_id = searchParams.get("team_id");
 
   let q = supabase.from("doc_categories").select("*").order("sort_order", { ascending: true });
-  const ownerFilter = docsOwnerOrFilter(session);
-  if (ownerFilter) q = q.or(ownerFilter);
+
+  if (team_id) {
+    // Team categories mode
+    q = q.eq("team_id", team_id);
+  } else {
+    // Normal mode — personal + public categories, exclude team categories
+    const ownerFilter = docsOwnerOrFilter(session);
+    if (ownerFilter) q = q.or(ownerFilter);
+    q = q.is("team_id", null);
+  }
 
   const { data: categories, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -21,7 +30,13 @@ export async function GET(req: NextRequest) {
 
   if (with_counts && list.length > 0) {
     let dq = supabase.from("docs").select("category_id, owner_id");
-    if (ownerFilter) dq = dq.or(ownerFilter);
+    if (team_id) {
+      dq = dq.eq("team_id", team_id);
+    } else {
+      const ownerFilter = docsOwnerOrFilter(session);
+      if (ownerFilter) dq = dq.or(ownerFilter);
+      dq = dq.is("team_id", null);
+    }
     const { data: docRows } = await dq;
     const countByCategory: Record<string, number> = {};
     for (const c of list) countByCategory[c.id] = 0;
@@ -36,8 +51,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getRfSession();
   const body = await req.json();
-  const { name, icon = "📁", description, is_auto_include = false, sort_order = 0, is_public } = body;
+  const { name, icon = "📁", description, is_auto_include = false, sort_order = 0, is_public, team_id } = body;
   if (!name?.trim()) return NextResponse.json({ error: "name is required" }, { status: 400 });
+
+  // If creating a team category, verify membership
+  if (team_id && session) {
+    const { isTeamMember } = await import("@/lib/team-membership");
+    const { isMember } = await isTeamMember(team_id, session.userId);
+    if (!isMember) {
+      return NextResponse.json({ error: "你不是该团队成员" }, { status: 403 });
+    }
+  }
 
   const ownerId = resolveOwnerIdForCreate(session, is_public === true);
   const insertPayload: Record<string, unknown> = {
@@ -48,6 +72,7 @@ export async function POST(req: NextRequest) {
     sort_order: Number(sort_order) || 0,
   };
   if (ownerId !== undefined) insertPayload.owner_id = ownerId;
+  if (team_id) insertPayload.team_id = team_id;
 
   const { data, error } = await supabase.from("doc_categories").insert(insertPayload).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
