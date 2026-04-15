@@ -8,12 +8,14 @@ import {
   FolderOpen,
   PenLine,
   Sparkles,
+  ShieldAlert,
   Calendar,
   CalendarRange,
   Users,
   BarChart3,
   Newspaper,
   Languages,
+  Building2,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -27,12 +29,14 @@ const navItemsMain = [
   { href: "/documents", labelKey: "nav.documents", icon: FolderOpen },
   { href: "/copywriter", labelKey: "nav.copywriter", icon: PenLine },
   { href: "/copywriter-rag", labelKey: "nav.copywriterRag", icon: Sparkles },
+  { href: "/forbidden-words", labelKey: "nav.forbiddenWords", icon: ShieldAlert },
 ] as const;
 
 const navItemsAfterContentCreation = [
   { href: "/planning", labelKey: "nav.planning", icon: CalendarRange },
   { href: "/calendar", labelKey: "nav.calendar", icon: Calendar },
   { href: "/crm", labelKey: "nav.crm", icon: Users },
+  { href: "/apartments", labelKey: "nav.apartments", icon: Building2 },
   { href: "/kpi", labelKey: "nav.kpi", icon: BarChart3 },
   { href: "/news", labelKey: "nav.news", icon: Newspaper },
   { href: "/settings", labelKey: "nav.settings", icon: Settings },

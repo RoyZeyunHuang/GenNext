@@ -4,9 +4,11 @@
     "documents": "Content Factory",
     "copywriter": "Copywriter",
     "copywriterRag": "Black Magic",
+    "forbiddenWords": "Forbidden Words",
     "planning": "Planning",
     "calendar": "AI Calendar",
     "crm": "BRM",
+    "apartments": "Apartments",
     "kpi": "KPI",
     "news": "News",
     "settings": "Settings",
@@ -139,10 +141,12 @@
   "pages": {
     "dashboard": "Dashboard",
     "crm": "BRM",
+    "apartments": "Apartments",
     "kpi": "KPI",
     "documents": "Content Factory",
     "copywriter": "Copywriter",
     "copywriterRag": "Black Magic",
+    "forbiddenWords": "Forbidden Words",
     "planning": "Planning",
     "calendar": "AI Calendar",
     "news": "News",
@@ -239,6 +243,10 @@
   "copywriterRag": {
     "title": "Black Magic",
     "subtitle": "Black magic, full transformation 🪄"
+  },
+  "forbiddenWords": {
+    "title": "Forbidden Words",
+    "subtitle": "Paste text to highlight risky terms in real time (Xiaohongshu policy + real-estate / medical / false-advertising lists)"
   },
   "settings": {
     "title": "Settings",

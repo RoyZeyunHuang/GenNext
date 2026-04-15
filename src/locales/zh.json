@@ -4,9 +4,11 @@
     "documents": "内容工厂",
     "copywriter": "内容创作",
     "copywriterRag": "黑魔法",
+    "forbiddenWords": "违禁词查词",
     "planning": "内容排期",
     "calendar": "AI日历",
     "crm": "BRM",
+    "apartments": "楼盘监控",
     "kpi": "KPI",
     "news": "新闻摘要",
     "settings": "设置",
@@ -139,10 +141,12 @@
   "pages": {
     "dashboard": "概览",
     "crm": "BRM",
+    "apartments": "楼盘监控",
     "kpi": "KPI",
     "documents": "内容工厂",
     "copywriter": "内容创作",
     "copywriterRag": "黑魔法",
+    "forbiddenWords": "违禁词查词",
     "planning": "内容排期",
     "calendar": "AI 日历",
     "news": "新闻摘要",
@@ -239,6 +243,10 @@
   "copywriterRag": {
     "title": "黑魔法",
     "subtitle": "黑魔法全身变🪄"
+  },
+  "forbiddenWords": {
+    "title": "违禁词查词",
+    "subtitle": "粘贴文案实时高亮风险词（小红书总表 + 房产/医疗/虚假宣传等专项）"
   },
   "settings": {
     "title": "设置",
