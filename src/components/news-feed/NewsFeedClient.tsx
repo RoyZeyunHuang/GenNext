@@ -25,6 +25,9 @@ type ArticleSummary = {
   tags: string[];
   published_at: string;
   bookmarked: boolean;
+  persona_name?: string | null;
+  persona_id?: string | null;
+  persona_angle?: string | null;
 };
 
 type ArticleFull = ArticleSummary & {
@@ -32,6 +35,9 @@ type ArticleFull = ArticleSummary & {
   source_url: string | null;
   created_at: string;
   doc_id: string | null;
+  original_title?: string | null;
+  original_content?: string | null;
+  original_source_name?: string | null;
 };
 
 type PromptKey = "share" | "experience" | "market";
@@ -59,6 +65,18 @@ const PROMPT_TEMPLATES: Record<
     text: "基于这条新闻写一篇给客户的市场观察/解读笔记",
   },
 };
+
+/* ─── Persona avatar helper ─── */
+const PERSONA_IMAGE_NAMES = [
+  "Aurora", "Bella", "Beverly", "Caesy", "Cammy",
+  "Freya", "Kelvin", "Luke", "Mia", "Ray", "Sabrina",
+];
+function personaAvatarSrc(name: string): string {
+  const hit = PERSONA_IMAGE_NAMES.find(
+    (k) => k.toLowerCase() === name.trim().toLowerCase()
+  );
+  return hit ? `/profileimages/${hit}.png` : "/profileimages/Profile_placeholder.png";
+}
 
 /* ─── Helpers ─── */
 function relativeDate(iso: string) {
@@ -127,10 +145,12 @@ function ArticleCard({
   onOpen: () => void;
   onToggleLike: () => void;
 }) {
-  const hasImage = !!article.image_url;
+  const isPersona = !!article.persona_name;
+  const hasImage = !isPersona && !!article.image_url;
   const gradient = useMemo(() => gradientFor(article.id), [article.id]);
   const aspect = useMemo(() => aspectFor(article.id), [article.id]);
-  const initial = (article.source_name ?? "新").slice(0, 1);
+  const displayName = isPersona ? article.persona_name! : (article.source_name ?? "新闻");
+  const initial = displayName.slice(0, 1);
 
   return (
     <div
@@ -149,6 +169,9 @@ function ArticleCard({
               (e.currentTarget.parentElement as HTMLElement).style.display = "none";
             }}
           />
+          <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/40 px-1.5 py-0.5 text-[9px] font-medium text-white/90 backdrop-blur-sm">
+            {relativeDate(article.published_at)}
+          </span>
         </div>
       ) : (
         <div
@@ -158,12 +181,14 @@ function ArticleCard({
             aspect
           )}
         >
-          {/* Decorative title preview on placeholder */}
           <div className="absolute inset-0 flex items-center justify-center p-3">
             <p className="line-clamp-4 text-center text-[13px] font-bold leading-tight text-white/90 drop-shadow-sm">
               {article.title}
             </p>
           </div>
+          <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/20 px-1.5 py-0.5 text-[9px] font-medium text-white/80">
+            {relativeDate(article.published_at)}
+          </span>
         </div>
       )}
 
@@ -191,13 +216,28 @@ function ArticleCard({
           </div>
         )}
 
-        {/* Footer: source + bookmark status icon */}
+        {/* Footer: source + date + bookmark */}
         <div className="mt-1.5 flex items-center justify-between text-[11px] text-[#999]">
           <div className="flex min-w-0 items-center gap-1">
-            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-[8px] font-bold text-white">
-              {initial}
+            {isPersona ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={personaAvatarSrc(displayName)}
+                alt=""
+                className="h-4 w-4 shrink-0 rounded-full object-cover object-top"
+              />
+            ) : (
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-[8px] font-bold text-white">
+                {initial}
+              </span>
+            )}
+            <span className={cn("truncate", isPersona && "font-medium text-violet-600")}>
+              {displayName}
             </span>
-            <span className="truncate">{article.source_name ?? "新闻"}</span>
+            <span className="shrink-0 text-[10px] text-[#BBB]">·</span>
+            <span className="shrink-0 text-[10px] text-[#BBB]">
+              {relativeDate(article.published_at)}
+            </span>
           </div>
           <button
             onClick={(e) => {
@@ -304,13 +344,15 @@ function ArticleDetail({
   onToggleBookmark: () => void;
   onGenerate: () => void;
 }) {
-  const hasImage = !!article.image_url;
+  const isPersona = !!article.persona_name;
+  const hasImage = !isPersona && !!article.image_url;
   const gradient = useMemo(() => gradientFor(article.id), [article.id]);
-  const initial = (article.source_name ?? "新").slice(0, 1);
+  const displayName = isPersona ? article.persona_name! : (article.source_name ?? "新闻");
+  const initial = displayName.slice(0, 1);
 
   return (
     <div className="flex min-h-full flex-col bg-white">
-      {/* Top bar: back / source / bookmark / generate */}
+      {/* Top bar */}
       <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-[#F0F0F0] bg-white/95 px-3 py-2.5 backdrop-blur-sm">
         <button
           onClick={onBack}
@@ -320,14 +362,25 @@ function ArticleDetail({
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-xs font-bold text-white">
-            {initial}
-          </span>
-          <span className="truncate text-sm font-medium text-[#222]">
-            {article.source_name ?? "新闻"}
+          {isPersona ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={personaAvatarSrc(displayName)}
+              alt=""
+              className="h-7 w-7 shrink-0 rounded-full object-cover object-top"
+            />
+          ) : (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-xs font-bold text-white">
+              {initial}
+            </span>
+          )}
+          <span className={cn(
+            "truncate text-sm font-medium",
+            isPersona ? "text-violet-700" : "text-[#222]"
+          )}>
+            {displayName}
           </span>
         </div>
-        {/* Bookmark in top bar */}
         <button
           onClick={onToggleBookmark}
           className={cn(
@@ -346,7 +399,6 @@ function ArticleDetail({
           />
           {article.bookmarked ? "已收藏" : "收藏"}
         </button>
-        {/* Generate */}
         <button
           type="button"
           onClick={onGenerate}
@@ -364,7 +416,10 @@ function ArticleDetail({
           <img src={article.image_url!} alt="" className="w-full object-contain" />
         </div>
       ) : (
-        <div className={cn("aspect-[3/4] w-full bg-gradient-to-br", gradient)}>
+        <div className={cn(
+          "aspect-[3/4] w-full bg-gradient-to-br",
+          isPersona ? "from-violet-100 via-indigo-100 to-purple-200" : gradient
+        )}>
           <div className="flex h-full w-full items-center justify-center p-6">
             <p className="text-center text-xl font-bold leading-tight text-white/95 drop-shadow">
               {article.title}
@@ -400,9 +455,15 @@ function ArticleDetail({
           </div>
         )}
 
-        {/* Meta */}
+        {/* Meta + original source link */}
         <div className="mt-4 text-[12px] text-[#999]">
           {relativeDate(article.published_at)}
+          {isPersona && article.original_title && (
+            <>
+              <span className="mx-2">·</span>
+              <span className="text-[#BBB]">原文：{article.original_source_name ?? "新闻"}</span>
+            </>
+          )}
           {article.source_url && (
             <>
               <span className="mx-2">·</span>

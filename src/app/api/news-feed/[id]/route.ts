@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { getRfSession } from "@/lib/rf-session";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { findNewsDocId } from "@/lib/news-to-doc";
+import { getPersonaOverlay } from "@/lib/news-persona-overlay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,6 @@ export async function GET(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!article) return NextResponse.json({ error: "文章不存在" }, { status: 404 });
 
-  // Check bookmark
   const { data: bm } = await supabase
     .from("news_bookmarks")
     .select("id")
@@ -34,10 +34,28 @@ export async function GET(
     .maybeSingle();
 
   const bookmarked = !!bm;
-  // 若已收藏，查对应 doc_id（用于「生成」跳转 copywriter 时预选知识库）
   const doc_id = bookmarked
     ? await findNewsDocId(getSupabaseAdmin(), session.userId, id)
     : null;
+
+  const overlay = getPersonaOverlay(id);
+  if (overlay) {
+    return NextResponse.json({
+      ...article,
+      title: overlay.title,
+      content: overlay.body,
+      source_name: overlay.persona_name,
+      persona_name: overlay.persona_name,
+      persona_id: overlay.persona_id,
+      persona_angle: overlay.angle,
+      original_title: article.title,
+      original_content: article.content,
+      original_source_name: article.source_name,
+      image_url: null,
+      bookmarked,
+      doc_id,
+    });
+  }
 
   return NextResponse.json({ ...article, bookmarked, doc_id });
 }

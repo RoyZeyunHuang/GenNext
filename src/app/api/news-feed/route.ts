@@ -1,9 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getRfSession } from "@/lib/rf-session";
+import { getPersonaOverlay } from "@/lib/news-persona-overlay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Apply persona overlay to an article summary row */
+function applyOverlay(a: Record<string, unknown>): Record<string, unknown> {
+  const overlay = getPersonaOverlay(a.id as string);
+  if (!overlay) return a;
+  return {
+    ...a,
+    title: overlay.title,
+    summary: overlay.body.slice(0, 200),
+    source_name: overlay.persona_name,
+    persona_name: overlay.persona_name,
+    persona_id: overlay.persona_id,
+    persona_angle: overlay.angle,
+    image_url: null,
+  };
+}
 
 /**
  * GET /api/news-feed
@@ -21,7 +38,6 @@ export async function GET(req: NextRequest) {
   const bookmarked = searchParams.get("bookmarked") === "true";
 
   if (bookmarked) {
-    // Fetch bookmarked articles for current user
     const { data: bms, error: be } = await supabase
       .from("news_bookmarks")
       .select("article_id")
@@ -46,7 +62,7 @@ export async function GET(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     return NextResponse.json({
-      articles: (data ?? []).map((a) => ({ ...a, bookmarked: true })),
+      articles: (data ?? []).map((a) => applyOverlay({ ...a, bookmarked: true })),
       total: count ?? 0,
       page,
       limit,
@@ -65,7 +81,6 @@ export async function GET(req: NextRequest) {
   const { data, error, count } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Check bookmarks for current user
   const articleIds = (data ?? []).map((a) => a.id as string);
   let bookmarkSet = new Set<string>();
   if (articleIds.length > 0) {
@@ -77,13 +92,25 @@ export async function GET(req: NextRequest) {
     bookmarkSet = new Set((bms ?? []).map((b) => b.article_id as string));
   }
 
-  return NextResponse.json({
-    articles: (data ?? []).map((a) => ({
-      ...a,
-      bookmarked: bookmarkSet.has(a.id as string),
-    })),
-    total: count ?? 0,
-    page,
-    limit,
-  });
+  const articles = (data ?? []).map((a) =>
+    applyOverlay({ ...a, bookmarked: bookmarkSet.has(a.id as string) })
+  );
+
+  // First page: boost up to 3 persona articles to the top for visibility
+  if (page === 1) {
+    const persona: typeof articles = [];
+    const normal: typeof articles = [];
+    for (const a of articles) {
+      if (a.persona_name && persona.length < 3) persona.push(a);
+      else normal.push(a);
+    }
+    return NextResponse.json({
+      articles: [...persona, ...normal],
+      total: count ?? 0,
+      page,
+      limit,
+    });
+  }
+
+  return NextResponse.json({ articles, total: count ?? 0, page, limit });
 }
