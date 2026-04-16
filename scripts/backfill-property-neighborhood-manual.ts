@@ -148,16 +148,16 @@ const NAME_TO_AREA: Record<string, { area: string; addrContains: string }> = {
   "NEW HAVEN":  { area: "New Haven CT", addrContains: "New Haven" },
   "NEW HEAVEN": { area: "New Haven CT", addrContains: "New Haven" },
 
-  // 剩下这些地址太模糊 / 没把握，脚本里显式忽略，留给人工：
-  //   "Union Channel"     (240 3rd Ave 可能 Manhattan 也可能 Bronx)
-  //   "Vinty"             (只有 "Union St" 无号段)
-  //   "Hallmark House"    (10 Hill St 无城市)
-  //   "Glenwood Apartments" (55 Glenwood Ave 无城市)
-  //   "Cambridge Manor"   (539-571 N Broad St 无城市)
-  //   "The Centre"        (1 Towne Centre Dr 无城市)
-  //   "Vermella Broad Street" (355 Broad St 无城市)
-  //   "Hudson Piers (6 bldgs)" (55 Riverside Dr 无城市)
-  //   "Premiere Residences" (7 Livingston Ave 无城市)
+  // ──────── 第二批：用户人工确认城市后补上 ────────
+  "Cambridge Manor":         { area: "Elizabeth NJ",       addrContains: "N Broad" },
+  "Vinty (Vintage City Ph1)":{ area: "Elizabeth NJ",       addrContains: "Union St" },
+  "Glenwood Apartments":     { area: "East Orange NJ",     addrContains: "Glenwood" },
+  "Hallmark House":          { area: "Newark",             addrContains: "Hill St" },
+  "Vermella Broad Street":   { area: "Newark",             addrContains: "Broad" },
+  "Hudson Piers (6 bldgs)":  { area: "Yonkers",            addrContains: "Riverside" },
+  "Premiere Residences":     { area: "New Brunswick NJ",   addrContains: "Livingston" },
+  "The Centre":              { area: "Cliffside Park NJ",  addrContains: "Towne" },
+  "Union Channel":           { area: "Gowanus",            addrContains: "3rd Ave" },
 };
 
 async function main() {
