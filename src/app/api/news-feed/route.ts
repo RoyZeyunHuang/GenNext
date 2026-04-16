@@ -6,21 +6,54 @@ import { getPersonaOverlay } from "@/lib/news-persona-overlay";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Apply persona overlay to an article summary row */
+/**
+ * Apply persona overlay to an article row.
+ *
+ * 优先级：
+ *   1. DB 里的 persona_* 五列（走完黑魔法 RAG 后由 ingest/backfill 写入）
+ *   2. JSON 静态 overlay（老数据兜底，hand-curated 24 条）
+ *   3. 返回原始新闻（无 overlay）
+ */
 function applyOverlay(a: Record<string, unknown>): Record<string, unknown> {
+  const personaName = typeof a.persona_name === "string" ? a.persona_name : null;
+  const personaTitle = typeof a.persona_title === "string" ? a.persona_title : null;
+  const personaBody = typeof a.persona_body === "string" ? a.persona_body : null;
+
+  // 1. DB 列优先
+  if (personaName && personaTitle && personaBody) {
+    return {
+      ...a,
+      title: personaTitle,
+      summary: personaBody.slice(0, 200),
+      source_name: personaName,
+      persona_name: personaName,
+      persona_id: typeof a.persona_id === "string" ? a.persona_id : null,
+      persona_angle: typeof a.persona_angle === "string" ? a.persona_angle : null,
+      image_url: null,
+    };
+  }
+
+  // 2. JSON 静态 overlay 兜底
   const overlay = getPersonaOverlay(a.id as string);
-  if (!overlay) return a;
-  return {
-    ...a,
-    title: overlay.title,
-    summary: overlay.body.slice(0, 200),
-    source_name: overlay.persona_name,
-    persona_name: overlay.persona_name,
-    persona_id: overlay.persona_id,
-    persona_angle: overlay.angle,
-    image_url: null,
-  };
+  if (overlay) {
+    return {
+      ...a,
+      title: overlay.title,
+      summary: overlay.body.slice(0, 200),
+      source_name: overlay.persona_name,
+      persona_name: overlay.persona_name,
+      persona_id: overlay.persona_id,
+      persona_angle: overlay.angle,
+      image_url: null,
+    };
+  }
+
+  // 3. 原始新闻
+  return a;
 }
+
+const NEWS_FEED_SELECT =
+  "id, title, summary, source_name, image_url, tags, published_at, created_at, persona_name, persona_id, persona_title, persona_body, persona_angle";
 
 /**
  * GET /api/news-feed
@@ -51,7 +84,7 @@ export async function GET(req: NextRequest) {
 
     let q = supabase
       .from("news_feed")
-      .select("id, title, summary, source_name, image_url, tags, published_at, created_at", { count: "exact" })
+      .select(NEWS_FEED_SELECT, { count: "exact" })
       .in("id", articleIds)
       .order("published_at", { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
@@ -72,7 +105,7 @@ export async function GET(req: NextRequest) {
   // Normal feed
   let q = supabase
     .from("news_feed")
-    .select("id, title, summary, source_name, image_url, tags, published_at, created_at", { count: "exact" })
+    .select(NEWS_FEED_SELECT, { count: "exact" })
     .order("published_at", { ascending: false })
     .range((page - 1) * limit, page * limit - 1);
 

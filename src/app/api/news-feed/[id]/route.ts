@@ -8,7 +8,13 @@ import { getPersonaOverlay } from "@/lib/news-persona-overlay";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** GET /api/news-feed/[id] — 文章全文（含 bookmarked + doc_id） */
+/** GET /api/news-feed/[id] — 文章全文（含 bookmarked + doc_id）
+ *
+ * Overlay 优先级：
+ *   1. DB 列 persona_{name,id,title,body,angle}（ingest/backfill 写入）
+ *   2. JSON 静态 overlay（老数据 24 条兜底）
+ *   3. 原始新闻
+ */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -38,6 +44,29 @@ export async function GET(
     ? await findNewsDocId(getSupabaseAdmin(), session.userId, id)
     : null;
 
+  // 1. DB 列优先
+  const dbPersonaName = typeof article.persona_name === "string" ? article.persona_name : null;
+  const dbPersonaTitle = typeof article.persona_title === "string" ? article.persona_title : null;
+  const dbPersonaBody = typeof article.persona_body === "string" ? article.persona_body : null;
+  if (dbPersonaName && dbPersonaTitle && dbPersonaBody) {
+    return NextResponse.json({
+      ...article,
+      title: dbPersonaTitle,
+      content: dbPersonaBody,
+      source_name: dbPersonaName,
+      persona_name: dbPersonaName,
+      persona_id: typeof article.persona_id === "string" ? article.persona_id : null,
+      persona_angle: typeof article.persona_angle === "string" ? article.persona_angle : null,
+      original_title: article.title,
+      original_content: article.content,
+      original_source_name: article.source_name,
+      image_url: null,
+      bookmarked,
+      doc_id,
+    });
+  }
+
+  // 2. JSON 兜底
   const overlay = getPersonaOverlay(id);
   if (overlay) {
     return NextResponse.json({
@@ -57,5 +86,6 @@ export async function GET(
     });
   }
 
+  // 3. 原始
   return NextResponse.json({ ...article, bookmarked, doc_id });
 }

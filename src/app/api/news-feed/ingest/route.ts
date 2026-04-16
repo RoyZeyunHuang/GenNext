@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  generateOverlaysForArticles,
+  type NewsArticleForOverlay,
+} from "@/lib/news-persona-generate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// 单次 ingest 最多挂多少篇自动 overlay（避免 Vercel 30s 超时）
+const OVERLAY_MAX_PER_BATCH = 6;
 
 /**
  * POST /api/news-feed/ingest
@@ -20,7 +27,15 @@ export const dynamic = "force-dynamic";
  *     image_url?: string     (封面图)
  *     tags?: string[]        (标签)
  *     published_at?: string  (发布时间 ISO，默认 now)
- *   }]
+ *   }],
+ *   generate_overlay?: boolean   (默认 true；传 false 可关闭黑魔法)
+ * }
+ *
+ * Response:
+ * {
+ *   inserted: number,
+ *   articles: [{id,title}],
+ *   overlay?: { attempted, succeeded, failed, skipped }
  * }
  */
 export async function POST(req: NextRequest) {
@@ -36,6 +51,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const articles = Array.isArray(body.articles) ? body.articles : [];
+  const generateOverlay = body.generate_overlay !== false; // 默认开启
   if (articles.length === 0) {
     return NextResponse.json({ error: "articles array required and must not be empty" }, { status: 400 });
   }
@@ -65,10 +81,52 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin.from("news_feed").insert(rows).select("id, title");
+  const { data, error } = await admin
+    .from("news_feed")
+    .insert(rows)
+    .select("id, title, summary, content, source_name, tags, published_at");
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ inserted: data?.length ?? 0, articles: data });
+  const insertedRows = (data ?? []) as NewsArticleForOverlay[];
+
+  // 自动生成虚拟人笔记（黑魔法 RAG pipeline）
+  let overlay: {
+    attempted: number;
+    succeeded: number;
+    failed: number;
+    skipped: number;
+    details?: unknown;
+  } | undefined;
+
+  if (generateOverlay && insertedRows.length > 0) {
+    try {
+      const result = await generateOverlaysForArticles(admin, insertedRows, {
+        maxCount: OVERLAY_MAX_PER_BATCH,
+      });
+      overlay = {
+        attempted: Math.min(insertedRows.length, OVERLAY_MAX_PER_BATCH),
+        succeeded: result.succeeded.length,
+        failed: result.failed.length,
+        skipped: result.skipped.length,
+        details: result,
+      };
+    } catch (e) {
+      // 兜底：生成失败不阻塞 ingest 主流程
+      overlay = {
+        attempted: insertedRows.length,
+        succeeded: 0,
+        failed: insertedRows.length,
+        skipped: 0,
+        details: { error: e instanceof Error ? e.message : String(e) },
+      };
+    }
+  }
+
+  return NextResponse.json({
+    inserted: insertedRows.length,
+    articles: insertedRows.map((r) => ({ id: r.id, title: r.title })),
+    overlay,
+  });
 }
