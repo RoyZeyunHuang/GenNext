@@ -13,7 +13,9 @@
     "research:linkedin-lookup": "node scripts/enrich-master-linkedin-lookup.mjs",
     "research:master-full": "npm run research:consolidate-contacts && npm run research:linkedin-lookup",
     "archive:persona-rag": "node --env-file=.env.local scripts/export-persona-rag-archive.mjs",
-    "import:personas": "node --env-file=.env.local scripts/import-personas-from-files.mjs"
+    "import:personas": "node --env-file=.env.local scripts/import-personas-from-files.mjs",
+    "apartments:migrate": "node --env-file=.env.local scripts/migrate-apartments-data.mjs /Users/roycehuang/ClaudeApps/TheMoniter/data/listings.db",
+    "apartments:sql": "node --env-file=.env.local scripts/apply-sql-migration.mjs supabase/migrations/053_apartments.sql"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
