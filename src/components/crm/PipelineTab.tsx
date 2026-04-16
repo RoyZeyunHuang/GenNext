@@ -8,6 +8,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useLocale } from "@/contexts/LocaleContext";
+import { DistrictPitchReport } from "./DistrictPitchReport";
 
 const STAGE_COLORS: Record<string, string> = {
   "Not Started": "#8a7f74",
@@ -153,6 +154,8 @@ export function PipelineTab() {
           })}
         </div>
       </div>
+
+      <DistrictPitchReport />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-lg bg-white p-5 shadow-card">
