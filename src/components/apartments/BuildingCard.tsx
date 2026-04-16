@@ -1,7 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { areaLabel, tagColor } from "./format";
+import { areaLabel, tagColor, shouldShowTag, tagLabel, effectiveBuildingImage } from "./format";
+import { buildingLabels } from "@/lib/apartments/compute";
+import { CompareToggle } from "./CompareBar";
 
 interface Building {
   id: string;
@@ -18,6 +20,11 @@ interface Building {
   unit_count: number | null;
   note: string | null;
   building_slug: string | null;
+  amenities?: string[] | null;
+  subways?: unknown;
+  /** Optional unit photos from the building's listings, used to substitute
+   *  for StreetEasy's "no photo" placeholder image. */
+  fallback_image_urls?: Array<string | null> | null;
 }
 
 function safeSlug(building: Building): string {
@@ -30,15 +37,28 @@ function safeSlug(building: Building): string {
 
 export function BuildingCard({ building }: { building: Building }) {
   const available = building.open_rentals_count ?? building.active_rentals_count ?? 0;
+  const heroImage = effectiveBuildingImage(building.image_url, building.fallback_image_urls ?? []);
+  const labels = buildingLabels(
+    {
+      tag: building.tag as never,
+      year_built: building.year_built,
+      amenities: building.amenities ?? null,
+      subways: (building.subways as never) ?? null,
+      active_rentals_count: building.active_rentals_count,
+      open_rentals_count: building.open_rentals_count,
+    },
+    [],
+  );
   return (
     <Link
       href={`/apartments/buildings/${safeSlug(building)}`}
-      className="group flex overflow-hidden rounded-lg border bg-card transition-shadow active:bg-accent/40 hover:shadow-md"
+      className="group relative flex overflow-hidden rounded-lg border bg-card transition-shadow active:bg-accent/40 hover:shadow-md"
     >
-      <div className="relative h-24 w-32 flex-shrink-0 bg-muted sm:h-28 sm:w-40">
-        {building.image_url ? (
+      <CompareToggle id={building.id} />
+      <div className="relative w-32 flex-shrink-0 self-stretch bg-muted sm:w-40">
+        {heroImage ? (
           <Image
-            src={building.image_url}
+            src={heroImage}
             alt=""
             fill
             className="object-cover"
@@ -46,8 +66,8 @@ export function BuildingCard({ building }: { building: Building }) {
             sizes="160px"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-            no photo
+          <div className="flex h-full min-h-[6rem] w-full items-center justify-center text-xs text-muted-foreground">
+            暂无照片
           </div>
         )}
       </div>
@@ -56,14 +76,14 @@ export function BuildingCard({ building }: { building: Building }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="truncate font-semibold">{building.name}</span>
-              {building.tag && (
+              {shouldShowTag(building.tag) && (
                 <span
                   className={cn(
                     "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1",
                     tagColor(building.tag)
                   )}
                 >
-                  {building.tag.replace("_", " ")}
+                  {tagLabel(building.tag)}
                 </span>
               )}
             </div>
@@ -74,16 +94,32 @@ export function BuildingCard({ building }: { building: Building }) {
           <div className="text-right">
             <div className="text-lg font-bold text-primary">{available}</div>
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              available
+              在租
             </div>
           </div>
         </div>
-        <div className="mt-auto flex flex-wrap gap-3 text-xs text-muted-foreground">
-          {building.year_built && <span>Built {building.year_built}</span>}
-          {building.floor_count && <span>{building.floor_count} fl</span>}
-          {building.unit_count && <span>{building.unit_count} units</span>}
+        {labels.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {labels.slice(0, 4).map((l) => (
+              <span
+                key={l.id}
+                title={l.tooltip}
+                className={cn(
+                  "rounded px-1.5 py-0.5 text-[10px] font-medium ring-1",
+                  l.className,
+                )}
+              >
+                {l.emoji} {l.short}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mt-auto flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+          {building.year_built && <span>{building.year_built} 年建</span>}
+          {building.floor_count && <span>{building.floor_count} 层</span>}
+          {building.unit_count && <span>共 {building.unit_count} 套</span>}
           {building.closed_rentals_count != null && (
-            <span>{building.closed_rentals_count} closed</span>
+            <span>历史 {building.closed_rentals_count} 套</span>
           )}
         </div>
         {building.note && (

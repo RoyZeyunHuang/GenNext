@@ -24,6 +24,18 @@ export function subwayBg(route: string): string {
   return SUBWAY_COLORS[route] ?? "#808183";
 }
 
+/** Short Chinese-friendly area label, used in WeChat snippets. */
+export function areaShortLabel(area: string | null | undefined): string {
+  switch (area) {
+    case "lic": return "LIC";
+    case "queens": return "Queens";
+    case "manhattan": return "Manhattan";
+    case "brooklyn": return "Brooklyn";
+    case "jersey_city": return "Jersey City";
+    default: return area ?? "";
+  }
+}
+
 export function subwayFg(route: string): string {
   // Yellow and light lines need dark text
   const darkText = new Set(["N", "Q", "R", "W", "FERRY"]);
@@ -32,53 +44,53 @@ export function subwayFg(route: string): string {
 
 // ---------- Amenity Categories ----------
 export const AMENITY_CATEGORIES: Record<string, string[]> = {
-  "Services & Facilities": [
+  "服务与设施": [
     "concierge", "full_time_doorman", "doorman", "elevator", "laundry",
     "live_in_super", "package_room", "bike_room", "parking", "valet_parking",
     "garage",
   ],
-  "Wellness & Recreation": [
+  "健身与休闲": [
     "gym", "pool", "hot_tub", "media_room", "childrens_playroom",
   ],
-  "Storage": [
+  "储物": [
     "storage_room", "cold_storage", "locker_cage",
   ],
-  "Shared Outdoor": [
+  "户外公共区": [
     "roofdeck", "garden", "deck",
   ],
-  "Policies": [
+  "政策": [
     "dogs", "cats", "smoke_free", "guarantors", "wheelchair_access",
   ],
 };
 
 export const AMENITY_LABELS: Record<string, string> = {
-  concierge: "Concierge",
-  full_time_doorman: "Full-time Doorman",
-  doorman: "Doorman",
-  elevator: "Elevator",
-  laundry: "Laundry in Building",
-  live_in_super: "Live-in Super",
-  package_room: "Package Room",
-  bike_room: "Bike Room",
-  parking: "Parking",
-  valet_parking: "Valet Parking",
-  garage: "Garage",
-  gym: "Gym",
-  pool: "Swimming Pool",
-  hot_tub: "Hot Tub",
-  media_room: "Media Room",
-  childrens_playroom: "Children's Playroom",
-  storage_room: "Storage",
-  cold_storage: "Cold Storage",
-  locker_cage: "Locker/Cage",
-  roofdeck: "Roof Deck",
-  garden: "Garden",
-  deck: "Deck",
-  dogs: "Dogs Allowed",
-  cats: "Cats Allowed",
-  smoke_free: "Smoke-free",
-  guarantors: "Guarantors Accepted",
-  wheelchair_access: "Wheelchair Access",
+  concierge: "礼宾服务",
+  full_time_doorman: "全天门卫",
+  doorman: "门卫",
+  elevator: "电梯",
+  laundry: "楼内洗衣房",
+  live_in_super: "驻楼管理员",
+  package_room: "包裹室",
+  bike_room: "自行车房",
+  parking: "停车位",
+  valet_parking: "代客泊车",
+  garage: "车库",
+  gym: "健身房",
+  pool: "泳池",
+  hot_tub: "热水按摩池",
+  media_room: "影音室",
+  childrens_playroom: "儿童活动室",
+  storage_room: "储物间",
+  cold_storage: "冷藏储物",
+  locker_cage: "储物柜",
+  roofdeck: "屋顶平台",
+  garden: "花园",
+  deck: "露台",
+  dogs: "可养狗",
+  cats: "可养猫",
+  smoke_free: "无烟楼",
+  guarantors: "接受担保人",
+  wheelchair_access: "无障碍通道",
 };
 
 // ---------- NYC University Campuses ----------

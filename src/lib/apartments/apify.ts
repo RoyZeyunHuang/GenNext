@@ -42,6 +42,81 @@ async function startRun(urls: string[]): Promise<string> {
   return runId;
 }
 
+/**
+ * Kick off an Apify actor run and register a per-run webhook so Apify pings
+ * us back when it finishes. Returns the runId immediately — does NOT poll.
+ *
+ * Used by the cron handler so Vercel's 5-minute serverless ceiling no longer
+ * matters: cron just kicks off the run and returns; the webhook handler picks
+ * up the dataset later.
+ *
+ * The webhook fires for ACTOR.RUN.SUCCEEDED, FAILED, ABORTED, and TIMED-OUT.
+ */
+export async function startRunWithWebhook(
+  urls: string[],
+  webhookRequestUrl: string,
+): Promise<string> {
+  if (!APIFY_TOKEN) throw new ApifyFetchError("APIFY_API_TOKEN not set");
+  const deduped = Array.from(new Set(urls.filter(Boolean)));
+  if (deduped.length === 0) throw new ApifyFetchError("no urls supplied");
+
+  const body = {
+    startUrls: deduped.map((u) => ({ url: u })),
+    webhooks: [
+      {
+        eventTypes: [
+          "ACTOR.RUN.SUCCEEDED",
+          "ACTOR.RUN.FAILED",
+          "ACTOR.RUN.ABORTED",
+          "ACTOR.RUN.TIMED_OUT",
+        ],
+        requestUrl: webhookRequestUrl,
+        // Apify substitutes these placeholders before POSTing — we use them
+        // in the webhook handler to find the dataset and refresh-run row.
+        payloadTemplate: JSON.stringify({
+          eventType: "{{eventType}}",
+          actorRunId: "{{resource.id}}",
+          status: "{{resource.status}}",
+          defaultDatasetId: "{{resource.defaultDatasetId}}",
+        }),
+      },
+    ],
+  };
+
+  const res = await fetch(
+    `${APIFY_BASE}/acts/${actorPath()}/runs?token=${APIFY_TOKEN}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new ApifyFetchError(`actor start ${res.status}: ${text.slice(0, 500)}`);
+  }
+  const json = (await res.json()) as { data?: { id?: string } };
+  const runId = json.data?.id;
+  if (!runId) throw new ApifyFetchError("missing run id in start response");
+  return runId;
+}
+
+/** Look up an Apify run's dataset id post-hoc (used by the webhook handler). */
+export async function getRunDatasetId(runId: string): Promise<string | null> {
+  if (!APIFY_TOKEN) throw new ApifyFetchError("APIFY_API_TOKEN not set");
+  const res = await fetch(`${APIFY_BASE}/actor-runs/${runId}?token=${APIFY_TOKEN}`);
+  if (!res.ok) return null;
+  const json = (await res.json()) as {
+    data?: { defaultDatasetId?: string; status?: string };
+  };
+  return json.data?.defaultDatasetId ?? null;
+}
+
+/** Public wrapper around the dataset fetcher for use by the webhook handler. */
+export async function fetchDatasetItems(datasetId: string): Promise<ApifyActorItem[]> {
+  return fetchDataset(datasetId);
+}
+
 async function waitForRun(runId: string, maxWaitMs = 600_000): Promise<{ datasetId: string; cost?: number }> {
   const deadline = Date.now() + maxWaitMs;
   let interval = 2000;

@@ -58,25 +58,26 @@ export function NotesPanel({
   }
 
   async function del(id: string) {
-    if (!confirm("Delete this note?")) return;
+    if (!confirm("确定删除这条备注吗?")) return;
     const res = await fetch(`/api/apartments/notes?id=${id}&kind=${kind}`, {
       method: "DELETE",
     });
     if (res.ok) router.refresh();
   }
 
+  const scopeLabel = scope === "building" ? "栋楼" : "套房源";
+
   return (
     <div className="rounded-lg border bg-card">
       <div className="flex items-center justify-between border-b p-3">
-        <h3 className="font-semibold">📝 Team Notes</h3>
+        <h3 className="font-semibold">📝 团队备注</h3>
         <span className="text-xs text-muted-foreground">{notes.length}</span>
       </div>
       <div className="space-y-3 p-3">
         {notes.length === 0 ? (
           <p className="text-sm italic text-muted-foreground">
-            No team notes yet. Add what you&rsquo;ve learned about this{" "}
-            {scope}: leasing office quirks, fee tricks, hidden costs, which
-            broker owns it.
+            还没有团队备注。把你了解到的关于这{scopeLabel}的信息写下来:
+            租赁办公室的脾气、费用套路、隐藏成本、归属哪个 broker 等。
           </p>
         ) : (
           notes.map((n) => (
@@ -91,7 +92,7 @@ export function NotesPanel({
                     onClick={() => del(n.id)}
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive"
                   >
-                    <Trash2 className="h-3 w-3" /> delete
+                    <Trash2 className="h-3 w-3" /> 删除
                   </button>
                 )}
               </div>
@@ -103,19 +104,19 @@ export function NotesPanel({
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Add a note…"
+          placeholder="添加备注…"
           rows={3}
           maxLength={3500}
           className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
         />
         <div className="mt-2 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
-            {draft.length > 0 ? `${draft.length} / 3500` : "Visible to your whole team."}
+            {draft.length > 0 ? `${draft.length} / 3500` : "团队全体可见"}
           </span>
           <div className="flex items-center gap-2">
             {err && <span className="text-xs text-destructive">{err}</span>}
             <Button size="sm" onClick={submit} disabled={busy || !draft.trim()}>
-              {busy ? "Posting…" : "Post note"}
+              {busy ? "提交中…" : "发布备注"}
             </Button>
           </div>
         </div>

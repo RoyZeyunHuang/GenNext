@@ -14,13 +14,12 @@ export default async function AdminWatchlistPage() {
   if (!user.isAdmin) {
     return (
       <div className="mx-auto max-w-2xl p-6 text-sm">
-        <h1 className="text-xl font-bold">Apartments · Admin</h1>
+        <h1 className="text-xl font-bold">公寓 · 管理</h1>
         <p className="mt-3 text-muted-foreground">
-          Only the admin can edit the watchlist. If this should be you, set
-          your email in <code>ADMIN_EMAILS</code> in the deploy env.
+          只有管理员可以修改楼盘跟踪列表。如果你应该是管理员,请把你的邮箱加到部署环境的 <code>ADMIN_EMAILS</code> 中。
         </p>
         <Link href="/apartments" className="mt-3 inline-block text-sm underline">
-          ← Back
+          ← 返回
         </Link>
       </div>
     );
@@ -49,33 +48,33 @@ export default async function AdminWatchlistPage() {
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-3 py-4 lg:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Apartments · Admin</h1>
+          <h1 className="text-2xl font-bold">公寓 · 管理</h1>
           <p className="text-sm text-muted-foreground">
-            Toggle which buildings are on the team watchlist; trigger a manual refresh.
+            管理团队的楼盘跟踪列表,可手动触发抓取刷新。
           </p>
         </div>
         <Link
           href="/apartments"
           className="rounded border px-3 py-1 text-xs hover:bg-accent"
         >
-          ← Back to dashboard
+          ← 返回主页
         </Link>
       </header>
 
       <div className="rounded-lg border bg-card p-4 text-sm">
         <div className="flex flex-wrap gap-4">
           <span>
-            Last scan{" "}
-            <strong>{lastRun?.finished_at ? formatAge(lastRun.finished_at) : "never"}</strong>
+            上次抓取{" "}
+            <strong>{lastRun?.finished_at ? formatAge(lastRun.finished_at) : "从未"}</strong>
           </span>
           <span>
-            Status <strong>{lastRun?.status ?? "—"}</strong>
+            状态 <strong>{lastRun?.status ?? "—"}</strong>
           </span>
           <span>
-            New units <strong>{lastRun?.listings_new ?? 0}</strong>
+            新增房源 <strong>{lastRun?.listings_new ?? 0}</strong>
           </span>
           <span>
-            Cost estimate{" "}
+            预估花费{" "}
             <strong>
               ${((lastRun?.cost_cents_estimate ?? 0) / 100).toFixed(2)}
             </strong>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { areaLabel, tagColor } from "./format";
+import { areaLabel, tagColor, shouldShowTag, tagLabel } from "./format";
 
 interface BuildingRow {
   id: string;
@@ -50,7 +50,7 @@ export function AdminWatchlistClient({ buildings }: { buildings: BuildingRow[] }
   }
 
   async function runRefresh() {
-    const secret = prompt("CRON_SECRET (for manual refresh):");
+    const secret = prompt("请输入 CRON_SECRET (用于手动刷新):");
     if (!secret) return;
     setRefreshing(true);
     try {
@@ -61,8 +61,8 @@ export function AdminWatchlistClient({ buildings }: { buildings: BuildingRow[] }
       const json = await res.json();
       alert(
         res.ok
-          ? `Done. buildings=${json.buildings_fetched}, new units=${json.listings_new}, cost=$${(json.cost_cents_estimate / 100).toFixed(2)}`
-          : `Failed: ${json.error}`
+          ? `完成。共 ${json.buildings_fetched} 栋楼,新增 ${json.listings_new} 套,花费 $${(json.cost_cents_estimate / 100).toFixed(2)}`
+          : `失败: ${json.error}`
       );
       router.refresh();
     } finally {
@@ -86,23 +86,23 @@ export function AdminWatchlistClient({ buildings }: { buildings: BuildingRow[] }
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Search by name / address / area…"
+          placeholder="按名称 / 地址 / 区域搜索…"
           className="w-64 rounded-md border border-input bg-background px-2 py-1 text-sm"
         />
         <Button onClick={runRefresh} disabled={refreshing} size="sm">
           <RefreshCw className={cn("mr-1 h-3.5 w-3.5", refreshing && "animate-spin")} />
-          {refreshing ? "Scraping…" : "Run refresh now"}
+          {refreshing ? "抓取中…" : "立即刷新"}
         </Button>
       </div>
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
           <tr>
-            <th className="w-20 px-3 py-2 text-left">Tracked</th>
-            <th className="px-3 py-2 text-left">Name</th>
-            <th className="px-3 py-2 text-left">Address</th>
-            <th className="px-3 py-2 text-left">Area / Tag</th>
-            <th className="w-20 px-3 py-2 text-right">Active</th>
-            <th className="px-3 py-2 text-left">Note</th>
+            <th className="w-20 px-3 py-2 text-left">跟踪</th>
+            <th className="px-3 py-2 text-left">楼盘</th>
+            <th className="px-3 py-2 text-left">地址</th>
+            <th className="px-3 py-2 text-left">区域 / 标签</th>
+            <th className="w-20 px-3 py-2 text-right">在租</th>
+            <th className="px-3 py-2 text-left">备注</th>
           </tr>
         </thead>
         <tbody>
@@ -124,14 +124,14 @@ export function AdminWatchlistClient({ buildings }: { buildings: BuildingRow[] }
               <td className="px-3 py-2">
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="text-muted-foreground">{areaLabel(b.area)}</span>
-                  {b.tag && (
+                  {shouldShowTag(b.tag) && (
                     <span
                       className={cn(
                         "rounded px-1.5 py-0.5 font-semibold uppercase ring-1",
                         tagColor(b.tag)
                       )}
                     >
-                      {b.tag.replace("_", " ")}
+                      {tagLabel(b.tag)}
                     </span>
                   )}
                 </div>
@@ -148,7 +148,7 @@ export function AdminWatchlistClient({ buildings }: { buildings: BuildingRow[] }
       </table>
       {rows.length === 0 && (
         <div className="p-6 text-center text-sm text-muted-foreground">
-          No buildings match.
+          没有匹配的楼盘。
         </div>
       )}
     </div>
@@ -167,7 +167,7 @@ function EditableNote({ value, onSave }: { value: string; onSave: (v: string) =>
           setDirty(e.target.value !== value);
         }}
         className="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
-        placeholder="Curator note…"
+        placeholder="管理员备注…"
       />
       {dirty && (
         <button
@@ -177,7 +177,7 @@ function EditableNote({ value, onSave }: { value: string; onSave: (v: string) =>
           }}
           className="rounded border px-2 py-1 text-xs hover:bg-accent"
         >
-          Save
+          保存
         </button>
       )}
     </div>

@@ -147,7 +147,12 @@ export function parseApifyItem(
     open_rentals_count: n(item.building_open_rentals_count),
     closed_rentals_count: n(item.building_closed_rentals_count),
     is_new_development: Boolean(item.building_is_new_development),
-    image_url: s(item.building_medium_image_uri),
+    image_url: (() => {
+      const raw = s(item.building_medium_image_uri);
+      // Strip StreetEasy's "no_photo_building" placeholder — UI falls back
+      // to a listing photo instead.
+      return raw && raw.includes("no_photo_building") ? null : raw;
+    })(),
     official_url: s(item.building_building_showcase_website),
     leasing_phone: s(item.building_building_showcase_phone),
     leasing_company: s(item.building_building_showcase_company_name),

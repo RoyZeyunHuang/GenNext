@@ -1,34 +1,46 @@
-import Link from "next/link";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { AreaPills } from "@/components/apartments/AreaPills";
-import { FilterBar } from "@/components/apartments/FilterBar";
 import { UnitTable } from "@/components/apartments/UnitTable";
-import { formatAge } from "@/components/apartments/format";
+import { ViewToggle } from "@/components/apartments/preview/ViewToggle";
+import { PreviewFilterRow } from "@/components/apartments/preview/PreviewFilterRow";
+import { UnitFilterPanel } from "@/components/apartments/preview/UnitFilterPanel";
 import type { Area } from "@/lib/apartments/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Unit Search · Apartments" };
+export const metadata = { title: "房源搜索 · 公寓" };
 
 type SP = { [k: string]: string | string[] | undefined };
+
+const UNIT_SORT_OPTIONS = [
+  { value: "newest", label: "最新" },
+  { value: "price_asc", label: "价低" },
+  { value: "price_desc", label: "价高" },
+  { value: "move_in", label: "入住近" },
+  { value: "eff_rent_asc", label: "净租金低" },
+];
 
 export default async function UnitsPage({ searchParams }: { searchParams: SP }) {
   const currentArea = ((searchParams.area ?? "all") as string) as Area | "all";
   const db = getSupabaseAdmin();
 
-  // Narrow by area
+  const sort = (searchParams.sort ?? "newest") as string;
+  const bedsMin = numParam(searchParams.beds_min);
+  const bedsMax = numParam(searchParams.beds_max);
+  const minPrice = numParam(searchParams.min_price);
+  const maxPrice = numParam(searchParams.max_price);
+  const moveIn = typeof searchParams.move_in === "string" ? searchParams.move_in : null;
+
+  // Narrow by area to building IDs first (we still need this hop because
+  // listings store area on the joined building, not directly).
   let buildingIds: string[] | null = null;
   if (currentArea !== "all") {
     const { data: bs } = await db
       .from("apt_buildings")
       .select("id")
-      .eq("area", currentArea)
-      .eq("is_tracked", true);
-    buildingIds = (bs ?? []).map((b: { id: string }) => b.id);
+      .eq("is_tracked", true)
+      .eq("area", currentArea);
+    buildingIds = ((bs ?? []) as Array<{ id: string }>).map((b) => b.id);
   }
-
-  const beds = (searchParams.beds ?? "") as string;
-  const sort = (searchParams.sort ?? "newest") as string;
 
   let q = db
     .from("apt_listings")
@@ -42,12 +54,13 @@ export default async function UnitsPage({ searchParams }: { searchParams: SP }) 
     .eq("is_active", true);
 
   if (buildingIds) q = q.in("building_id", buildingIds);
-  const bedsArr = beds.split(",").map(Number).filter((n) => !Number.isNaN(n));
-  if (bedsArr.length > 0) q = q.in("bedrooms", bedsArr);
-  if (searchParams.min_price) q = q.gte("price_monthly", Number(searchParams.min_price));
-  if (searchParams.max_price) q = q.lte("price_monthly", Number(searchParams.max_price));
-  if (searchParams.no_fee === "1") q = q.eq("no_fee", true);
-  if (searchParams.move_in_after) q = q.gte("available_at", searchParams.move_in_after as string);
+  if (bedsMin != null) q = q.gte("bedrooms", bedsMin);
+  // 4卧+ means "anything 4 or higher", so we only apply the upper bound
+  // when the user dialed it strictly below the max.
+  if (bedsMax != null && bedsMax < 4) q = q.lte("bedrooms", bedsMax);
+  if (minPrice != null) q = q.gte("price_monthly", minPrice);
+  if (maxPrice != null) q = q.lte("price_monthly", maxPrice);
+  if (moveIn) q = q.lte("available_at", moveIn);
 
   switch (sort) {
     case "price_asc":
@@ -59,29 +72,57 @@ export default async function UnitsPage({ searchParams }: { searchParams: SP }) 
     case "move_in":
       q = q.order("available_at", { ascending: true, nullsFirst: false });
       break;
+    case "eff_rent_asc":
+      // Postgres can't easily sort by computed eff rent — fetch wider and re-sort in JS
+      q = q.order("price_monthly", { ascending: true, nullsFirst: false });
+      break;
     default:
       q = q.order("first_seen_at", { ascending: false });
   }
   q = q.range(0, 199);
 
-  const { data: units, count } = await q;
+  let { data: units, count } = await q;
+  if (sort === "eff_rent_asc" && units) {
+    const { effectiveRent } = await import("@/lib/apartments/compute");
+    units = units.slice().sort((a, b) => {
+      const ea = effectiveRent(a.price_monthly, a.months_free, a.lease_term_months) ?? a.price_monthly ?? Infinity;
+      const eb = effectiveRent(b.price_monthly, b.months_free, b.lease_term_months) ?? b.price_monthly ?? Infinity;
+      return ea - eb;
+    });
+  }
+
+  // Build query string for view toggle so filter state round-trips
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(searchParams)) {
+    if (typeof v === "string" && v) qs.set(k, v);
+  }
 
   return (
-    <div className="mx-auto flex max-w-[1600px] flex-col gap-4 px-3 py-4 lg:p-6">
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Unit Search</h1>
-          <p className="text-sm text-muted-foreground">
-            {count ?? 0} units · agent 快速查询视图
-          </p>
+    <div className="mx-auto flex max-w-[1600px] flex-col gap-3 px-3 py-3 md:gap-4 md:py-4 lg:p-8">
+      {/* ROW 1: SAME chips as buildings view + view toggle */}
+      <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 py-2">
+        <PreviewFilterRow
+          currentArea={currentArea}
+          currentSort={sort}
+          sortOptions={UNIT_SORT_OPTIONS}
+          clearSortOnValues={["newest"]}
+        />
+        <div className="ml-auto">
+          <ViewToggle current="units" searchParamsString={qs.toString()} />
         </div>
-        <Link href="/apartments" className="rounded border px-3 py-1 text-xs hover:bg-accent">
-          ← Buildings
-        </Link>
-      </header>
-      <AreaPills current={currentArea} basePath="/apartments/units" />
-      <FilterBar />
+      </div>
+
+      {/* ROW 2: filter panel with sliders */}
+      <UnitFilterPanel resultCount={count ?? 0} />
+
+      {/* RESULTS */}
       <UnitTable units={(units ?? []) as never[]} />
     </div>
   );
+}
+
+function numParam(v: string | string[] | undefined): number | null {
+  if (typeof v !== "string" || !v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }

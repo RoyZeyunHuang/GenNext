@@ -235,6 +235,20 @@ export function CopywriterClient({
     return () => mq.removeEventListener("change", fn);
   }, []);
 
+  // Prefill from /apartments — sessionStorage handoff (preferred) or ?prefill=
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.sessionStorage.getItem("apartments_prefill");
+    if (stored) {
+      setUserInput(stored);
+      window.sessionStorage.removeItem("apartments_prefill");
+      return;
+    }
+    const sp = new URLSearchParams(window.location.search);
+    const q = sp.get("prefill");
+    if (q) setUserInput(q);
+  }, []);
+
   /** 原标题模版类：名称「标题套路」/「标题」或 sort_order=6（与 generate 校验一致） */
   const resolvedTitlePatternCategory = useMemo(() => {
     return categories.find((c) => isTitlePatternCategoryRow(c));

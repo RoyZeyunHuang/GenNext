@@ -9,13 +9,21 @@ import { getSessionUser } from "@/lib/apartments/auth";
 import { NotesPanel } from "@/components/apartments/NotesPanel";
 import {
   areaLabel, formatBaths, formatBeds, formatDate, formatPrice,
-  formatSqft, tagColor,
+  formatSqft, tagColor, shouldShowTag, tagLabel, effectiveBuildingImage,
 } from "@/components/apartments/format";
 import {
   AMENITY_CATEGORIES, AMENITY_LABELS,
   subwayBg, subwayFg,
 } from "@/lib/apartments/constants";
 import { getOrComputeCommutes, type CommuteResult } from "@/lib/apartments/commute";
+import { formatBuildingSnippet } from "@/lib/apartments/wechat";
+import { effectiveRent } from "@/lib/apartments/compute";
+import { extractDescriptionAmenities, bulletEmoji } from "@/lib/apartments/extract";
+import { CopyButton } from "@/components/apartments/CopyButton";
+import { SendToCopywriterButton } from "@/components/apartments/SendToCopywriterButton";
+import { PitchGenerator } from "@/components/apartments/PitchGenerator";
+import { TrendSparklines } from "@/components/apartments/TrendSparklines";
+import { getRecentSnapshots, ensureTodaySnapshot } from "@/lib/apartments/snapshots";
 import type { Building, Listing, BuildingNote } from "@/lib/apartments/types";
 import { cn } from "@/lib/utils";
 
@@ -104,7 +112,16 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
   if (!data) notFound();
   const { building, listings, notes } = data;
   const user = await getSessionUser();
+
+  // Ensure there's at least today's snapshot, then pull last 30 days
+  const db = getSupabaseAdmin();
+  await ensureTodaySnapshot(db, building.id).catch(() => undefined);
+  const snapshots = await getRecentSnapshots(db, building.id, 30).catch(() => []);
   const available = building.open_rentals_count ?? building.active_rentals_count ?? listings.length;
+  const heroImage = effectiveBuildingImage(
+    building.image_url,
+    listings.map((l) => l.image_url),
+  );
 
   // ---- Subways: normalize Apify shape ----
   const subways = ((building.subways ?? []) as Array<Record<string, unknown>>).map(s => ({
@@ -123,6 +140,13 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
   const categorized = new Set(Object.values(AMENITY_CATEGORIES).flat());
   const uncategorized = [...amenitySet].filter((a) => !categorized.has(a));
   if (uncategorized.length > 0) grouped["Other"] = uncategorized;
+
+  // Extra amenity bullets parsed from the building description (StreetEasy's
+  // tag list often misses unique features like "Karaoke Lounge", etc.)
+  const descAmenities = extractDescriptionAmenities(
+    building.description,
+    building.amenities ?? [],
+  );
 
   // ---- Commutes: real Google Maps when possible, cached ----
   const bAny = building as Record<string, unknown>;
@@ -145,7 +169,7 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-3 py-4 lg:gap-6 lg:px-6 lg:py-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
-        <Link href="/apartments" className="hover:underline">Apartments</Link>
+        <Link href="/apartments" className="hover:underline">公寓</Link>
         <span>/</span>
         <span className="truncate text-foreground">{building.name}</span>
       </div>
@@ -153,18 +177,18 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
       {/* Hero */}
       <section className="flex flex-col overflow-hidden rounded-xl border bg-card md:flex-row">
         <div className="relative h-48 w-full flex-shrink-0 bg-muted sm:h-60 md:h-72 md:w-72 lg:h-80 lg:w-80">
-          {building.image_url ? (
-            <Image src={building.image_url} alt="" fill className="object-cover" unoptimized sizes="(max-width: 768px) 100vw, 320px" />
+          {heroImage ? (
+            <Image src={heroImage} alt="" fill className="object-cover" unoptimized sizes="(max-width: 768px) 100vw, 320px" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">no photo</div>
+            <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">暂无照片</div>
           )}
         </div>
         <div className="flex flex-1 flex-col gap-3 p-4 lg:p-5">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold sm:text-2xl">{building.name}</h1>
-            {building.tag && (
+            {shouldShowTag(building.tag) && (
               <span className={cn("rounded px-2 py-0.5 text-xs font-semibold uppercase ring-1", tagColor(building.tag))}>
-                {building.tag.replace("_", " ")}
+                {tagLabel(building.tag)}
               </span>
             )}
             <span className="text-xs text-muted-foreground sm:text-sm">· {areaLabel(building.area)}</span>
@@ -172,12 +196,12 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
           <p className="text-sm text-muted-foreground">{building.address}</p>
 
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            {building.year_built && <span><Building2 className="mr-1 inline h-4 w-4 text-muted-foreground" />Built {building.year_built}</span>}
-            {building.floor_count && <span>{building.floor_count} fl</span>}
-            {building.unit_count && <span>{building.unit_count.toLocaleString()} units</span>}
-            <span><strong className="text-primary">{available}</strong> available</span>
+            {building.year_built && <span><Building2 className="mr-1 inline h-4 w-4 text-muted-foreground" />{building.year_built} 年建</span>}
+            {building.floor_count && <span>{building.floor_count} 层</span>}
+            {building.unit_count && <span>共 {building.unit_count.toLocaleString()} 套</span>}
+            <span><strong className="text-primary">{available}</strong> 套在租</span>
             {building.closed_rentals_count != null && (
-              <span className="text-muted-foreground">{building.closed_rentals_count} past</span>
+              <span className="text-muted-foreground">历史 {building.closed_rentals_count} 套</span>
             )}
           </div>
 
@@ -193,25 +217,40 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
             {building.official_url && (
               <a href={building.official_url} target="_blank" rel="noopener"
                 className="inline-flex items-center gap-1 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent">
-                🏠 Official
+                🏠 官网
               </a>
             )}
             {building.leasing_phone && (
               <a href={`tel:${building.leasing_phone}`}
                 className="inline-flex items-center gap-1 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent">
-                <Phone className="h-3.5 w-3.5" /> Leasing
+                <Phone className="h-3.5 w-3.5" /> 租赁电话
               </a>
             )}
+            <CopyButton
+              text={formatBuildingSnippet({ building, activeListings: listings, commutes })}
+              label="📱 微信文案"
+              copiedLabel="✓ 已复制"
+              size="sm"
+              className="px-3 py-2 text-sm"
+            />
+            <SendToCopywriterButton
+              content={formatBuildingSnippet({ building, activeListings: listings, commutes })}
+              label="→ 文案工坊"
+              className="px-3 py-2 text-sm"
+            />
           </div>
         </div>
       </section>
+
+      {/* AI Pitch — auto-generated school-targeted Chinese pitch */}
+      <PitchGenerator buildingSlug={building.building_slug ?? building.id} />
 
       {/* INFO BLOCKS — building info first */}
 
       {/* About description */}
       {building.description && (
         <section className="rounded-xl border bg-card p-4">
-          <h2 className="mb-2 font-semibold">About</h2>
+          <h2 className="mb-2 font-semibold">楼盘介绍</h2>
           <div className="max-h-72 overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed">
             {building.description}
           </div>
@@ -219,12 +258,38 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
       )}
 
       {/* Amenities */}
-      {Object.keys(grouped).length > 0 && (
+      {(Object.keys(grouped).length > 0 || descAmenities.length > 0) && (
         <section className="space-y-4 rounded-xl border bg-card p-4">
-          <h2 className="font-semibold">Amenities & Policies</h2>
+          <h2 className="font-semibold">配套与政策</h2>
           {Object.entries(grouped).map(([cat, items]) => (
             <AmenitySection key={cat} title={cat} items={items} />
           ))}
+          {descAmenities.length > 0 && (
+            <div>
+              <h4 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground">
+                楼盘介绍中的特色
+              </h4>
+              <div className="flex flex-wrap gap-1.5">
+                {descAmenities.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900"
+                    title="来源:楼盘介绍中的项目"
+                  >
+                    {bulletEmoji(item)} {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 30-day trend — hidden until enough data accumulates (re-enable after 7+ days of cron) */}
+      {false && snapshots.length > 0 && (
+        <section className="rounded-xl border bg-card p-4">
+          <h3 className="mb-3 font-semibold">📈 近 30 天趋势</h3>
+          <TrendSparklines snapshots={snapshots} />
         </section>
       )}
 
@@ -232,7 +297,7 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
       {commutes.length > 0 && (
         <section className="rounded-xl border bg-card p-4">
           <h3 className="mb-3 flex items-center gap-1.5 font-semibold">
-            <GraduationCap className="h-4 w-4" /> Commute to Campus
+            <GraduationCap className="h-4 w-4" /> 到校通勤
           </h3>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {commutes
@@ -261,13 +326,13 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
                     {/* All 3 modes summary */}
                     <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                       {transit && (
-                        <span title="Transit">🚇 {transit.durationMinutes}min</span>
+                        <span title="地铁">🚇 {transit.durationMinutes} 分钟</span>
                       )}
                       {c.walking && (
-                        <span title="Walking">🚶 {c.walking.durationMinutes}min</span>
+                        <span title="步行">🚶 {c.walking.durationMinutes} 分钟</span>
                       )}
                       {c.driving && (
-                        <span title="Driving">🚗 {c.driving.durationMinutes}min</span>
+                        <span title="开车">🚗 {c.driving.durationMinutes} 分钟</span>
                       )}
                     </div>
                   </div>
@@ -275,7 +340,7 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
               })}
           </div>
           <p className="mt-3 text-[10px] text-muted-foreground">
-            * Real-time Google Maps · transit uses next available departure
+            * 实时 Google Maps · 地铁按下一班车计算
           </p>
         </section>
       )}
@@ -286,7 +351,7 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
         {subways.length > 0 && (
           <section className="rounded-xl border bg-card p-4">
             <h3 className="mb-3 flex items-center gap-1.5 font-semibold">
-              <Train className="h-4 w-4" /> Transit
+              <Train className="h-4 w-4" /> 周边地铁
             </h3>
             <ul className="space-y-2.5">
               {subways.slice(0, 8).map((sub, i) => (
@@ -296,7 +361,7 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
                     <span className="text-sm truncate">{sub.name}</span>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-                    {sub.distance.toFixed(2)} mi
+                    {sub.distance.toFixed(2)} 英里
                   </span>
                 </li>
               ))}
@@ -311,35 +376,45 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
       {/* AVAILABLE UNITS — moved to bottom per user request */}
       <section className="rounded-xl border bg-card">
         <div className="flex items-center justify-between border-b p-4">
-          <h2 className="font-semibold">Available Units ({listings.length})</h2>
+          <h2 className="font-semibold">在租房源 ({listings.length} 套)</h2>
           <Link href={`/apartments/units`} className="text-xs text-primary hover:underline">
-            Search all units →
+            搜索全部房源 →
           </Link>
         </div>
         {listings.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            None available in our last scan. Check StreetEasy for live inventory.
+            上次抓取时无在租房源,请到 StreetEasy 查看实时挂牌情况。
           </div>
         ) : (
           <>
             {/* Desktop table */}
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2 text-left">Unit</th>
-                    <th className="px-3 py-2 text-left">Price</th>
-                    <th className="px-3 py-2 text-left">Layout</th>
-                    <th className="px-3 py-2 text-left">Move-in</th>
-                    <th className="px-3 py-2 text-left">Concessions</th>
+                    <th className="px-3 py-2 text-left">户号</th>
+                    <th className="px-3 py-2 text-left">价格</th>
+                    <th className="px-3 py-2 text-left">净租金</th>
+                    <th className="px-3 py-2 text-left">户型</th>
+                    <th className="px-3 py-2 text-left">入住</th>
+                    <th className="px-3 py-2 text-left">优惠</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {listings.map((u) => (
+                  {listings.map((u) => {
+                    const eff = effectiveRent(u.price_monthly, u.months_free, u.lease_term_months);
+                    return (
                     <tr key={u.id} className="border-b last:border-0 hover:bg-accent/40">
                       <td className="px-3 py-2 font-medium">{u.unit ?? "—"}</td>
                       <td className="px-3 py-2 font-semibold">{formatPrice(u.price_monthly)}</td>
+                      <td className="px-3 py-2">
+                        {eff && eff !== u.price_monthly ? (
+                          <span className="font-medium text-green-700">{formatPrice(eff)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {formatBeds(u.bedrooms)}
                         {u.bathrooms ? ` · ${formatBaths(u.bathrooms)}` : ""}
@@ -347,9 +422,9 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{formatDate(u.available_at)}</td>
                       <td className="px-3 py-2 text-muted-foreground">
-                        {u.months_free ? `${u.months_free} mo free` : ""}
-                        {u.lease_term_months ? ` · ${u.lease_term_months}mo` : ""}
-                        {u.no_fee ? " · No fee" : ""}
+                        {u.months_free ? `${u.months_free} 个月免租` : ""}
+                        {u.lease_term_months ? ` · 签约 ${u.lease_term_months} 个月` : ""}
+                        {u.no_fee ? " · 免中介费" : ""}
                       </td>
                       <td className="px-3 py-2">
                         <a href={u.url} target="_blank" rel="noopener"
@@ -358,33 +433,42 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
                         </a>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile cards */}
             <div className="divide-y md:hidden">
-              {listings.map((u) => (
+              {listings.map((u) => {
+                const eff = effectiveRent(u.price_monthly, u.months_free, u.lease_term_months);
+                return (
                 <a key={u.id} href={u.url} target="_blank" rel="noopener"
                   className="block px-4 py-3 active:bg-accent/40">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-base font-semibold">{formatPrice(u.price_monthly)}</span>
                     <span className="text-xs text-muted-foreground">#{u.unit ?? "—"}</span>
                   </div>
+                  {eff && eff !== u.price_monthly && (
+                    <div className="text-xs font-medium text-green-700">
+                      净租金 {formatPrice(eff)}/月
+                    </div>
+                  )}
                   <div className="mt-0.5 text-sm text-muted-foreground">
                     {formatBeds(u.bedrooms)}
                     {u.bathrooms ? ` · ${formatBaths(u.bathrooms)}` : ""}
                     {u.sqft ? ` · ${formatSqft(u.sqft)}` : ""}
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
-                    <span>Move-in {formatDate(u.available_at)}</span>
-                    {u.months_free ? <span>· {u.months_free} mo free</span> : null}
-                    {u.lease_term_months ? <span>· {u.lease_term_months}mo</span> : null}
-                    {u.no_fee ? <span>· No fee</span> : null}
+                    <span>入住 {formatDate(u.available_at)}</span>
+                    {u.months_free ? <span>· {u.months_free} 月免租</span> : null}
+                    {u.lease_term_months ? <span>· 签 {u.lease_term_months} 月</span> : null}
+                    {u.no_fee ? <span>· 免中介费</span> : null}
                   </div>
                 </a>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

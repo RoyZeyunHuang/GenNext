@@ -21,6 +21,60 @@ if (!SUPA_URL || !SUPA_KEY) { console.error("SUPABASE vars not set"); process.ex
 const supa = createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } });
 const BASE = "https://api.apify.com/v2";
 
+/**
+ * Authoritative seed name → area map. Mirror of HOT_BUILDINGS in
+ * src/lib/apartments/hot_buildings.ts. Apify's borough/neighborhood is NOT
+ * reliable for our purposes (it returns "Hunters Point" for LIC sub-areas,
+ * borough=null for Jersey City, etc.) — the seed catalog is the truth.
+ */
+const SEED_AREA_BY_NAME = {
+  // LIC
+  "The Orchard": "lic", "Jasper": "lic", "The Italic": "lic", "The Bold": "lic",
+  "Lumen LIC": "lic", "2-21 Malt Drive": "lic", "2-21 Malt Dr": "lic",
+  "Gotham Point": "lic", "Bevel LIC": "lic", "Skyline Tower": "lic",
+  "Jackson Park": "lic", "Sven": "lic", "ARC": "lic", "Eagle Lofts": "lic",
+  "Tower 28": "lic", "Watermark LIC": "lic", "GALERIE": "lic", "5Pointz LIC": "lic",
+  "Heritage 27 on 27th": "lic", "AltaLIC": "lic", "HERO": "lic", "The Forge": "lic",
+  "Dutch LIC": "lic", "4610 Center Blvd": "lic",
+  "28-10 Jackson Avenue": "lic", "28-40 Jackson Avenue": "lic",
+  "42-62 Hunter Street": "lic",
+  // Queens
+  "Vista65": "queens",
+  // Manhattan
+  "1440 Amsterdam Avenue": "manhattan", "1440 Amsterdam": "manhattan", "Lyra": "manhattan",
+  "MIMA": "manhattan", "MiMA": "manhattan",
+  "Miramar": "manhattan", "Miramar at 407 West 206th Street": "manhattan",
+  "The Octagon": "manhattan", "The Ritz Plaza": "manhattan",
+  "Stuyvesant Town": "manhattan", "448 East 107th Street": "manhattan",
+  // Brooklyn
+  "The Highland": "brooklyn",
+  // Jersey City
+  "Journal Squared": "jersey_city", "555 Summit Avenue": "jersey_city",
+  "43 Cottage Street": "jersey_city", "351 Marin Boulevard": "jersey_city",
+};
+
+function lookupSeedArea(item) {
+  const name = (item.building_title ?? "").trim();
+  let area = SEED_AREA_BY_NAME[name];
+  // "Manhattan Park" exists in both Brooklyn (Driggs Ave) and Manhattan (Roosevelt Island)
+  if (name === "Manhattan Park") {
+    const url = (item.building_url ?? "").toLowerCase();
+    area = url.includes("brooklyn") ? "brooklyn" : "manhattan";
+  }
+  return area ?? null;
+}
+
+/** Last-resort area derivation when the building isn't in our seed catalog. */
+function deriveAreaFromBorough(item) {
+  const borough = (item.building_area_borough_name ?? "").toLowerCase();
+  const url = (item.building_url ?? "").toLowerCase();
+  if (borough === "manhattan") return "manhattan";
+  if (borough === "brooklyn") return "brooklyn";
+  if (borough === "queens") return "queens";
+  if (url.includes("jersey") || url.includes("hoboken")) return "jersey_city";
+  return null;
+}
+
 // ---------- Get tracked building URLs ----------
 const { data: buildings } = await supa
   .from("apt_buildings")
@@ -72,6 +126,15 @@ while (status === "RUNNING" || status === "READY") {
       const buildingUrl = String(item.building_url ?? item.originalAddress ?? "");
       const seedMatch = (buildings ?? []).find(b => b.building_url === buildingUrl);
 
+      // area: HOT_BUILDINGS seed (matched by name) is the source of truth.
+      // Apify's borough/neighborhood cannot distinguish LIC sub-areas
+      // (returns "Hunters Point" instead of "Long Island City") and returns
+      // borough=null for Jersey City. Only fall back to borough-derive if the
+      // building isn't in our seed catalog.
+      const seededArea = lookupSeedArea(item);
+      const derivedArea = deriveAreaFromBorough(item);
+      const finalArea = seededArea ?? derivedArea ?? seedMatch?.area ?? "lic";
+
       // Parse subway data
       let subways = [];
       try { subways = JSON.parse(item.building_nearby_subways_json ?? "[]"); } catch {}
@@ -80,6 +143,11 @@ while (status === "RUNNING" || status === "READY") {
       let amenities = [];
       try { amenities = JSON.parse(item.building_amenities_json ?? "[]").map(a => a.id).filter(Boolean); } catch {}
 
+      // Strip StreetEasy "no_photo_building" placeholder so the UI can fall
+      // back to a listing photo instead of showing the generic SVG.
+      const rawBldgImg = item.building_medium_image_uri ?? null;
+      const cleanBldgImg = rawBldgImg && rawBldgImg.includes("no_photo_building") ? null : rawBldgImg;
+
       // Upsert building
       const bldgRow = {
         id: buildingId,
@@ -87,7 +155,7 @@ while (status === "RUNNING" || status === "READY") {
         address: item.building_subtitle ?? null,
         neighborhood: item.building_area_name ?? null,
         borough: item.building_area_borough_name ?? null,
-        area: seedMatch?.area ?? "lic",
+        area: finalArea,
         tag: seedMatch?.tag ?? null,
         building_url: buildingUrl,
         building_slug: seedMatch?.building_slug ?? null,
@@ -101,7 +169,7 @@ while (status === "RUNNING" || status === "READY") {
         open_rentals_count: item.building_open_rentals_count ?? null,
         closed_rentals_count: item.building_closed_rentals_count ?? null,
         is_new_development: !!item.building_is_new_development,
-        image_url: item.building_medium_image_uri ?? null,
+        image_url: cleanBldgImg,
         amenities: amenities,
         subways: subways,
         schools: schools,

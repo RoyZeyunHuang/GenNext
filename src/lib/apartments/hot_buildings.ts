@@ -171,12 +171,12 @@ export const HOT_BUILDINGS: readonly HotBuildingSeed[] = [
 ];
 
 export const AREAS: readonly { value: string; label: string }[] = [
-  { value: "all", label: "All" },
+  { value: "all", label: "全部" },
   { value: "lic", label: "LIC" },
-  { value: "queens", label: "Queens" },
-  { value: "manhattan", label: "Manhattan" },
-  { value: "brooklyn", label: "Brooklyn" },
-  { value: "jersey_city", label: "Jersey City" },
+  { value: "queens", label: "皇后区" },
+  { value: "manhattan", label: "曼哈顿" },
+  { value: "brooklyn", label: "布鲁克林" },
+  { value: "jersey_city", label: "新泽西城" },
 ];
 
 export function buildingUrlForSeed(s: HotBuildingSeed): string {
