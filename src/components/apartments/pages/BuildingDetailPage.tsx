@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import {
-  ExternalLink, Phone, Building2, Train, GraduationCap,
+  ExternalLink, Building2, Train, GraduationCap,
 } from "lucide-react";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getSessionUser } from "@/lib/apartments/auth";
@@ -19,7 +19,6 @@ import { getOrComputeCommutes, type CommuteResult } from "@/lib/apartments/commu
 import { formatBuildingSnippet } from "@/lib/apartments/wechat";
 import { effectiveRent } from "@/lib/apartments/compute";
 import { extractDescriptionAmenities, bulletEmoji } from "@/lib/apartments/extract";
-import { CopyButton } from "@/components/apartments/CopyButton";
 import { SendToCopywriterButton } from "@/components/apartments/SendToCopywriterButton";
 import { PitchGenerator } from "@/components/apartments/PitchGenerator";
 import { TrendSparklines } from "@/components/apartments/TrendSparklines";
@@ -211,33 +210,34 @@ export async function BuildingDetailPage({
           )}
 
           <div className="mt-auto flex flex-wrap gap-2">
-            <a href={building.building_url} target="_blank" rel="noopener"
-              className="inline-flex items-center gap-1 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent">
-              <ExternalLink className="h-3.5 w-3.5" /> StreetEasy
+            <a
+              href={building.building_url}
+              target="_blank"
+              rel="noopener"
+              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent"
+            >
+              🔗 StreetEasy
             </a>
             {building.official_url && (
-              <a href={building.official_url} target="_blank" rel="noopener"
-                className="inline-flex items-center gap-1 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent">
+              <a
+                href={building.official_url}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent"
+              >
                 🏠 官网
               </a>
             )}
-            {building.leasing_phone && (
-              <a href={`tel:${building.leasing_phone}`}
-                className="inline-flex items-center gap-1 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent">
-                <Phone className="h-3.5 w-3.5" /> 租赁电话
-              </a>
-            )}
-            <CopyButton
-              text={formatBuildingSnippet({ building, activeListings: listings, commutes })}
-              label="📱 微信文案"
-              copiedLabel="✓ 已复制"
-              size="sm"
-              className="px-3 py-2 text-sm"
-            />
             <SendToCopywriterButton
               content={formatBuildingSnippet({ building, activeListings: listings, commutes })}
-              label="→ 文案工坊"
-              className="px-3 py-2 text-sm"
+              label="✨ 黑魔法"
+              icon={null}
+              targetHref={
+                basePath.startsWith("/rednote-factory")
+                  ? "/rednote-factory/copywriter-rag"
+                  : "/copywriter"
+              }
+              className="gap-1.5 px-3 py-2 text-sm"
             />
           </div>
         </div>

@@ -123,6 +123,20 @@ export function CopywriterClientRAG({
     }
   }, [searchParams]);
 
+  // Prefill from /apartments → 黑魔法 handoff (sessionStorage preferred,
+  // ?prefill= as fallback for private-mode browsers).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.sessionStorage.getItem("apartments_prefill");
+    if (stored) {
+      setUserInput(stored);
+      window.sessionStorage.removeItem("apartments_prefill");
+      return;
+    }
+    const q = searchParams.get("prefill");
+    if (q) setUserInput(q);
+  }, [searchParams]);
+
   // docs 加载完后，若 URL 带 news_doc_id，且该 doc 在拉到的列表里，预选到知识库下拉
   useEffect(() => {
     const newsDocId = searchParams.get("news_doc_id");
