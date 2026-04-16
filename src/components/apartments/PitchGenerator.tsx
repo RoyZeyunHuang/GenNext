@@ -76,9 +76,9 @@ export function PitchGenerator({
     <section className="rounded-xl border bg-gradient-to-br from-amber-50/50 to-card p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-          <Sparkles className="h-4 w-4 text-amber-600" /> AI 推介文案
+          <Sparkles className="h-4 w-4 text-amber-600" /> AI 卖点 brief
         </h3>
-        <span className="text-xs text-muted-foreground">针对目标学校生成中文话术</span>
+        <span className="text-xs text-muted-foreground">汇总本楼的客观卖点供你写推介参考</span>
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center gap-1">
             <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
@@ -131,8 +131,9 @@ export function PitchGenerator({
 
       {state.kind === "idle" && (
         <p className="mt-3 text-xs text-muted-foreground">
-          点 <strong>生成</strong>,让 AI 针对 <strong>{school}</strong> 学生及家长写一段中文推介
-          (基于本楼实时数据 + 通勤 + 价格 + 配套)。
+          点 <strong>生成</strong>,AI 会从本楼实时数据 + 同区其他楼对比中
+          提炼一份针对 <strong>{school}</strong> 的客观卖点清单
+          (价格/配套/通勤/同区对比/时机),你可以挑感兴趣的点自己组织语言写推介。
         </p>
       )}
     </section>
