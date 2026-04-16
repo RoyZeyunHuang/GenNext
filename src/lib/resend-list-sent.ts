@@ -38,6 +38,13 @@ export function classifyResendLastEvent(lastEvent: string | null | undefined): {
 
 const LIST_FETCH_CACHE_TTL_MS = 60_000;
 
+/** Resend 硬限：5 req/s。这里按 4 req/s（250ms 间隔）预留安全缓冲。 */
+const MIN_REQUEST_INTERVAL_MS = 250;
+/** 429 / 明显限流错误时的最大重试次数 */
+const RATE_LIMIT_MAX_RETRIES = 5;
+/** 429 退避基础毫秒（指数退避：500 / 1000 / 2000 / 4000 / 8000） */
+const RATE_LIMIT_BASE_BACKOFF_MS = 500;
+
 let listFetchCache: {
   at: number;
   map: Map<string, ResendListEntry>;
@@ -48,6 +55,33 @@ let listFetchInflight: Promise<{
   map: Map<string, ResendListEntry>;
   pagesFetched: number;
 }> | null = null;
+
+/** 进程内的「上一次 Resend 调用时间戳」，用于节流——让不同路径共用同一个间隔守门。 */
+let lastResendCallAt = 0;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 等到距上一次调用至少 MIN_REQUEST_INTERVAL_MS，避免 5 req/s 撞墙。 */
+async function throttle(): Promise<void> {
+  const now = Date.now();
+  const elapsed = now - lastResendCallAt;
+  if (elapsed < MIN_REQUEST_INTERVAL_MS) {
+    await sleep(MIN_REQUEST_INTERVAL_MS - elapsed);
+  }
+  lastResendCallAt = Date.now();
+}
+
+/** 判断错误消息是否是限流相关 */
+function isRateLimitError(msg: string): boolean {
+  const s = msg.toLowerCase();
+  return (
+    s.includes("too many requests") ||
+    s.includes("rate limit") ||
+    s.includes("429")
+  );
+}
 
 /**
  * 实际请求 Resend 分页（无缓存）。
@@ -75,13 +109,33 @@ async function fetchAllResendSentListUncached(): Promise<{
     }
     const opts =
       after !== undefined ? { limit: LIMIT, after } : { limit: LIMIT };
-    const { data, error } = await resend.emails.list(opts);
-    if (error) {
-      const msg =
-        typeof error === "object" && error !== null && "message" in error
-          ? String((error as { message: string }).message)
-          : JSON.stringify(error);
-      throw new Error(`Resend list 失败: ${msg}`);
+
+    // 带退避的单页请求
+    let data: unknown;
+    let lastErrMsg = "";
+    let succeeded = false;
+    for (let attempt = 0; attempt <= RATE_LIMIT_MAX_RETRIES; attempt++) {
+      await throttle();
+      const resp = await resend.emails.list(opts);
+      if (!resp.error) {
+        data = resp.data;
+        succeeded = true;
+        break;
+      }
+      const err = resp.error;
+      lastErrMsg =
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message: string }).message)
+          : JSON.stringify(err);
+      if (!isRateLimitError(lastErrMsg) || attempt === RATE_LIMIT_MAX_RETRIES) {
+        break;
+      }
+      // 指数退避：500ms → 1s → 2s → 4s → 8s
+      const backoff = RATE_LIMIT_BASE_BACKOFF_MS * Math.pow(2, attempt);
+      await sleep(backoff);
+    }
+    if (!succeeded) {
+      throw new Error(`Resend list 失败: ${lastErrMsg}`);
     }
     const body = data as
       | { data?: unknown[]; has_more?: boolean; hasMore?: boolean }
