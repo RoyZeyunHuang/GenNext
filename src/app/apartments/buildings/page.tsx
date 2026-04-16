@@ -39,8 +39,10 @@ export default async function BuildingsPage({
     .eq("is_tracked", true);
   if (currentArea !== "all") q = q.eq("area", currentArea);
 
+  type BldgRow = { id: string; tag: string | null; open_rentals_count: number | null; active_rentals_count: number | null };
   const { data } = await q;
-  const buildings = (data ?? []).slice().sort((a, b) => {
+  const dataArr = (Array.isArray(data) ? data : []) as unknown as BldgRow[];
+  const buildings = dataArr.slice().sort((a, b) => {
     const ta = TAG_ORDER[a.tag ?? "legacy"] ?? 9;
     const tb = TAG_ORDER[b.tag ?? "legacy"] ?? 9;
     if (ta !== tb) return ta - tb;

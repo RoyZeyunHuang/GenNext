@@ -334,7 +334,7 @@ export default async function ComparePage({ searchParams }: { searchParams: SP }
       </div>
 
       <p className="text-xs text-muted-foreground">
-        提示:每行高亮的单元格表示该维度上的最优项。点击 "📋 复制对比" 即可一键生成对比文案发给客户。
+        提示:每行高亮的单元格表示该维度上的最优项。点击「📋 复制对比」即可一键生成对比文案发给客户。
       </p>
     </div>
   );

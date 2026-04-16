@@ -128,7 +128,7 @@ async function main() {
   // 按新 area 汇总预览
   const byArea = new Map<string, number>();
   for (const p of plans) byArea.set(p.newArea, (byArea.get(p.newArea) ?? 0) + 1);
-  const byAreaSorted = [...byArea.entries()].sort((a, z) => z[1] - a[1]);
+  const byAreaSorted = Array.from(byArea.entries()).sort((a, z) => z[1] - a[1]);
   console.log("");
   console.log("Top new neighborhoods (count):");
   for (const [a, c] of byAreaSorted.slice(0, 20)) {

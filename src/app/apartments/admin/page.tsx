@@ -82,7 +82,7 @@ export default async function AdminWatchlistPage() {
         </div>
       </div>
 
-      <AdminWatchlistClient buildings={buildings ?? []} />
+      <AdminWatchlistClient buildings={(Array.isArray(buildings) ? buildings : []) as never[]} />
     </div>
   );
 }

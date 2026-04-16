@@ -124,7 +124,7 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
   );
 
   // ---- Subways: normalize Apify shape ----
-  const subways = ((building.subways ?? []) as Array<Record<string, unknown>>).map(s => ({
+  const subways = ((building.subways ?? []) as unknown as Array<Record<string, unknown>>).map(s => ({
     name: String(s.station_name ?? s.name ?? ""),
     routes: (s.routes ?? []) as string[],
     distance: Number(s.distance ?? 0),
@@ -138,7 +138,7 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
     if (hits.length > 0) grouped[cat] = hits;
   }
   const categorized = new Set(Object.values(AMENITY_CATEGORIES).flat());
-  const uncategorized = [...amenitySet].filter((a) => !categorized.has(a));
+  const uncategorized = Array.from(amenitySet).filter((a) => !categorized.has(a));
   if (uncategorized.length > 0) grouped["Other"] = uncategorized;
 
   // Extra amenity bullets parsed from the building description (StreetEasy's
@@ -149,7 +149,7 @@ export default async function BuildingDetailPage({ params }: { params: { slug: s
   );
 
   // ---- Commutes: real Google Maps when possible, cached ----
-  const bAny = building as Record<string, unknown>;
+  const bAny = building as unknown as Record<string, unknown>;
   const lat = bAny.latitude ? Number(bAny.latitude) : null;
   const lng = bAny.longitude ? Number(bAny.longitude) : null;
   const commutes: CommuteResult[] = await getOrComputeCommutes({

@@ -81,8 +81,11 @@ export default async function UnitsPage({ searchParams }: { searchParams: SP }) 
   }
   q = q.range(0, 199);
 
-  let { data: units, count } = await q;
-  if (sort === "eff_rent_asc" && units) {
+  type UnitRow = { price_monthly: number | null; months_free: number | null; lease_term_months: number | null };
+  const queryResult = await q;
+  const count = queryResult.count;
+  let units = (Array.isArray(queryResult.data) ? queryResult.data : []) as unknown as UnitRow[];
+  if (sort === "eff_rent_asc") {
     const { effectiveRent } = await import("@/lib/apartments/compute");
     units = units.slice().sort((a, b) => {
       const ea = effectiveRent(a.price_monthly, a.months_free, a.lease_term_months) ?? a.price_monthly ?? Infinity;
