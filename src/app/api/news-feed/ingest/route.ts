@@ -8,8 +8,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// 单次 ingest 最多挂多少篇自动 overlay（避免 Vercel 30s 超时）
+// 单次 ingest 最多挂多少篇自动 overlay（避免 Vercel 30s 超时的硬上限）
 const OVERLAY_MAX_PER_BATCH = 6;
+// 默认有多少比例的新闻转成虚拟人笔记（剩下的保留原样）
+const DEFAULT_OVERLAY_RATIO = 0.5;
 
 /**
  * POST /api/news-feed/ingest
@@ -28,14 +30,15 @@ const OVERLAY_MAX_PER_BATCH = 6;
  *     tags?: string[]        (标签)
  *     published_at?: string  (发布时间 ISO，默认 now)
  *   }],
- *   generate_overlay?: boolean   (默认 true；传 false 可关闭黑魔法)
+ *   generate_overlay?: boolean   (默认 true；传 false 可关闭黑魔法，所有条目都保持原新闻)
+ *   overlay_ratio?: number       (0~1，默认 0.5；即本批一半转虚拟人笔记，另一半保持原新闻)
  * }
  *
  * Response:
  * {
  *   inserted: number,
  *   articles: [{id,title}],
- *   overlay?: { attempted, succeeded, failed, skipped }
+ *   overlay?: { attempted, succeeded, failed, skipped, ratio }
  * }
  */
 export async function POST(req: NextRequest) {
@@ -52,6 +55,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const articles = Array.isArray(body.articles) ? body.articles : [];
   const generateOverlay = body.generate_overlay !== false; // 默认开启
+  const overlayRatio =
+    typeof body.overlay_ratio === "number" && body.overlay_ratio >= 0 && body.overlay_ratio <= 1
+      ? body.overlay_ratio
+      : DEFAULT_OVERLAY_RATIO;
   if (articles.length === 0) {
     return NextResponse.json({ error: "articles array required and must not be empty" }, { status: 400 });
   }
@@ -92,33 +99,42 @@ export async function POST(req: NextRequest) {
   const insertedRows = (data ?? []) as NewsArticleForOverlay[];
 
   // 自动生成虚拟人笔记（黑魔法 RAG pipeline）
-  let overlay: {
-    attempted: number;
-    succeeded: number;
-    failed: number;
-    skipped: number;
-    details?: unknown;
-  } | undefined;
+  let overlay:
+    | {
+        attempted: number;
+        succeeded: number;
+        failed: number;
+        skipped: number;
+        ratio: number;
+        details?: unknown;
+      }
+    | undefined;
 
-  if (generateOverlay && insertedRows.length > 0) {
+  if (generateOverlay && insertedRows.length > 0 && overlayRatio > 0) {
+    // 按 ratio 随机抽样：保证每次 ingest 命中的条目分布均匀，不总是前 N 条
+    const targetByRatio = Math.ceil(insertedRows.length * overlayRatio);
+    const targetCount = Math.min(OVERLAY_MAX_PER_BATCH, targetByRatio);
+    const shuffled = [...insertedRows].sort(() => Math.random() - 0.5);
+    const toOverlay = shuffled.slice(0, targetCount);
+
     try {
-      const result = await generateOverlaysForArticles(admin, insertedRows, {
-        maxCount: OVERLAY_MAX_PER_BATCH,
-      });
+      const result = await generateOverlaysForArticles(admin, toOverlay);
       overlay = {
-        attempted: Math.min(insertedRows.length, OVERLAY_MAX_PER_BATCH),
+        attempted: toOverlay.length,
         succeeded: result.succeeded.length,
         failed: result.failed.length,
         skipped: result.skipped.length,
+        ratio: overlayRatio,
         details: result,
       };
     } catch (e) {
       // 兜底：生成失败不阻塞 ingest 主流程
       overlay = {
-        attempted: insertedRows.length,
+        attempted: toOverlay.length,
         succeeded: 0,
-        failed: insertedRows.length,
+        failed: toOverlay.length,
         skipped: 0,
+        ratio: overlayRatio,
         details: { error: e instanceof Error ? e.message : String(e) },
       };
     }
