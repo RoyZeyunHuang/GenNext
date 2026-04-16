@@ -55,12 +55,17 @@ export function useCompareIds() {
 }
 
 /**
- * Floating bottom bar showing the current selection. Tap → /apartments/compare.
+ * Floating bottom bar showing the current selection. Tap → {basePath}/compare.
  */
-export function CompareBar() {
+export function CompareBar({
+  basePath = "/apartments",
+}: {
+  basePath?: string;
+} = {}) {
   const { ids, clear } = useCompareIds();
   if (ids.length === 0) return null;
   const idsParam = ids.map(encodeURIComponent).join(",");
+  const prefix = basePath.replace(/\/$/, "");
   return (
     <div className="fixed inset-x-0 bottom-3 z-50 flex justify-center px-3">
       <div className="flex w-full max-w-md items-center gap-2 rounded-full border bg-card px-3 py-2 shadow-lg">
@@ -75,7 +80,7 @@ export function CompareBar() {
           <X className="h-3 w-3" />
         </button>
         <Link
-          href={`/apartments/compare?ids=${idsParam}`}
+          href={`${prefix}/compare?ids=${idsParam}`}
           className={cn(
             "ml-auto inline-flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90",
             ids.length < 2 && "pointer-events-none opacity-50",

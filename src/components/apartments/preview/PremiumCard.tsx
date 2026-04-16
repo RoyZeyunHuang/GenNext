@@ -62,12 +62,16 @@ export function PremiumCard({
   building,
   stats,
   match,
+  basePath = "/apartments",
 }: {
   building: PremiumBuilding;
   stats: BuildingStats;
   /** When the agent has filled out a client brief, this drives the
    *  "为什么匹配 / 不匹配" panel. null = no brief active. */
   match?: MatchResult | null;
+  /** Route prefix for the detail link. Defaults to the main /apartments
+   *  tree; pass "/rednote-factory/apartments" from the RF shell. */
+  basePath?: string;
 }) {
   const heroImage = effectiveBuildingImage(
     building.image_url,
@@ -76,7 +80,7 @@ export function PremiumCard({
   const chips = topAmenityChips(building.amenities);
   const hasPromo = stats.maxFreeMonths >= 0.5 || stats.anyNoFee;
   const slug = safeSlug(building);
-  const detailHref = `/apartments/buildings/${slug}`;
+  const detailHref = `${basePath.replace(/\/$/, "")}/buildings/${slug}`;
 
   // Show match badge when brief is set and the building has anything to score
   const showMatch = match != null && match.total > 0;

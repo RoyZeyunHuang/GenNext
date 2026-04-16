@@ -88,7 +88,15 @@ function AnomalyBadge({ verdict, pctDelta }: { verdict: ReturnType<typeof priceA
   return null;
 }
 
-export function UnitTable({ units }: { units: UnitRow[] }) {
+export function UnitTable({
+  units,
+  basePath = "/apartments",
+}: {
+  units: UnitRow[];
+  /** Route prefix for internal nav (unit / building detail links). */
+  basePath?: string;
+}) {
+  const prefix = basePath.replace(/\/$/, "");
   // Group units by building once for anomaly comparison
   const byBuilding = useMemo(() => {
     const m = new Map<string, UnitRow[]>();
@@ -132,7 +140,7 @@ export function UnitTable({ units }: { units: UnitRow[] }) {
         const eff = effectiveRent(u.price_monthly, u.months_free, u.lease_term_months);
         const an = anomalyFor(u);
         return (
-          <Link key={u.id} href={`/apartments/units/${u.id}`}
+          <Link key={u.id} href={`${prefix}/units/${u.id}`}
             className="flex gap-3 p-3 active:bg-accent/40">
             <div className="h-20 w-24 flex-shrink-0 overflow-hidden rounded bg-muted">
               {img ? (
@@ -238,7 +246,7 @@ export function UnitTable({ units }: { units: UnitRow[] }) {
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
                     <Link
-                      href={`/apartments/buildings/${u.building_id}`}
+                      href={`${prefix}/buildings/${u.building_id}`}
                       className="font-medium hover:underline"
                     >
                       {b?.name ?? u.address ?? "?"}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Fingerprint, LogOut, MessageSquareHeart, Newspaper, Sparkles, User, Users, type LucideIcon } from "lucide-react";
+import { BookOpen, Building, Fingerprint, LogOut, MessageSquareHeart, Newspaper, Sparkles, User, Users, type LucideIcon } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ const DOCUMENTS = "/rednote-factory/documents";
 const TEAM = "/rednote-factory/team";
 const NEWS_FEED = "/rednote-factory/news-feed";
 const FEEDBACK = "/rednote-factory/feedback";
+const APARTMENTS = "/rednote-factory/apartments";
 
 function TabItem({
   href,
@@ -105,6 +106,7 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
   const onTeam = pathname === TEAM || pathname.startsWith(`${TEAM}/`);
   const onNewsFeed = pathname === NEWS_FEED || pathname.startsWith(`${NEWS_FEED}/`);
   const onFeedback = pathname === FEEDBACK || pathname.startsWith(`${FEEDBACK}/`);
+  const onApartments = pathname === APARTMENTS || pathname.startsWith(`${APARTMENTS}/`);
 
   return (
     <div className="flex min-h-[100dvh] bg-[#e8e5e0] lg:h-[100dvh] lg:max-h-[100dvh] lg:bg-[#FAFAF9]">
@@ -130,6 +132,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onRag}
             icon={Sparkles}
             label="黑魔法"
+          />
+          <SidebarItem
+            href={APARTMENTS}
+            active={onApartments}
+            icon={Building}
+            label="房源"
           />
           <SidebarItem
             href={SOUL_CUSTOMIZE}
@@ -214,16 +222,22 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             label="黑魔法"
           />
           <TabItem
+            href={APARTMENTS}
+            active={onApartments}
+            icon={Building}
+            label="房源"
+          />
+          <TabItem
             href={SOUL_CUSTOMIZE}
             active={onSoul}
             icon={Fingerprint}
-            label="灵魂定制"
+            label="灵魂"
           />
           <TabItem
             href={DOCUMENTS}
             active={onDocs}
             icon={BookOpen}
-            label="素材库"
+            label="素材"
           />
           <TabItem
             href={TEAM}

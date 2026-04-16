@@ -2,14 +2,19 @@ import { BuildingsGridPage } from "@/components/apartments/pages/BuildingsGridPa
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "公寓 · 楼盘" };
+export const metadata = { title: "房源 · 楼盘" };
 
 type SP = { [k: string]: string | string[] | undefined };
 
-export default async function ApartmentsPage({
+export default async function RFApartmentsBuildingsPage({
   searchParams,
 }: {
   searchParams: SP;
 }) {
-  return <BuildingsGridPage searchParams={searchParams} basePath="/apartments" />;
+  return (
+    <BuildingsGridPage
+      searchParams={searchParams}
+      basePath="/rednote-factory/apartments"
+    />
+  );
 }

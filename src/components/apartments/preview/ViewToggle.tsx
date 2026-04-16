@@ -13,11 +13,16 @@ export function ViewToggle({
   current,
   /** When provided, preserves the current query params on the new route. */
   searchParamsString,
+  /** Route prefix. "/apartments" for the main app, or e.g.
+   *  "/rednote-factory/apartments" for the RF shell. Trailing slash stripped. */
+  basePath = "/apartments",
 }: {
   current: "buildings" | "units";
   searchParamsString?: string;
+  basePath?: string;
 }) {
   const qs = searchParamsString ? `?${searchParamsString}` : "";
+  const prefix = basePath.replace(/\/$/, "");
   return (
     <div
       className="inline-flex flex-shrink-0 items-center rounded-full border border-border bg-background p-0.5 shadow-sm ring-1 ring-black/[0.02]"
@@ -25,13 +30,13 @@ export function ViewToggle({
       aria-label="视图切换"
     >
       <ToggleItem
-        href={`/apartments${qs}`}
+        href={`${prefix}${qs}`}
         active={current === "buildings"}
         icon={<Building2 className="h-3.5 w-3.5" />}
         label="楼盘"
       />
       <ToggleItem
-        href={`/apartments/units${qs}`}
+        href={`${prefix}/units${qs}`}
         active={current === "units"}
         icon={<BedDouble className="h-3.5 w-3.5" />}
         label="房源"
