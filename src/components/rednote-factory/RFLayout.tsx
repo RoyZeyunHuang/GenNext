@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Building, Fingerprint, LogOut, MessageSquareHeart, Newspaper, Sparkles, User, Users, type LucideIcon } from "lucide-react";
+import { BookOpen, Building, LogOut, MessageSquare, MessageSquareHeart, Newspaper, Sparkles, User, Users, type LucideIcon } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
+const CHAT = "/rednote-factory/chat";
 const COPYWRITER_RAG = "/rednote-factory/copywriter-rag";
-const SOUL_CUSTOMIZE = "/rednote-factory/soul-customize";
+// 灵魂定制暂时隐藏（保留常量以便将来快速恢复）
+// const SOUL_CUSTOMIZE = "/rednote-factory/soul-customize";
 const DOCUMENTS = "/rednote-factory/documents";
 const TEAM = "/rednote-factory/team";
 const NEWS_FEED = "/rednote-factory/news-feed";
@@ -100,8 +102,8 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
     router.refresh();
   }, [router]);
 
+  const onChat = pathname === CHAT || pathname.startsWith(`${CHAT}/`);
   const onRag = pathname === COPYWRITER_RAG || pathname.startsWith(`${COPYWRITER_RAG}/`);
-  const onSoul = pathname === SOUL_CUSTOMIZE || pathname.startsWith(`${SOUL_CUSTOMIZE}/`);
   const onDocs = pathname === DOCUMENTS || pathname.startsWith(`${DOCUMENTS}/`);
   const onTeam = pathname === TEAM || pathname.startsWith(`${TEAM}/`);
   const onNewsFeed = pathname === NEWS_FEED || pathname.startsWith(`${NEWS_FEED}/`);
@@ -122,6 +124,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-2">
           <SidebarItem
+            href={CHAT}
+            active={onChat}
+            icon={MessageSquare}
+            label="AI 助手"
+          />
+          <SidebarItem
             href={NEWS_FEED}
             active={onNewsFeed}
             icon={Newspaper}
@@ -138,12 +146,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onApartments}
             icon={Building}
             label="房源"
-          />
-          <SidebarItem
-            href={SOUL_CUSTOMIZE}
-            active={onSoul}
-            icon={Fingerprint}
-            label="灵魂定制"
           />
           <SidebarItem
             href={DOCUMENTS}
@@ -201,7 +203,7 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="relative min-h-0 flex-1 overflow-y-auto pb-[calc(68px+env(safe-area-inset-bottom,0px))] lg:pb-0">
-          <div className="flex min-h-full flex-col lg:min-h-0">{children}</div>
+          <div className="flex min-h-full flex-col">{children}</div>
         </main>
 
         {/* Mobile bottom tab */}
@@ -209,6 +211,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
           className="fixed bottom-0 left-0 right-0 z-40 flex h-[68px] items-start justify-around border-t border-[#E7E5E4] bg-white pt-1.5 lg:hidden"
           style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
         >
+          <TabItem
+            href={CHAT}
+            active={onChat}
+            icon={MessageSquare}
+            label="助手"
+          />
           <TabItem
             href={NEWS_FEED}
             active={onNewsFeed}
@@ -226,12 +234,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onApartments}
             icon={Building}
             label="房源"
-          />
-          <TabItem
-            href={SOUL_CUSTOMIZE}
-            active={onSoul}
-            icon={Fingerprint}
-            label="灵魂"
           />
           <TabItem
             href={DOCUMENTS}
