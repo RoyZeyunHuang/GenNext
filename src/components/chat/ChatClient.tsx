@@ -40,13 +40,6 @@ type Msg = {
 
 const MAX_HISTORY = 12;
 
-type ContentKind = "xiaohongshu" | "instagram" | "oral";
-const CONTENT_KINDS: { value: ContentKind; label: string; hint: string }[] = [
-  { value: "xiaohongshu", label: "小红书", hint: "图文" },
-  { value: "instagram", label: "Instagram", hint: "Caption" },
-  { value: "oral", label: "口播", hint: "脚本" },
-];
-
 const EXAMPLE_PROMPTS = [
   "LIC 有哪些 $3500 以下的 studio？",
   "Halletts 那几栋楼最新价格",
@@ -71,13 +64,28 @@ export function ChatClient({
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(false);
-  const [contentKind, setContentKind] = useState<ContentKind>("xiaohongshu");
-  const bottomRef = useRef<HTMLDivElement>(null);
+  /**
+   * 用户有没有在滚动容器底部附近。只有在底部附近时才 auto-scroll，
+   * 这样用户往上翻看历史时不会被流式 delta 硬拽回底部。
+   */
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setIsAtBottom(nearBottom);
+  }
+
+  // 只在"用户本来就在底部"时才 auto-scroll；用 "auto" 不是 "smooth"，
+  // 否则流式 delta 每次都会触发一次 smooth 动画，卡卡的。
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, loading]);
+    if (!isAtBottom) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, loading, isAtBottom]);
 
   function conversationHistoryForApi() {
     return messages
@@ -117,7 +125,6 @@ export function ChatClient({
         body: JSON.stringify({
           message: content,
           conversation_history: history,
-          content_kind: contentKind,
         }),
       });
       if (!res.ok) {
@@ -254,15 +261,27 @@ export function ChatClient({
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-[#FAFAF9]">
-      <header className="hidden shrink-0 items-center gap-2 border-b border-[#E7E5E4] bg-white px-6 py-3 lg:flex">
+    // Grid 三行布局——聊天 UI 的教科书做法，比 flex+flex-1 可靠得多：
+    //  · row 1 (auto): header
+    //  · row 2 (1fr):  messages，独立滚
+    //  · row 3 (auto): 输入
+    // h-full 取父容器高度（main 由 LayoutWithSidebar 给到 h-screen）
+    <div
+      className="grid h-full min-h-0 bg-[#FAFAF9]"
+      style={{ gridTemplateRows: "auto minmax(0,1fr) auto" }}
+    >
+      <header className="hidden items-center gap-2 border-b border-[#E7E5E4] bg-white px-6 py-3 lg:flex">
         <Sparkles className="h-4 w-4 text-[#78716C]" />
         <h1 className="text-sm font-semibold text-[#1C1917]">{title}</h1>
         <span className="text-xs text-[#A8A29E]">{subtitle}</span>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-4 py-4 lg:px-6">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="overflow-y-auto overscroll-contain"
+      >
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-4 lg:px-6">
           {messages.length === 0 && (
             <div className="my-6 rounded-xl border border-dashed border-[#E7E5E4] bg-white p-5 text-sm text-[#57534E]">
               <div className="mb-2 font-medium text-[#1C1917]">你可以问我：</div>
@@ -297,7 +316,7 @@ export function ChatClient({
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> 思考中…
               </div>
             )}
-          <div ref={bottomRef} />
+          <div />
         </div>
       </div>
 
@@ -306,29 +325,8 @@ export function ChatClient({
           e.preventDefault();
           void handleSubmit();
         }}
-        className="sticky bottom-0 shrink-0 border-t border-[#E7E5E4] bg-white px-4 py-3 lg:px-6"
+        className="border-t border-[#E7E5E4] bg-white px-4 py-3 lg:px-6"
       >
-        <div className="mx-auto mb-2 flex w-full max-w-3xl items-center gap-1.5">
-          <span className="text-[11px] text-[#78716C]">出文案形态：</span>
-          <div className="inline-flex rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-0.5">
-            {CONTENT_KINDS.map((k) => (
-              <button
-                key={k.value}
-                type="button"
-                onClick={() => setContentKind(k.value)}
-                className={cn(
-                  "rounded-md px-2.5 py-1 text-[11px] transition",
-                  contentKind === k.value
-                    ? "bg-white font-medium text-[#1C1917] shadow-sm"
-                    : "text-[#78716C] hover:text-[#1C1917]"
-                )}
-              >
-                {k.label}
-                <span className="ml-1 text-[9px] text-[#A8A29E]">{k.hint}</span>
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
           <textarea
             ref={textareaRef}

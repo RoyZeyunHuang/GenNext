@@ -203,7 +203,7 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="relative min-h-0 flex-1 overflow-y-auto pb-[calc(68px+env(safe-area-inset-bottom,0px))] lg:pb-0">
-          <div className="flex min-h-full flex-col">{children}</div>
+          <div className="flex min-h-full flex-col lg:h-full">{children}</div>
         </main>
 
         {/* Mobile bottom tab */}
