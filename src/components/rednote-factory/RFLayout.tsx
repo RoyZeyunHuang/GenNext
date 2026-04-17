@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Building, LogOut, MessageSquare, MessageSquareHeart, Newspaper, Sparkles, User, Users, type LucideIcon } from "lucide-react";
+import { BookOpen, Building, LogOut, MessageSquare, MessageSquareHeart, Newspaper, ShieldAlert, Sparkles, User, Users, type LucideIcon } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ const TEAM = "/rednote-factory/team";
 const NEWS_FEED = "/rednote-factory/news-feed";
 const FEEDBACK = "/rednote-factory/feedback";
 const APARTMENTS = "/rednote-factory/apartments";
+const FORBIDDEN_WORDS = "/rednote-factory/forbidden-words";
 
 function TabItem({
   href,
@@ -109,6 +110,7 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
   const onNewsFeed = pathname === NEWS_FEED || pathname.startsWith(`${NEWS_FEED}/`);
   const onFeedback = pathname === FEEDBACK || pathname.startsWith(`${FEEDBACK}/`);
   const onApartments = pathname === APARTMENTS || pathname.startsWith(`${APARTMENTS}/`);
+  const onForbidden = pathname === FORBIDDEN_WORDS || pathname.startsWith(`${FORBIDDEN_WORDS}/`);
 
   return (
     <div className="flex min-h-[100dvh] bg-[#e8e5e0] lg:h-[100dvh] lg:max-h-[100dvh] lg:bg-[#FAFAF9]">
@@ -140,6 +142,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onRag}
             icon={Sparkles}
             label="黑魔法"
+          />
+          <SidebarItem
+            href={FORBIDDEN_WORDS}
+            active={onForbidden}
+            icon={ShieldAlert}
+            label="违禁词查词"
           />
           <SidebarItem
             href={APARTMENTS}
@@ -228,6 +236,12 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onRag}
             icon={Sparkles}
             label="黑魔法"
+          />
+          <TabItem
+            href={FORBIDDEN_WORDS}
+            active={onForbidden}
+            icon={ShieldAlert}
+            label="查词"
           />
           <TabItem
             href={APARTMENTS}

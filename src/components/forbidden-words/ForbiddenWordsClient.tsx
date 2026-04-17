@@ -64,12 +64,29 @@ function aggregateHits(hits: ForbiddenHit[]): HitAgg[] {
   );
 }
 
+/** sessionStorage key——别的页（比如小黑 chat）可以把要查的文本塞这里跳转过来 */
+export const FORBIDDEN_WORDS_PREFILL_KEY = "forbidden_words_prefill";
+
 export function ForbiddenWordsClient() {
   const [text, setText] = useState("");
   const [scan, setScan] = useState<ScanResult>({ hits: [], levelAt: [] });
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // 挂载时检查 sessionStorage 有没有预填文本（从小黑 chat 跳过来的场景）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const prefill = window.sessionStorage.getItem(FORBIDDEN_WORDS_PREFILL_KEY);
+      if (prefill) {
+        setText(prefill);
+        window.sessionStorage.removeItem(FORBIDDEN_WORDS_PREFILL_KEY);
+      }
+    } catch {
+      /* sessionStorage 可能被禁，忽略 */
+    }
+  }, []);
 
   // 防抖扫描（120ms），避免大文本每个字符都跑一遍 786 条 phrase
   useEffect(() => {

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, ChevronDown, Circle, CircleAlert, Loader2, Send, Sparkles, Wrench } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { CheckCircle2, ChevronDown, Circle, CircleAlert, Loader2, Send, ShieldAlert, Sparkles, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatAiErrorForUser } from "@/lib/ai-user-facing-error";
+import { FORBIDDEN_WORDS_PREFILL_KEY } from "@/components/forbidden-words/ForbiddenWordsClient";
 
 /**
  * RF Chat v2 前端
@@ -61,6 +63,24 @@ export function ChatClient({
   subtitle = "24 小时赛博牛马 · 查楼盘 · 出文案",
   examples = EXAMPLE_PROMPTS,
 }: ChatClientProps = {}) {
+  const pathname = usePathname() ?? "";
+  const router = useRouter();
+  // 根据当前所在站点决定「送去违禁词查词」按钮跳哪个路由
+  const forbiddenWordsHref = pathname.startsWith("/rednote-factory")
+    ? "/rednote-factory/forbidden-words"
+    : "/forbidden-words";
+
+  function sendToForbiddenWords(text: string) {
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(FORBIDDEN_WORDS_PREFILL_KEY, text);
+      } catch {
+        /* ignore */
+      }
+    }
+    router.push(forbiddenWordsHref);
+  }
+
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(false);
@@ -305,7 +325,12 @@ export function ChatClient({
           )}
 
           {messages.map((m) => (
-            <MessageBubble key={m.id} msg={m} onPick={(label) => pickOption(m.id, label)} />
+            <MessageBubble
+              key={m.id}
+              msg={m}
+              onPick={(label) => pickOption(m.id, label)}
+              onSendToForbidden={() => sendToForbiddenWords(m.content)}
+            />
           ))}
 
           {loading &&
@@ -357,7 +382,15 @@ export function ChatClient({
   );
 }
 
-function MessageBubble({ msg, onPick }: { msg: Msg; onPick: (label: string) => void }) {
+function MessageBubble({
+  msg,
+  onPick,
+  onSendToForbidden,
+}: {
+  msg: Msg;
+  onPick: (label: string) => void;
+  onSendToForbidden: () => void;
+}) {
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
@@ -367,6 +400,11 @@ function MessageBubble({ msg, onPick }: { msg: Msg; onPick: (label: string) => v
       </div>
     );
   }
+
+  // 判断这条消息是不是有成功的 generate_copy——是的话显示"送去违禁词查词"按钮
+  const hasGeneratedCopy = msg.tools.some(
+    (t) => t.name === "generate_copy" && t.status === "ok"
+  );
 
   return (
     <div className="flex flex-col items-start gap-1.5">
@@ -381,6 +419,17 @@ function MessageBubble({ msg, onPick }: { msg: Msg; onPick: (label: string) => v
           {msg.content}
         </div>
       ) : null}
+
+      {hasGeneratedCopy && msg.content && !msg.error && (
+        <button
+          type="button"
+          onClick={onSendToForbidden}
+          className="flex items-center gap-1 rounded-full border border-[#E7E5E4] bg-white px-2.5 py-1 text-[11px] text-[#57534E] hover:bg-[#F5F5F4]"
+        >
+          <ShieldAlert className="h-3 w-3" />
+          送去违禁词查词
+        </button>
+      )}
 
       {msg.askUser && (
         <AskUserBlock
