@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Building, LogOut, MessageSquare, MessageSquareHeart, Newspaper, ShieldAlert, Sparkles, User, Users, type LucideIcon } from "lucide-react";
+import { BookOpen, LogOut, MessageSquare, MessageSquareHeart, ShieldAlert, Sparkles, User, Users, type LucideIcon } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { cn } from "@/lib/utils";
 
@@ -13,9 +13,11 @@ const COPYWRITER_RAG = "/rednote-factory/copywriter-rag";
 // const SOUL_CUSTOMIZE = "/rednote-factory/soul-customize";
 const DOCUMENTS = "/rednote-factory/documents";
 const TEAM = "/rednote-factory/team";
-const NEWS_FEED = "/rednote-factory/news-feed";
+// 新闻推送暂时隐藏（保留常量以便将来快速恢复）
+// const NEWS_FEED = "/rednote-factory/news-feed";
 const FEEDBACK = "/rednote-factory/feedback";
-const APARTMENTS = "/rednote-factory/apartments";
+// 房源暂时隐藏（保留常量以便将来快速恢复）
+// const APARTMENTS = "/rednote-factory/apartments";
 const FORBIDDEN_WORDS = "/rednote-factory/forbidden-words";
 
 function TabItem({
@@ -107,9 +109,7 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
   const onRag = pathname === COPYWRITER_RAG || pathname.startsWith(`${COPYWRITER_RAG}/`);
   const onDocs = pathname === DOCUMENTS || pathname.startsWith(`${DOCUMENTS}/`);
   const onTeam = pathname === TEAM || pathname.startsWith(`${TEAM}/`);
-  const onNewsFeed = pathname === NEWS_FEED || pathname.startsWith(`${NEWS_FEED}/`);
   const onFeedback = pathname === FEEDBACK || pathname.startsWith(`${FEEDBACK}/`);
-  const onApartments = pathname === APARTMENTS || pathname.startsWith(`${APARTMENTS}/`);
   const onForbidden = pathname === FORBIDDEN_WORDS || pathname.startsWith(`${FORBIDDEN_WORDS}/`);
 
   return (
@@ -132,12 +132,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             label="小黑"
           />
           <SidebarItem
-            href={NEWS_FEED}
-            active={onNewsFeed}
-            icon={Newspaper}
-            label="新闻推送"
-          />
-          <SidebarItem
             href={COPYWRITER_RAG}
             active={onRag}
             icon={Sparkles}
@@ -148,12 +142,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onForbidden}
             icon={ShieldAlert}
             label="违禁词查词"
-          />
-          <SidebarItem
-            href={APARTMENTS}
-            active={onApartments}
-            icon={Building}
-            label="房源"
           />
           <SidebarItem
             href={DOCUMENTS}
@@ -226,12 +214,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             label="小黑"
           />
           <TabItem
-            href={NEWS_FEED}
-            active={onNewsFeed}
-            icon={Newspaper}
-            label="新闻"
-          />
-          <TabItem
             href={COPYWRITER_RAG}
             active={onRag}
             icon={Sparkles}
@@ -242,12 +224,6 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             active={onForbidden}
             icon={ShieldAlert}
             label="查词"
-          />
-          <TabItem
-            href={APARTMENTS}
-            active={onApartments}
-            icon={Building}
-            label="房源"
           />
           <TabItem
             href={DOCUMENTS}

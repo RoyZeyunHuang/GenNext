@@ -43,10 +43,10 @@ type Msg = {
 const MAX_HISTORY = 12;
 
 const EXAMPLE_PROMPTS = [
-  "LIC 有哪些 $3500 以下的 studio？",
-  "Halletts 那几栋楼最新价格",
-  "带泳池 + 2024 年建的楼有哪些",
-  "帮我用 Mia 人格给 The Orchard 写一篇",
+  "帮我写一篇深夜做烘焙的小红书",
+  "写一条 30 秒吐槽加班的口播",
+  "帮我出一篇新买香水的种草文案",
+  "用博主人格写一组穿搭 ins",
 ];
 
 export interface ChatClientProps {
@@ -60,7 +60,7 @@ export interface ChatClientProps {
 
 export function ChatClient({
   title = "小黑",
-  subtitle = "24 小时赛博牛马 · 查楼盘 · 出文案",
+  subtitle = "24 小时赛博牛马 · 小红书 · 口播 · ins",
   examples = EXAMPLE_PROMPTS,
 }: ChatClientProps = {}) {
   const pathname = usePathname() ?? "";
@@ -363,7 +363,7 @@ export function ChatClient({
                 void handleSubmit();
               }
             }}
-            placeholder="问我楼盘、找房源、出文案…（Enter 发送，Shift+Enter 换行）"
+            placeholder="告诉我想写什么，小红书 / 口播 / ins 都行…（Enter 发送，Shift+Enter 换行）"
             rows={2}
             disabled={loading}
             className="flex-1 resize-none rounded-lg border border-[#E7E5E4] bg-white px-3 py-2 text-sm text-[#1C1917] placeholder:text-[#A8A29E] focus:border-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#1C1917]/10 disabled:opacity-60"
