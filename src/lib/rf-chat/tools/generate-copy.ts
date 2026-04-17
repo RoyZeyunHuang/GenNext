@@ -67,10 +67,11 @@ export const generateCopyTool: Tool<Input> = {
     required: ["persona", "user_prompt"],
   },
   async execute(input, ctx) {
-    // 单次请求硬限 1 次（防刷额度 + 防 AI 死循环）
+    // 单次请求（本条用户消息）硬限 1 次（防刷额度 + 防 AI 死循环）
+    // 用户下一条新消息进来会是新 ctx、新限额。
     if (ctx.generateCopyFirstResult) {
       return alreadyDone(
-        "本轮对话已经生成过文案。请把上次的结果原样展示给用户。如果用户明确要换版本，让他下一句说「再来一版」「换个风格」等，会话轮转时再调。",
+        "本条用户消息已经生成过一次文案（本次请求内额度 1/1）。请把上次的结果原样展示给用户。如果用户想改，他下一条消息发过来就是新一轮，到时可以重新调 generate_copy。",
         ctx.generateCopyFirstResult
       );
     }
