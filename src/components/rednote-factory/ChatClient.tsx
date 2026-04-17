@@ -232,8 +232,8 @@ export function ChatClient() {
     <div className="flex flex-1 flex-col bg-[#FAFAF9]">
       <header className="hidden shrink-0 items-center gap-2 border-b border-[#E7E5E4] bg-white px-6 py-3 lg:flex">
         <Sparkles className="h-4 w-4 text-[#78716C]" />
-        <h1 className="text-sm font-semibold text-[#1C1917]">AI 助手</h1>
-        <span className="text-xs text-[#A8A29E]">自由查楼盘、出文案，对话式</span>
+        <h1 className="text-sm font-semibold text-[#1C1917]">小黑</h1>
+        <span className="text-xs text-[#A8A29E]">24 小时赛博牛马 · 查楼盘 · 出文案</span>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col">

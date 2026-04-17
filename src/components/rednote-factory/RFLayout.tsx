@@ -127,7 +127,7 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             href={CHAT}
             active={onChat}
             icon={MessageSquare}
-            label="AI 助手"
+            label="小黑"
           />
           <SidebarItem
             href={NEWS_FEED}
@@ -215,7 +215,7 @@ export function RFLayout({ children }: { children: React.ReactNode }) {
             href={CHAT}
             active={onChat}
             icon={MessageSquare}
-            label="助手"
+            label="小黑"
           />
           <TabItem
             href={NEWS_FEED}
