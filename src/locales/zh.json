@@ -1,6 +1,7 @@
 {
   "nav": {
     "dashboard": "概览",
+    "chat": "小黑",
     "documents": "内容工厂",
     "copywriter": "内容创作",
     "copywriterRag": "黑魔法",
@@ -140,6 +141,7 @@
   },
   "pages": {
     "dashboard": "概览",
+    "chat": "小黑",
     "crm": "BRM",
     "apartments": "楼盘监控",
     "kpi": "KPI",

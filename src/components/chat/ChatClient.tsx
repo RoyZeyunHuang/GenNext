@@ -40,17 +40,38 @@ type Msg = {
 
 const MAX_HISTORY = 12;
 
+type ContentKind = "xiaohongshu" | "instagram" | "oral";
+const CONTENT_KINDS: { value: ContentKind; label: string; hint: string }[] = [
+  { value: "xiaohongshu", label: "小红书", hint: "图文" },
+  { value: "instagram", label: "Instagram", hint: "Caption" },
+  { value: "oral", label: "口播", hint: "脚本" },
+];
+
 const EXAMPLE_PROMPTS = [
   "LIC 有哪些 $3500 以下的 studio？",
   "Halletts 那几栋楼最新价格",
   "带泳池 + 2024 年建的楼有哪些",
-  "帮我用 Mia 人格给 SOLA 写个小红书",
+  "帮我用 Mia 人格给 SOLA 写一篇",
 ];
 
-export function ChatClient() {
+export interface ChatClientProps {
+  /** 页面头部标题，默认「小黑」 */
+  title?: string;
+  /** 副标 */
+  subtitle?: string;
+  /** 示例 prompt（为空则用默认） */
+  examples?: string[];
+}
+
+export function ChatClient({
+  title = "小黑",
+  subtitle = "24 小时赛博牛马 · 查楼盘 · 出文案",
+  examples = EXAMPLE_PROMPTS,
+}: ChatClientProps = {}) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [loading, setLoading] = useState(false);
+  const [contentKind, setContentKind] = useState<ContentKind>("xiaohongshu");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -93,7 +114,11 @@ export function ChatClient() {
       const res = await fetch("/api/rf/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content, conversation_history: history }),
+        body: JSON.stringify({
+          message: content,
+          conversation_history: history,
+          content_kind: contentKind,
+        }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -232,8 +257,8 @@ export function ChatClient() {
     <div className="flex flex-1 flex-col bg-[#FAFAF9]">
       <header className="hidden shrink-0 items-center gap-2 border-b border-[#E7E5E4] bg-white px-6 py-3 lg:flex">
         <Sparkles className="h-4 w-4 text-[#78716C]" />
-        <h1 className="text-sm font-semibold text-[#1C1917]">小黑</h1>
-        <span className="text-xs text-[#A8A29E]">24 小时赛博牛马 · 查楼盘 · 出文案</span>
+        <h1 className="text-sm font-semibold text-[#1C1917]">{title}</h1>
+        <span className="text-xs text-[#A8A29E]">{subtitle}</span>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col">
@@ -242,7 +267,7 @@ export function ChatClient() {
             <div className="my-6 rounded-xl border border-dashed border-[#E7E5E4] bg-white p-5 text-sm text-[#57534E]">
               <div className="mb-2 font-medium text-[#1C1917]">你可以问我：</div>
               <div className="flex flex-wrap gap-2">
-                {EXAMPLE_PROMPTS.map((p) => (
+                {examples.map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -283,6 +308,27 @@ export function ChatClient() {
         }}
         className="sticky bottom-0 shrink-0 border-t border-[#E7E5E4] bg-white px-4 py-3 lg:px-6"
       >
+        <div className="mx-auto mb-2 flex w-full max-w-3xl items-center gap-1.5">
+          <span className="text-[11px] text-[#78716C]">出文案形态：</span>
+          <div className="inline-flex rounded-lg border border-[#E7E5E4] bg-[#FAFAF9] p-0.5">
+            {CONTENT_KINDS.map((k) => (
+              <button
+                key={k.value}
+                type="button"
+                onClick={() => setContentKind(k.value)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-[11px] transition",
+                  contentKind === k.value
+                    ? "bg-white font-medium text-[#1C1917] shadow-sm"
+                    : "text-[#78716C] hover:text-[#1C1917]"
+                )}
+              >
+                {k.label}
+                <span className="ml-1 text-[9px] text-[#A8A29E]">{k.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="mx-auto flex w-full max-w-3xl items-end gap-2">
           <textarea
             ref={textareaRef}

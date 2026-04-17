@@ -56,6 +56,14 @@ const SYSTEM_PROMPT = `你是「小黑」，RF（Rednote Factory）里 24 小时
 type ChatBody = {
   message?: string;
   conversation_history?: Anthropic.MessageParam[];
+  /** 用户在 UI 选的偏好形态：xiaohongshu / instagram / oral。AI 调 generate_copy 时默认用这个 */
+  content_kind?: "xiaohongshu" | "instagram" | "oral";
+};
+
+const CONTENT_KIND_LABEL: Record<string, string> = {
+  xiaohongshu: "小红书（图文）",
+  instagram: "Instagram（Caption）",
+  oral: "口播（脚本）",
 };
 
 export async function POST(req: NextRequest) {
@@ -83,6 +91,17 @@ export async function POST(req: NextRequest) {
     ...history,
     { role: "user", content: message },
   ];
+
+  const preferredKind: "xiaohongshu" | "instagram" | "oral" =
+    body.content_kind === "instagram" || body.content_kind === "oral"
+      ? body.content_kind
+      : "xiaohongshu";
+  const kindLabel = CONTENT_KIND_LABEL[preferredKind];
+  const systemWithPref = `${SYSTEM_PROMPT}
+
+# 本次会话的用户偏好
+用户在界面上选择了输出形态：**${kindLabel}**。
+调 generate_copy 时，content_kind 默认传 "${preferredKind}"，除非用户在这一句里明确说要别的形态（比如「给我写一个口播版」「改成 Instagram 风」）。`;
 
   const ctx: ExecContext = {
     userId: gate.session.userId,
@@ -116,7 +135,7 @@ export async function POST(req: NextRequest) {
             model: "claude-sonnet-4-20250514",
             maxIterations: 8,
             maxConsecutiveNonOk: 4,
-            systemPrompt: SYSTEM_PROMPT,
+            systemPrompt: systemWithPref,
           },
           emit
         );

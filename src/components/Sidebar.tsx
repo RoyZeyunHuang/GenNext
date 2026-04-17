@@ -16,6 +16,7 @@ import {
   Newspaper,
   Languages,
   Building2,
+  MessageSquare,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 
 const navItemsMain = [
   { href: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { href: "/chat", labelKey: "nav.chat", icon: MessageSquare },
   { href: "/documents", labelKey: "nav.documents", icon: FolderOpen },
   { href: "/copywriter", labelKey: "nav.copywriter", icon: PenLine },
   { href: "/copywriter-rag", labelKey: "nav.copywriterRag", icon: Sparkles },
