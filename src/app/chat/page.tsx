@@ -13,7 +13,7 @@ export default function ChatPage() {
         "LIC 有哪些 $3500 以下的 studio？",
         "Halletts 那几栋楼最新价格",
         "带泳池 + 2024 年建的楼",
-        "用 Mia 人格给 SOLA 写一篇",
+        "用 Mia 人格给 The Orchard 写一篇",
       ]}
     />
   );
