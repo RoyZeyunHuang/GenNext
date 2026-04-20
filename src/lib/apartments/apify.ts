@@ -62,10 +62,10 @@ export async function startRunWithWebhook(
 
   const body = {
     startUrls: deduped.map((u) => ({ url: u })),
-    // 住宅代理——绕过 StreetEasy 的 Cloudflare 拦截。
-    // 注意：Apify Console UI 里选的 proxy 只对 Console 手动启动的 run 生效；
-    // 通过 API 触发必须在 body 里明确传，否则走默认 datacenter，会被 SE 403。
-    proxyConfiguration: {
+    // 住宅代理 + 强制美国出口 —— 绕过 StreetEasy 的 Cloudflare 拦截。
+    // 注意 key 是 `proxy`（该 actor 专用字段名），不是一般的 `proxyConfiguration`。
+    // country=US：SE 对非美 IP 拦截更严，强制美国 residential 可能性最大。
+    proxy: {
       useApifyProxy: true,
       apifyProxyGroups: ["RESIDENTIAL"],
       apifyProxyCountry: "US",
