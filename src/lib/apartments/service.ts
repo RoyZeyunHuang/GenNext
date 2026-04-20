@@ -16,8 +16,8 @@ import {
 } from "./apify";
 import { parseApifyItem } from "./parser";
 import type { ParsedBuilding, ParsedListing, HotBuildingSeed } from "./types";
-import { fetchHtml, ScrapingBeeError } from "./scrapingbee";
-import { parseAvailableAt, parseBuildingPage } from "./rsc-parser";
+import { scrapeBuilding } from "./scrape";
+import { parseAvailableAt } from "./rsc-parser";
 
 export interface RefreshResult {
   runId: string;
@@ -604,8 +604,7 @@ async function processBuildingViaScrapingBee(
   b: TrackedBuilding,
 ): Promise<ScrapingBeeRefreshResult["per_building"][number]> {
   try {
-    const html = await fetchHtml(b.building_url);
-    const parsed = parseBuildingPage(html);
+    const parsed = await scrapeBuilding(b.building_url);
 
     const nowIso = new Date().toISOString();
 
