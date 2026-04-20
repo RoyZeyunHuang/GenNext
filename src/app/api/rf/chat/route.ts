@@ -24,13 +24,11 @@ export const dynamic = "force-dynamic";
 // 自然知道下一步。prompt 只讲「这个助手是谁 / 说话风格 / 产品规则」。
 
 // ════════════════════════════════════════════════════════════════════════════
-// DEMO 模式开关：
-//   USE_REAL_ESTATE_MODE = true  → 地产营销版（原生产 prompt，查楼盘/listing/生成地产文案）
-//   USE_REAL_ESTATE_MODE = false → 全类目文案助手版（生活/美妆/穿搭/美食/情绪/种草等）
-//
-// 演示结束后改回 true 即可恢复地产版。两套 prompt 都保留，切换零成本。
+// 模式开关（保留供后续 demo 切换）：
+//   USE_REAL_ESTATE_MODE = true  → 地产营销版（生产默认）
+//   USE_REAL_ESTATE_MODE = false → 全类目文案助手版（demo 临时使用）
 // ════════════════════════════════════════════════════════════════════════════
-const USE_REAL_ESTATE_MODE = false;
+const USE_REAL_ESTATE_MODE = true;
 
 function buildSystemPrompt(today: string): string {
   return USE_REAL_ESTATE_MODE
