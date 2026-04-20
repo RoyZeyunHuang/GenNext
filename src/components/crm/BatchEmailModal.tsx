@@ -394,9 +394,14 @@ export function BatchEmailModal({
 
         const tRes = await fetch("/api/email/templates");
         const tData = await tRes.json().catch(() => []);
-        setTemplates(Array.isArray(tData) ? tData : []);
-        const firstTpl = Array.isArray(tData) && tData[0]?.id ? tData[0].id : "";
-        setTemplateId(firstTpl);
+        const tArr: Template[] = Array.isArray(tData) ? tData : [];
+        setTemplates(tArr);
+        // 默认优先选中 INVO Established（是否换 New 由 buildPreviewFromTemplate 按 build_year 自动切换）
+        const preferred =
+          tArr.find((t) => t.name === "INVO — Established Buildings") ??
+          tArr.find((t) => isInvoManagedEmailTemplateName(t.name)) ??
+          tArr[0];
+        setTemplateId(preferred?.id ?? "");
       } finally {
         if (!cancelGuard.current) setLoading(false);
       }
@@ -451,6 +456,31 @@ export function BatchEmailModal({
     const set = selectedIds;
     return properties.filter((p) => set.has(p.row_key));
   }, [properties, selectedIds]);
+
+  /**
+   * 自动生成预览：进入 step 2 + 模板模式 + 联系人已加载 + 选了楼盘 + 还没预览时，
+   * 自动套 INVO 模板（按 build_year 自动 Established / New）并默认全选所有公司联系人。
+   * 用户仍可手动点"生成预览"重建或切换模板。
+   */
+  useEffect(() => {
+    if (step !== 2) return;
+    if (mode !== "template") return;
+    if (contactsRefreshing) return;
+    if (previews.length > 0) return;
+    if (selectedProperties.length === 0) return;
+    if (!templateId || templates.length === 0) return;
+
+    const tpl = templates.find((t) => t.id === templateId);
+    if (!tpl) return;
+
+    const rows = buildPreviewFromTemplate(selectedProperties, tpl, templates);
+    if (rows.length > 0) {
+      setPreviews(rows);
+      setExpandedIndex(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildPreviewFromTemplate 是稳定闭包，
+    // 避免因 selectedProperties 每次 useMemo 变身触发无限回环，只在关键触发点运行
+  }, [step, mode, contactsRefreshing, templateId, templates.length, companyContactsMap]);
 
   const filteredRows = useMemo(() => {
     const from = buildYearFrom.trim() ? Number(buildYearFrom) : null;
@@ -654,6 +684,24 @@ export function BatchEmailModal({
       const body = applyTemplate(effectiveTpl.body, vars);
       const displayPropertyName = template_fill_vars.property_name || rep.property_name || "";
 
+      // 默认全选该公司下所有带邮箱的联系人（primary 放首位，其他按原顺序）。
+      // 用户仍可在预览卡片里取消勾选某个收件人。
+      const allCompanyContacts = companyContactsMap.get(rep.company_id) ?? [];
+      const seenEmails = new Set<string>();
+      const defaultRecipients: PreviewRecipient[] = [];
+      const addRec = (email: string | null | undefined, name: string | null | undefined) => {
+        const em = String(email ?? "").trim();
+        if (!em || seenEmails.has(em)) return;
+        seenEmails.add(em);
+        defaultRecipients.push({ email: em, name: name ?? null });
+      };
+      // primary 优先（rep.email 就是之前挑出的 primary-with-email 或任一带邮箱的）
+      addRec(rep.email, rep.contact_name);
+      // 再补上公司其他所有带邮箱的联系人
+      for (const c of allCompanyContacts) {
+        addRec(c.email, c.name);
+      }
+
       out.push({
         property_id: rep.property_id,
         property_ids: merged ? property_ids : undefined,
@@ -665,12 +713,9 @@ export function BatchEmailModal({
         to: rep.email,
         contact_name: rep.contact_name,
         stage: rep.stage,
-        recipients: [
-          {
-            email: String(rep.email),
-            name: rep.contact_name ?? null,
-          },
-        ],
+        recipients: defaultRecipients.length > 0
+          ? defaultRecipients
+          : [{ email: String(rep.email), name: rep.contact_name ?? null }],
         subject,
         body,
         template_subject_raw: effectiveTpl.subject,
@@ -1436,9 +1481,10 @@ export function BatchEmailModal({
               {mode === "template" && (
                 <div className="mt-4 rounded-lg border border-[#E7E5E4] bg-white p-4">
                   <p className="mb-3 text-xs text-[#78716C]">
-                    选 INVO 任一套即可：<strong className="text-[#57534E]">Established / New</strong> 会按楼盘{" "}
-                    <strong className="text-[#57534E]">build year</strong> 相对<strong>当前日历年</strong>自动选择（≥
-                    本年 → New，更早 → Established）。同一开发商多选楼盘会合并为一封，{" "}
+                    进入这一步已自动套用 INVO 模板并默认全选所有公司联系人——不用手点，确认即可发送。
+                    模板按楼盘 <strong className="text-[#57534E]">build year</strong> 自动二选一：
+                    <strong className="text-[#57534E]"> ≥ 2025 → New</strong>，<strong>&lt; 2025 → Established</strong>。
+                    同一开发商多选楼盘会合并为一封，{" "}
                     <code className="rounded bg-[#F5F5F4] px-1 text-[10px]">{"{{property_name}}"}</code> 和{" "}
                     <code className="rounded bg-[#F5F5F4] px-1 text-[10px]">{"{{neighborhood}}"}</code>{" "}
                     会自动拼接多个值。

@@ -53,9 +53,16 @@ export function applyTemplate(
   return out;
 }
 
-/** 021 两套基础 INVO 模版（按 build_year 相对「当前日历年」自动二选一） */
+/** 021 两套基础 INVO 模版（按 build_year 相对固定阈值自动二选一） */
 export const INVO_ESTABLISHED_TEMPLATE_NAME = "INVO — Established Buildings";
 export const INVO_NEW_BUILDINGS_TEMPLATE_NAME = "INVO — New Buildings";
+
+/**
+ * 新盘 vs 成熟盘的 build_year 阈值。
+ * 当前规则：build_year ≥ 2025 视为新盘，< 2025 视为成熟盘。
+ * 以后要调规则（比如换成「当前年」），改这个常量即可，所有计算走同一处。
+ */
+export const INVO_NEW_BUILDING_YEAR_THRESHOLD = 2025;
 
 const INVO_MANAGED_TEMPLATE_NAMES = new Set([
   INVO_ESTABLISHED_TEMPLATE_NAME,
@@ -71,16 +78,16 @@ export function isInvoManagedEmailTemplateName(name: string | null | undefined):
 }
 
 /**
- * build_year ≥ 当前日历年 → 新盘模版；否则成熟盘。无有效年份视为成熟盘。
+ * build_year ≥ INVO_NEW_BUILDING_YEAR_THRESHOLD → 新盘模版；否则成熟盘。无有效年份视为成熟盘。
  * 多盘取涉及楼盘中的最大 build_year。
  */
 export function invoBaseTemplateNameFromBuildYears(
   years: Array<number | null | undefined>,
-  nowYear: number = new Date().getFullYear()
+  thresholdYear: number = INVO_NEW_BUILDING_YEAR_THRESHOLD
 ): typeof INVO_ESTABLISHED_TEMPLATE_NAME | typeof INVO_NEW_BUILDINGS_TEMPLATE_NAME {
   const finite = years.filter((y): y is number => y != null && Number.isFinite(y));
   if (finite.length === 0) return INVO_ESTABLISHED_TEMPLATE_NAME;
-  return Math.max(...finite) >= nowYear
+  return Math.max(...finite) >= thresholdYear
     ? INVO_NEW_BUILDINGS_TEMPLATE_NAME
     : INVO_ESTABLISHED_TEMPLATE_NAME;
 }
