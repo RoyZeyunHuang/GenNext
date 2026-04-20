@@ -16,6 +16,8 @@ import {
 } from "./apify";
 import { parseApifyItem } from "./parser";
 import type { ParsedBuilding, ParsedListing, HotBuildingSeed } from "./types";
+import { fetchHtml, ScrapingBeeError } from "./scrapingbee";
+import { parseAvailableAt, parseBuildingPage } from "./rsc-parser";
 
 export interface RefreshResult {
   runId: string;
@@ -534,5 +536,282 @@ export async function processFinishedRun(opts: {
     listings_inactivated,
     cost_cents_estimate: cost,
     error: errorMsg,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ScrapingBee 分支 —— 新架构（替代 Apify）
+//
+//  设计：
+//   - 同步拉取：Vercel Function 一次请求跑完所有 tracked buildings（并发分批）
+//   - 数据来源：apt_buildings.is_tracked = true 的楼盘（DB 为列表权威）
+//   - 字段范围：listings 全量 + building 动态字段（active_rentals_count 等）
+//     静态字段（year_built / amenities 等）仅在首次 seed 或 row 缺字段时填
+//   - 跳过的字段：sqft / floor_plan_url / no_fee / 完整描述 / 图库
+//     → 由前端通过 listing.url 外链到 StreetEasy，用户自己看
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** 并发批次大小（ScrapingBee 并发建议 5-10；默认 5 保守） */
+const SCRAPINGBEE_CONCURRENCY = 5;
+
+export interface ScrapingBeeRefreshResult {
+  runId: string;
+  status: "ok" | "error";
+  buildings_requested: number;
+  buildings_fetched: number;
+  listings_upserted: number;
+  listings_new: number;
+  listings_inactivated: number;
+  /** 每栋 25 credits，按 credits 估价反映到 cost_cents（1 credit ≈ 0.049 cent on Freelance plan） */
+  cost_cents_estimate: number;
+  /** 每栋 building 的拉取状态，含失败原因 */
+  per_building: Array<{
+    building_id: string;
+    building_url: string;
+    ok: boolean;
+    listings_count: number;
+    error?: string;
+  }>;
+  error?: string;
+}
+
+interface TrackedBuilding {
+  id: string;
+  building_url: string;
+  building_slug: string | null;
+}
+
+/**
+ * 从 apt_buildings 读 is_tracked=true 的楼盘列表作为当日抓取任务。
+ * 这是 watchlist 机制的实现：不再 hardcode URL。
+ */
+async function loadTrackedBuildings(db: SupabaseClient): Promise<TrackedBuilding[]> {
+  const { data, error } = await db
+    .from("apt_buildings")
+    .select("id, building_url, building_slug")
+    .eq("is_tracked", true)
+    .not("building_url", "is", null);
+  if (error) throw new Error(`load tracked buildings: ${error.message}`);
+  return (data ?? []) as TrackedBuilding[];
+}
+
+/**
+ * 抓 + 解析 + 对当前这栋 building 做 DB 写入（listings upsert + 动态字段）。
+ * 不抛异常，失败通过返回值报告。
+ */
+async function processBuildingViaScrapingBee(
+  db: SupabaseClient,
+  b: TrackedBuilding,
+): Promise<ScrapingBeeRefreshResult["per_building"][number]> {
+  try {
+    const html = await fetchHtml(b.building_url);
+    const parsed = parseBuildingPage(html);
+
+    const nowIso = new Date().toISOString();
+
+    // 1) upsert listings
+    if (parsed.listings.length > 0) {
+      const listingRows = parsed.listings.map((l) => ({
+        id: l.id,
+        building_id: b.id,
+        url: l.url,
+        unit: l.unit,
+        address: null,
+        neighborhood: null,
+        borough: null,
+        price_monthly: l.price_monthly,
+        bedrooms: l.bedrooms,
+        bathrooms: l.bathrooms,
+        sqft: null, // 有意留空：用户点 url 外链看
+        no_fee: false,
+        is_featured: false,
+        furnished: l.furnished,
+        available_at: parseAvailableAt(l.available_at_raw),
+        months_free: l.months_free,
+        lease_term_months: l.lease_term_months,
+        image_url: l.image_url,
+        floor_plan_url: null, // 同上：外链看
+        listing_type: l.listing_type.toLowerCase(),
+        last_seen_at: nowIso,
+        is_active: l.is_active,
+        source: "scrapingbee",
+      }));
+      const { error: lErr } = await db
+        .from("apt_listings")
+        .upsert(listingRows, { onConflict: "id" });
+      if (lErr) throw new Error(`upsert listings: ${lErr.message}`);
+    }
+
+    // 2) 动态 building 字段（每日更新）
+    const activeCount = parsed.dynamic.active_rentals_count;
+    const openCount = parsed.dynamic.open_rentals_count;
+
+    // 3) 静态字段——仅在 row 缺字段时填补（保留已有值，防止覆盖人工修订）
+    const { data: curr } = await db
+      .from("apt_buildings")
+      .select("year_built, floor_count, unit_count, amenities, latitude, longitude, developer, leasing_company, official_url, description, image_url")
+      .eq("id", b.id)
+      .maybeSingle();
+
+    const updates: Record<string, unknown> = {
+      active_rentals_count: activeCount,
+      open_rentals_count: openCount,
+      last_fetched_at: nowIso,
+      updated_at: nowIso,
+    };
+    if (!curr?.year_built && parsed.static.year_built) updates.year_built = parsed.static.year_built;
+    if (!curr?.floor_count && parsed.static.floor_count) updates.floor_count = parsed.static.floor_count;
+    if (!curr?.unit_count && parsed.static.unit_count) updates.unit_count = parsed.static.unit_count;
+    if (!curr?.latitude && parsed.static.latitude) updates.latitude = parsed.static.latitude;
+    if (!curr?.longitude && parsed.static.longitude) updates.longitude = parsed.static.longitude;
+    if (!curr?.developer && parsed.static.developer) updates.developer = parsed.static.developer;
+    if (!curr?.leasing_company && parsed.static.leasing_company) updates.leasing_company = parsed.static.leasing_company;
+    if (!curr?.official_url && parsed.static.official_url) updates.official_url = parsed.static.official_url;
+    if (!curr?.description && parsed.static.description) updates.description = parsed.static.description;
+    if (!curr?.image_url && parsed.static.image_url) updates.image_url = parsed.static.image_url;
+    if ((!curr?.amenities || (curr.amenities as string[]).length === 0) && parsed.static.amenities.length > 0) {
+      updates.amenities = parsed.static.amenities;
+    }
+
+    const { error: bErr } = await db
+      .from("apt_buildings")
+      .update(updates)
+      .eq("id", b.id);
+    if (bErr) throw new Error(`update building dynamics: ${bErr.message}`);
+
+    return {
+      building_id: b.id,
+      building_url: b.building_url,
+      ok: true,
+      listings_count: parsed.listings.length,
+    };
+  } catch (e) {
+    return {
+      building_id: b.id,
+      building_url: b.building_url,
+      ok: false,
+      listings_count: 0,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
+/**
+ * 失效过时 listings：本轮刷新成功的 building 下，is_active=true 但 last_seen_at
+ * 早于 1 天前 —— 说明这一轮没再出现，视为下架。
+ * 只作用于本轮刷到的 building，失败的 building 的 listings 不会被误杀。
+ */
+async function inactivateStaleListings(
+  db: SupabaseClient,
+  refreshedBuildingIds: string[],
+  staleThresholdIso: string,
+): Promise<number> {
+  if (refreshedBuildingIds.length === 0) return 0;
+  const { data, error } = await db
+    .from("apt_listings")
+    .update({ is_active: false })
+    .in("building_id", refreshedBuildingIds)
+    .eq("is_active", true)
+    .lt("last_seen_at", staleThresholdIso)
+    .select("id");
+  if (error) {
+    console.warn("[scrapingbee refresh] inactivate stale failed", error.message);
+    return 0;
+  }
+  return (data ?? []).length;
+}
+
+/**
+ * ScrapingBee 主刷新入口。直接同步跑完所有 tracked buildings，返回结果。
+ * 启动阶段（env / DB 初始化）的致命错误会抛出；处理单栋楼盘的异常被吞在内部
+ * 并反映在 per_building 数组里，确保"一栋挂不影响其他栋"。
+ */
+export async function refreshViaScrapingBee(opts: {
+  triggeredBy: "cron" | "manual";
+  /** 可选：显式指定 building_url 列表，否则读 DB is_tracked=true */
+  onlyUrls?: string[];
+}): Promise<ScrapingBeeRefreshResult> {
+  const db = getSupabaseAdmin();
+
+  if (!process.env.SCRAPINGBEE_API_KEY) {
+    throw new Error("SCRAPINGBEE_API_KEY 未设置");
+  }
+
+  // 1) 建立 refresh_runs 行
+  const { data: runRow, error: runErr } = await db
+    .from("apt_refresh_runs")
+    .insert({
+      status: "running",
+      triggered_by: opts.triggeredBy,
+      buildings_requested: 0,
+    })
+    .select("id")
+    .single();
+  if (runErr) throw new Error(`create run log: ${runErr.message}`);
+  const runId = runRow!.id as string;
+
+  // 2) 确定 tracked 楼盘列表
+  let buildings = await loadTrackedBuildings(db);
+  if (opts.onlyUrls && opts.onlyUrls.length > 0) {
+    const allow = new Set(opts.onlyUrls);
+    buildings = buildings.filter((b) => allow.has(b.building_url));
+  }
+
+  await db
+    .from("apt_refresh_runs")
+    .update({ buildings_requested: buildings.length })
+    .eq("id", runId);
+
+  // 3) 分批并发抓取 + upsert
+  const results: ScrapingBeeRefreshResult["per_building"] = [];
+  for (let i = 0; i < buildings.length; i += SCRAPINGBEE_CONCURRENCY) {
+    const batch = buildings.slice(i, i + SCRAPINGBEE_CONCURRENCY);
+    const batchRes = await Promise.all(batch.map((b) => processBuildingViaScrapingBee(db, b)));
+    results.push(...batchRes);
+  }
+
+  // 4) 失效过时 listings
+  const refreshedOkIds = results.filter((r) => r.ok).map((r) => r.building_id);
+  const staleThreshold = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const inactivated = await inactivateStaleListings(db, refreshedOkIds, staleThreshold);
+
+  // 5) 汇总统计
+  const buildings_fetched = results.filter((r) => r.ok).length;
+  const listings_upserted = results.reduce((sum, r) => sum + r.listings_count, 0);
+  const costCreditsTotal = buildings.length * 25;
+  const cost_cents_estimate = Math.round(costCreditsTotal * 0.049); // Freelance $49 / 100k credits ≈ 0.049c/credit
+
+  const overallStatus = buildings_fetched === 0 && buildings.length > 0 ? "error" : "ok";
+  const errorMsg =
+    overallStatus === "error"
+      ? `All ${buildings.length} buildings failed. First: ${results[0]?.error ?? "unknown"}`
+      : null;
+
+  // 6) 写回 run 行
+  await db
+    .from("apt_refresh_runs")
+    .update({
+      status: overallStatus,
+      finished_at: new Date().toISOString(),
+      buildings_fetched,
+      listings_upserted,
+      listings_new: 0, // TODO: 精确区分 new 需额外查 existing listing ids
+      listings_inactivated: inactivated,
+      cost_cents_estimate,
+      error_message: errorMsg,
+    })
+    .eq("id", runId);
+
+  return {
+    runId,
+    status: overallStatus,
+    buildings_requested: buildings.length,
+    buildings_fetched,
+    listings_upserted,
+    listings_new: 0,
+    listings_inactivated: inactivated,
+    cost_cents_estimate,
+    per_building: results,
+    error: errorMsg ?? undefined,
   };
 }

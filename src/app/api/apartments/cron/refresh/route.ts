@@ -1,24 +1,25 @@
 import { NextRequest } from "next/server";
-import { kickRefresh } from "@/lib/apartments/service";
+import { refreshViaScrapingBee } from "@/lib/apartments/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-// Kick-and-return is fast (one Apify POST) but we keep maxDuration high in
-// case Apify's API is slow to respond.
-export const maxDuration = 60;
+// ScrapingBee 同步模式：40 栋楼并发分批，每栋 ~5s，总时长 60-200s；
+// 给个 300s 的 headroom，Vercel Pro 上限是 900s。
+export const maxDuration = 300;
 
 /**
- * Vercel Cron calls this with `Authorization: Bearer <CRON_SECRET>` daily.
+ * Vercel Cron 每天 UTC 13:00 调这个端点（Authorization: Bearer <CRON_SECRET>）。
  *
- * The actual scrape is async — we ask Apify to kick off the run with a
- * webhook pointing at /api/apartments/cron/webhook, then return immediately.
- * The webhook handler picks up the dataset when Apify finishes (5-15 min).
+ * 新架构（2026-04 换 ScrapingBee 之后）：
+ *  - 同步直连：在这个 function 里跑完所有 tracked building 的抓取 + 解析 + 入库
+ *  - 数据来源：apt_buildings.is_tracked=true 的楼盘
+ *  - 静态字段（year_built / amenities）仅在缺值时填补；动态字段每次覆盖
+ *  - listings 字段范围以 SE 建筑页能提供的为准（sqft / floor_plan_url 不抓，
+ *    前端通过 listing.url 外链）
  *
- * This pattern bypasses Vercel's serverless ceiling: each request stays
- * under a second, but the underlying scrape can take as long as it needs.
- *
- * See vercel.json: `/api/apartments/cron/refresh` scheduled daily.
+ * 见 vercel.json: `/api/apartments/cron/refresh` 每日 UTC 13:00 执行。
  */
+
 function authed(req: NextRequest): boolean {
   const expected = process.env.CRON_SECRET;
   if (!expected) return false;
@@ -29,38 +30,24 @@ function authed(req: NextRequest): boolean {
   return token === expected || qs === expected;
 }
 
-function buildWebhookUrl(req: NextRequest): string {
-  // Reuse CRON_SECRET as the webhook auth token — keeps env simple.
-  const secret = process.env.CRON_SECRET ?? "";
-  // Honor explicit base URL if provided (e.g. tunneled local dev), else
-  // derive from the incoming request.
-  const base =
-    process.env.APP_BASE_URL?.replace(/\/$/, "") ??
-    `${req.nextUrl.protocol}//${req.nextUrl.host}`;
-  return `${base}/api/apartments/cron/webhook?secret=${encodeURIComponent(secret)}`;
-}
-
 export async function POST(req: NextRequest) {
   if (!authed(req)) return new Response("unauthorized", { status: 401 });
+
   const trigger = (req.nextUrl.searchParams.get("trigger") as
     | "cron"
     | "manual"
     | null) ?? "cron";
+
   try {
-    const result = await kickRefresh({
-      triggeredBy: trigger,
-      webhookUrl: buildWebhookUrl(req),
-    });
+    const result = await refreshViaScrapingBee({ triggeredBy: trigger });
     return Response.json({
-      kicked: true,
-      mode: "async",
+      ok: result.status === "ok",
+      mode: "sync",
       ...result,
-      message:
-        "Apify actor started. Webhook will populate the database in 5-15 min.",
     });
   } catch (e) {
     return Response.json(
-      { error: e instanceof Error ? e.message : "kick failed" },
+      { error: e instanceof Error ? e.message : "refresh failed" },
       { status: 500 },
     );
   }
