@@ -159,13 +159,21 @@ export default function RfIntroPage() {
           <span className="truncate">
             内测申请入口在页面<span className="font-bold">最底部</span>，先往下看一遍再申请。
           </span>
-          <a
-            href="#apply"
-            className="flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-3 py-1 font-medium text-white transition hover:bg-white/20"
-          >
-            直达末尾
-            <ChevronDown className="h-3.5 w-3.5" />
-          </a>
+          <div className="flex shrink-0 items-center gap-2">
+            <a
+              href="#apply"
+              className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 font-medium text-white transition hover:bg-white/20"
+            >
+              直达末尾
+              <ChevronDown className="h-3.5 w-3.5" />
+            </a>
+            <Link
+              href="/rednote-factory/login"
+              className="rounded-full bg-white px-3 py-1 font-semibold text-[#1C1917] transition hover:bg-[#F5F5F4]"
+            >
+              登录
+            </Link>
+          </div>
         </div>
       </div>
 
