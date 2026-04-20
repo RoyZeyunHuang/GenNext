@@ -8,7 +8,8 @@ export function RednoteFactoryShell({ children }: { children: React.ReactNode })
   if (
     pathname === "/rednote-factory/login" ||
     pathname === "/rednote-factory/reset-password" ||
-    pathname === "/rednote-factory/pending"
+    pathname === "/rednote-factory/pending" ||
+    pathname === "/rednote-factory/intro"
   ) {
     return <>{children}</>;
   }
