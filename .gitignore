@@ -39,3 +39,6 @@ next-env.d.ts
 # local agent / Supabase CLI caches (do not commit)
 .claude/
 supabase/.temp/
+
+# 含 API key / 敏感配置的内部文档（本地用，不上 git）
+/docs/news-ingest-agent-prompt.md
