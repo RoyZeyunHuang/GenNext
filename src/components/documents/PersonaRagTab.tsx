@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Plus, Search, Sparkles, Trash2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MainAppModalPortal } from "@/components/MainAppModalPortal";
@@ -78,6 +78,11 @@ export function PersonaRagTab({
   const [loadingList, setLoadingList] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"profile" | "notes">("profile");
+  // savedAllowedIds = the server-confirmed allowed users for the current persona.
+  // Kept separate from profileForm so fetchPersonas() re-renders can't wipe it.
+  const [savedAllowedIds, setSavedAllowedIds] = useState<string[]>([]);
+  // When true, the next useEffect([selected]) run skips resetting allowed_user_ids.
+  const skipAllowedReset = useRef(false);
   const [profileForm, setProfileForm] = useState({
     name: "",
     short_description: "",
@@ -151,18 +156,52 @@ export function PersonaRagTab({
   useEffect(() => {
     if (!selected) {
       setProfileForm({ name: "", short_description: "", bio_md: "", is_public: false, visibility: "private", allowed_user_ids: [] });
+      setSavedAllowedIds([]);
       setNotes([]);
       return;
     }
+
+    const visibilityValue = (selected.visibility as PersonaVisibility) || (selected.is_public ? "public" : "private");
+
+    if (skipAllowedReset.current) {
+      // We just saved — keep the allowed_user_ids that saveProfile already set in the form.
+      skipAllowedReset.current = false;
+      setProfileForm((f) => ({
+        ...f,
+        name: selected.name,
+        short_description: selected.short_description ?? "",
+        bio_md: selected.bio_md ?? "",
+        is_public: Boolean(selected.is_public),
+        visibility: visibilityValue,
+        // allowed_user_ids intentionally preserved from the PATCH response
+      }));
+      return;
+    }
+
     setProfileForm({
       name: selected.name,
       short_description: selected.short_description ?? "",
       bio_md: selected.bio_md ?? "",
       is_public: Boolean(selected.is_public),
-      visibility: (selected.visibility as PersonaVisibility) || (selected.is_public ? "public" : "private"),
+      visibility: visibilityValue,
       allowed_user_ids: selected.allowed_user_ids ?? [],
     });
-  }, [selected]);
+
+    // For "assigned" visibility, fetch the individual persona to get the real allowed_user_ids
+    // (the list endpoint omits them). This populates both the form and the saved display.
+    if (visibilityValue === "assigned" && rfMe?.isAdmin) {
+      void fetch(`/api/personas/${selected.id}`)
+        .then((r) => r.json() as Promise<PersonaRow>)
+        .then((data) => {
+          const ids = data.allowed_user_ids ?? [];
+          setSavedAllowedIds(ids);
+          setProfileForm((f) => ({ ...f, allowed_user_ids: ids }));
+        })
+        .catch(() => { /* keep form as-is */ });
+    } else {
+      setSavedAllowedIds([]);
+    }
+  }, [selected, rfMe?.isAdmin]);
 
   const fetchNotes = useCallback(async (personaId: string) => {
     setLoadingNotes(true);
@@ -314,8 +353,14 @@ export function PersonaRagTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await parseResponseJson<{ error?: string }>(res);
-      if (!res.ok) throw new Error(data.error || "保存失败");
+      const data = await parseResponseJson<PersonaRow & { error?: string }>(res);
+      if (!res.ok) throw new Error((data as { error?: string }).error || "保存失败");
+      // Update form + saved display from PATCH response before fetchPersonas() triggers useEffect.
+      const confirmedIds = data.allowed_user_ids ?? [];
+      setProfileForm((f) => ({ ...f, allowed_user_ids: confirmedIds }));
+      setSavedAllowedIds(confirmedIds);
+      // Tell useEffect to skip the allowed_user_ids reset on the next list refresh.
+      skipAllowedReset.current = true;
       await fetchPersonas();
     } catch (e) {
       alert(e instanceof Error ? e.message : "保存失败");
@@ -729,39 +774,65 @@ export function PersonaRagTab({
                         </select>
                       </div>
                       {profileForm.visibility === "assigned" && (
-                        <div>
-                          <label className="mb-1 block text-xs font-medium text-[#78716C]">
-                            可见用户（勾选）
-                          </label>
-                          <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-[#E7E5E4] bg-white p-2">
-                            {allUsers.length === 0 ? (
-                              <p className="text-xs text-[#A8A29E]">加载中…</p>
+                        <div className="space-y-2">
+                          {/* Saved display — always reflects the last server-confirmed state */}
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-[#78716C]">
+                              当前可见{savedAllowedIds.length > 0 ? `（${savedAllowedIds.length} 人）` : ""}
+                            </label>
+                            {savedAllowedIds.length === 0 ? (
+                              <p className="text-xs text-[#A8A29E]">暂无，保存后生效</p>
                             ) : (
-                              allUsers.map((u) => (
-                                <label key={u.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-[#F5F5F4]">
-                                  <input
-                                    type="checkbox"
-                                    checked={profileForm.allowed_user_ids.includes(u.id)}
-                                    onChange={(e) => {
-                                      setProfileForm((f) => ({
-                                        ...f,
-                                        allowed_user_ids: e.target.checked
-                                          ? [...f.allowed_user_ids, u.id]
-                                          : f.allowed_user_ids.filter((x) => x !== u.id),
-                                      }));
-                                    }}
-                                    className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
-                                  />
-                                  <span className="truncate text-[#44403C]">{u.email}</span>
-                                </label>
-                              ))
+                              <div className="flex flex-wrap gap-1">
+                                {savedAllowedIds.map((id) => {
+                                  const u = allUsers.find((x) => x.id === id);
+                                  return u ? (
+                                    <span
+                                      key={id}
+                                      className="inline-flex items-center rounded-full bg-[#E7E5E4] px-2 py-0.5 text-xs text-[#44403C]"
+                                    >
+                                      {u.email}
+                                    </span>
+                                  ) : null;
+                                })}
+                              </div>
                             )}
                           </div>
-                          {profileForm.allowed_user_ids.length > 0 && (
-                            <p className="mt-1 text-[10px] text-[#A8A29E]">
-                              已选 {profileForm.allowed_user_ids.length} 人
-                            </p>
-                          )}
+                          {/* Checkbox picker — edits the pending form state */}
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-[#78716C]">
+                              编辑可见用户
+                            </label>
+                            <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-[#E7E5E4] bg-white p-2">
+                              {allUsers.length === 0 ? (
+                                <p className="text-xs text-[#A8A29E]">加载中…</p>
+                              ) : (
+                                allUsers.map((u) => (
+                                  <label key={u.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-[#F5F5F4]">
+                                    <input
+                                      type="checkbox"
+                                      checked={profileForm.allowed_user_ids.includes(u.id)}
+                                      onChange={(e) => {
+                                        setProfileForm((f) => ({
+                                          ...f,
+                                          allowed_user_ids: e.target.checked
+                                            ? [...f.allowed_user_ids, u.id]
+                                            : f.allowed_user_ids.filter((x) => x !== u.id),
+                                        }));
+                                      }}
+                                      className="rounded border-[#E7E5E4] text-[#1C1917] accent-[#1C1917]"
+                                    />
+                                    <span className="truncate text-[#44403C]">{u.email}</span>
+                                  </label>
+                                ))
+                              )}
+                            </div>
+                            {profileForm.allowed_user_ids.length > 0 && (
+                              <p className="mt-1 text-[10px] text-[#A8A29E]">
+                                已选 {profileForm.allowed_user_ids.length} 人，保存后生效
+                              </p>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>

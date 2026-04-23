@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
   const { data: persona, error: pe } = await supabase
     .from("personas")
-    .select("id, bio_md, name, user_id, is_public")
+    .select("id, bio_md, name, user_id, is_public, visibility")
     .eq("id", persona_id)
     .maybeSingle();
 
@@ -86,7 +86,18 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   }
-  if (!canReadPersona(gate.session, persona)) {
+
+  // For "assigned" visibility, load allowed_user_ids so canReadPersona can check membership.
+  let allowedUserIds: string[] | undefined;
+  if (persona.visibility === "assigned") {
+    const { data: rows } = await supabase
+      .from("persona_allowed_users")
+      .select("user_id")
+      .eq("persona_id", persona_id);
+    allowedUserIds = rows?.map((r) => r.user_id as string) ?? [];
+  }
+
+  if (!canReadPersona(gate.session, { ...persona, allowed_user_ids: allowedUserIds })) {
     return new Response(JSON.stringify({ error: "forbidden" }), {
       status: 403,
       headers: { "Content-Type": "application/json" },

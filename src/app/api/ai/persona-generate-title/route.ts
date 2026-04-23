@@ -42,13 +42,23 @@ export async function POST(req: NextRequest) {
 
   const { data: persona, error: pe } = await supabase
     .from("personas")
-    .select("id, bio_md, name, user_id, is_public")
+    .select("id, bio_md, name, user_id, is_public, visibility")
     .eq("id", persona_id)
     .maybeSingle();
 
   if (pe) return NextResponse.json({ error: pe.message }, { status: 500 });
   if (!persona) return NextResponse.json({ error: "persona not found" }, { status: 404 });
-  if (!canReadPersona(gate.session, persona)) {
+
+  let allowedUserIds: string[] | undefined;
+  if (persona.visibility === "assigned") {
+    const { data: rows } = await supabase
+      .from("persona_allowed_users")
+      .select("user_id")
+      .eq("persona_id", persona_id);
+    allowedUserIds = rows?.map((r) => r.user_id as string) ?? [];
+  }
+
+  if (!canReadPersona(gate.session, { ...persona, allowed_user_ids: allowedUserIds })) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
