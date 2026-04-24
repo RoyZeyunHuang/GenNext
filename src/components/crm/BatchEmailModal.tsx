@@ -10,16 +10,16 @@ import {
   dedupePropertiesByIdPreferHigherUnits,
   isInvoManagedEmailTemplateName,
   invoBaseTemplateNameFromBuildYears,
+  neighborhoodTableCell,
+  resolvePropertyNeighborhood,
   sleep,
 } from "@/lib/email-helpers";
 import { INVO_DECK_FILENAME } from "@/lib/email-attachments";
 import {
   AREA_MAP,
   getDisplayArea,
-
   getRegionForArea,
   getSubAreaForFilter,
-  parseCityFromAddress,
   subAreasMatch,
 } from "@/lib/resolve-area";
 
@@ -355,11 +355,17 @@ export function BatchEmailModal({
     async function load() {
       setLoading(true);
       try {
-        const pRes = await fetch("/api/crm/properties");
+        // 加 no-store + 时间戳 buster，避免浏览器 HTTP cache 返回旧的 property_companies 关联
+        // （用户在 BRM 刚加的 developer + contacts 若碰上 disk cache 就看不到，本 modal 前的 bug 成因）
+        const pRes = await fetch(`/api/crm/properties?_=${Date.now()}`, {
+          cache: "no-store",
+        });
         const propertiesData = await pRes.json().catch(() => []);
         const propertiesRaw: any[] = Array.isArray(propertiesData) ? propertiesData : [];
 
-        const oRes = await fetch("/api/crm/outreach");
+        const oRes = await fetch(`/api/crm/outreach?_=${Date.now()}`, {
+          cache: "no-store",
+        });
         const outreachData = await oRes.json().catch(() => []);
         const outreachItems: any[] = Array.isArray(outreachData) ? outreachData : [];
 
@@ -375,12 +381,14 @@ export function BatchEmailModal({
 
         let contactsData: any[] = [];
         if (companyIds.length) {
-          const cRes = await fetch(
-            `/api/crm/contacts-bulk?company_ids=${encodeURIComponent(
-              companyIds.join(",")
-            )}&_=${Date.now()}`,
-            { cache: "no-store" }
-          );
+          // POST 不走 query string——避免大量 company_id 撑爆 URL 导致 431
+          // Request Header Fields Too Large（~200+ 个 id 就会触发）
+          const cRes = await fetch("/api/crm/contacts-bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({ company_ids: companyIds }),
+          });
           contactsData = await cRes.json().catch(() => []);
         }
 
@@ -418,12 +426,12 @@ export function BatchEmailModal({
     if (!companyIds.length) {
       return new Map<string, CompanyContactRow[]>();
     }
-    const cRes = await fetch(
-      `/api/crm/contacts-bulk?company_ids=${encodeURIComponent(
-        companyIds.join(",")
-      )}&_=${Date.now()}`,
-      { cache: "no-store" }
-    );
+    const cRes = await fetch("/api/crm/contacts-bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ company_ids: companyIds }),
+    });
     const contactsData = await cRes.json().catch(() => []);
     return mapContactsByCompany(Array.isArray(contactsData) ? contactsData : []);
   }, []);
@@ -533,8 +541,13 @@ export function BatchEmailModal({
       }
 
       if (q) {
+        const n = resolvePropertyNeighborhood({
+          address: p.address,
+          city: p.city,
+          area: p.area,
+        });
         const hay =
-          [p.property_name, p.company_name]
+          [p.property_name, p.company_name, p.address, p.area, n]
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
@@ -670,7 +683,11 @@ export function BatchEmailModal({
           company_role: rep.company_role ?? "",
           property_name: rep.property_name || "",
           neighborhood:
-            parseCityFromAddress(rep.address) || rep.city || "the area",
+            resolvePropertyNeighborhood({
+              address: rep.address,
+              city: rep.city,
+              area: rep.area,
+            }) || "the area",
         };
       } else {
         template_fill_vars = buildDeveloperBatchTemplateVars(uniq, {
@@ -1365,7 +1382,7 @@ export function BatchEmailModal({
                     ) : (
                       filteredRows.map((r) => {
                         const disabled = !r.contact_name || !r.email;
-                        const neighborhoodCell = parseCityFromAddress(r.address) ?? "—";
+                        const neighborhoodCell = neighborhoodTableCell(r);
                         return (
                           <tr key={r.row_key} className={cn(disabled && "bg-[#FAFAF9] text-[#A8A29E]")}>
                             <td className="p-3">
