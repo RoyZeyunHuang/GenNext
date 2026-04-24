@@ -1,4 +1,4 @@
-import { parseCityFromAddress } from "./resolve-area";
+import { getDisplayArea, parseCityFromAddress } from "./resolve-area";
 
 export type CompanyWithContacts = {
   id: string;
@@ -139,15 +139,27 @@ export type BatchPropertyForTemplate = {
   company_role?: string;
 };
 
-/** 从楼盘行提取 city：优先从地址解析，其次 DB city 字段 */
-function cityForRow(
-  r: Pick<BatchPropertyForTemplate, "address" | "city">
+/**
+ * 从楼盘行提取展示用小区 / neighborhood：zip/正则 → DB area → 地址里的 city 段 → DB city。
+ * 用于批量邮件选盘表格、{{neighborhood}} 等，与 getSubAreaForFilter 一致优先用邮编解析出的「小区名」。
+ */
+export function resolvePropertyNeighborhood(
+  r: Pick<BatchPropertyForTemplate, "address" | "city" | "area">
 ): string | null {
+  const d = getDisplayArea(r.address, r.area);
+  if (d !== "—") return d;
   return (
     parseCityFromAddress(r.address) ||
     (r.city ? String(r.city).trim() : null) ||
     null
   );
+}
+
+/** 选盘表格列展示 */
+export function neighborhoodTableCell(
+  r: Pick<BatchPropertyForTemplate, "address" | "city" | "area">
+): string {
+  return resolvePropertyNeighborhood(r) ?? "—";
 }
 
 /**
@@ -159,7 +171,7 @@ function collectTwoCities(uniq: BatchPropertyForTemplate[]): string[] {
   const seen = new Set<string>();
   for (const r of uniq) {
     if (out.length >= 2) break;
-    const c = cityForRow(r);
+    const c = resolvePropertyNeighborhood(r);
     if (!c) continue;
     const k = c.toLowerCase();
     if (seen.has(k)) continue;
@@ -206,7 +218,7 @@ export function buildDeveloperBatchTemplateVars(
   );
 
   const citiesTwo = collectTwoCities(uniq);
-  const neighborhood = joinEnglishAnd(citiesTwo) || cityForRow(primary!) || "the area";
+  const neighborhood = joinEnglishAnd(citiesTwo) || resolvePropertyNeighborhood(primary!) || "the area";
 
   return {
     company_name: companyMeta.company_name,
