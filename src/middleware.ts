@@ -8,7 +8,8 @@ export async function middleware(request: NextRequest) {
     pathname === "/rednote-factory/login" ||
     pathname === "/rednote-factory/reset-password" ||
     pathname === "/rednote-factory/pending" ||
-    pathname === "/rednote-factory/intro"
+    pathname === "/rednote-factory/intro" ||
+    pathname === "/ga4-test"
   ) {
     return NextResponse.next();
   }

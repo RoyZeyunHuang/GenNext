@@ -7,8 +7,9 @@ import { AIAssistant } from "@/components/AIAssistant";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isRednoteFactory = pathname?.startsWith("/rednote-factory") ?? false;
+  const isStandalone = pathname === "/ga4-test";
 
-  if (isRednoteFactory) {
+  if (isRednoteFactory || isStandalone) {
     return <>{children}</>;
   }
 
