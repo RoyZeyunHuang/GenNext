@@ -44,6 +44,7 @@ async function fetchEmailHistorySummaries(companyId: string, propertyId: string)
     .select("direction, subject, ai_summary, body, created_at")
     .eq("company_id", companyId)
     .eq("property_id", propertyId)
+    .not("status", "in", "(scheduled,sending,failed,cancelled)")
     .order("created_at", { ascending: false })
     .limit(6);
 

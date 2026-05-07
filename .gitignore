@@ -37,7 +37,9 @@ next-env.d.ts
 /archive/persona-rag/*.json
 
 # local agent / Supabase CLI caches (do not commit)
-.claude/
+# 例外:.claude/skills/ 是项目级 skill,要随 repo 走
+.claude/*
+!.claude/skills/
 supabase/.temp/
 
 # 含 API key / 敏感配置的内部文档（本地用，不上 git）

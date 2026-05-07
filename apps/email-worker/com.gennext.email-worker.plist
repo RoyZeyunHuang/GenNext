@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd 启动配置 - GenNext Email Campaign Worker
+
+  安装(install-launchd.sh 会自动替换路径占位符并安装):
+    ./apps/email-worker/install-launchd.sh
+
+  手动安装:
+    cp apps/email-worker/com.gennext.email-worker.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.gennext.email-worker.plist
+
+  日志查看:
+    tail -f /tmp/gennext-email-worker.log
+    tail -f /tmp/gennext-email-worker.err
+
+  停止/卸载:
+    launchctl unload -w ~/Library/LaunchAgents/com.gennext.email-worker.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gennext.email-worker</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE_PATH__</string>
+    <string>--env-file=__REPO_ROOT__/.env.local</string>
+    <string>__REPO_ROOT__/apps/email-worker/index.mjs</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__REPO_ROOT__</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+    <key>Crashed</key>
+    <true/>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/gennext-email-worker.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/gennext-email-worker.err</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>

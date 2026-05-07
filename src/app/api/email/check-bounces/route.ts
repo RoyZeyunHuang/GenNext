@@ -41,7 +41,7 @@ export async function POST() {
       .from("emails")
       .select("id, property_id, status")
       .eq("to_email", recipient)
-      .neq("status", "bounced")
+      .in("status", ["sent", "delivered", "opened"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

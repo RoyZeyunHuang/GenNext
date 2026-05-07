@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
       .from("emails")
       .select("property_id, status, created_at")
       .in("property_id", propertyIds)
-      .eq("direction", "sent");
+      .eq("direction", "sent")
+      .not("status", "in", "(scheduled,sending,failed,cancelled)");
 
     const best = new Map<string, { t: number; status: string }>();
     for (const er of emailRows ?? []) {

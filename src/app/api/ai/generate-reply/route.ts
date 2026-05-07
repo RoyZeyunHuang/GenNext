@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
       .from("emails")
       .select("direction, subject, body, ai_summary, created_at")
       .eq("company_id", companyId)
+      .not("status", "in", "(scheduled,sending,failed,cancelled)")
       .order("created_at", { ascending: false })
       .limit(6);
 
